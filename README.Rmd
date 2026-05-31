@@ -1,0 +1,38 @@
+---
+title: "thesis-mse"
+author: ""
+date: "`r Sys.Date()`"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+## Overview
+
+This repository is the report-focused companion for the MSc thesis work on
+tree-based decomposition of health inequalities. It contains Quarto reports,
+supporting R scripts, and rendered outputs that can be shared more easily when
+the project is made public.
+
+## Current Scope
+
+1. Maintain the report-writing and rendering workflow.
+2. Keep reusable R scripts that support report generation.
+3. Separate public-facing materials from local data objects and machine-
+   specific files.
+
+## Key Files
+
+- `Decomposition_of_CI_Trees_MM.qmd` for the main report document.
+- `Generate_DRC_Results_Objects.qmd` for generating report objects.
+- `R/` for supporting analysis and helper scripts.
+- `report/` for report materials.
+- `docs/` for reference documents used during writing.
+
+## Notes
+
+- This README is intentionally brief and can be expanded later.
+- Local data files and temporary build artifacts are excluded through
+  `.gitignore`.

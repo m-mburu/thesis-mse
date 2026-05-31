@@ -1,0 +1,988 @@
+---
+title: "Decomposition of Concentration-Index Trees"
+author: "Moses Mburu"
+format:
+  pdf:
+    documentclass: article
+    papersize: a4
+    fontsize: 11pt
+    geometry:
+      - margin=25mm
+    pdf-engine: xelatex
+    toc: false
+    number-sections: true
+    number-depth: 3
+    fig-cap-location: bottom
+    tbl-cap-location: top
+    colorlinks: false
+    fig-pos: "H"
+    tbl-pos: "H"
+    fig-dpi: 500
+execute:
+  echo: false
+  warning: false
+  message: false
+  fig-dpi: 500
+params:
+  render_appendix_tree_plots: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  fig.width = 10,
+  fig.height = 6,
+  dpi = 500,
+  dev = "png",
+  warning = FALSE,
+  message = FALSE
+)
+
+library(gridExtra)
+library(data.table)
+library(ggplot2)
+library(grid)
+library(knitr)
+library(ineqTrees)
+library(partykit)
+
+source(file.path("R", "report_helpers.R"))
+source(file.path("R", "ci_known_subgroup_demo.R"))
+source(file.path("R", "ci_rpart_comparison_methods.R"))
+
+if (!exists("params", inherits = FALSE)) {
+  params <- list(render_appendix_tree_plots = TRUE)
+}
+
+if (requireNamespace("kableExtra", quietly = TRUE)) {
+  kableExtra::use_latex_packages()
+}
+```
+
+```{r load-results, include=FALSE}
+results_object_file <- file.path("data", "drc_report_results_objects.rda")
+if (!file.exists(results_object_file)) {
+  stop(
+    "Missing ", results_object_file, ". Render Generate_DRC_Results_Objects.qmd first.",
+    call. = FALSE
+  )
+}
+
+load(results_object_file)
+
+congo_model_dt <- drc_results_objects$congo_model_dt
+congo_var_labels <- drc_results_objects$congo_var_labels
+congo_predictors <- drc_results_objects$congo_predictors
+congo_ci_formula <- drc_results_objects$congo_ci_formula
+outcome_labels <- drc_results_objects$outcome_labels %||% c(
+  alive = "Alive at age 5",
+  died = "Died before age 5"
+)
+selected_tree_type <- drc_results_objects$selected_tree_type
+selected_tree_fit <- drc_results_objects$selected_tree_fit
+tree_models_by_type <- drc_results_objects$tree_models_by_type
+lecturer_rpart_models <- drc_results_objects$lecturer_rpart_models
+known_subgroup_sim_dt <- drc_results_objects$known_subgroup_sim_dt
+known_subgroup_fit <- drc_results_objects$known_subgroup_fit
+
+format_variable_label <- function(x) {
+  predictor_names <- names(congo_var_labels)
+  vapply(x, function(value) {
+    if (is.na(value) || !nzchar(value)) {
+      return(NA_character_)
+    }
+    if (value %in% predictor_names) {
+      return(unname(congo_var_labels[value]))
+    }
+
+    hits <- predictor_names[value == predictor_names | startsWith(value, predictor_names)]
+    if (length(hits)) {
+      parent <- hits[which.max(nchar(hits))]
+      suffix <- trimws(sub(paste0("^", parent), "", value))
+      suffix <- gsub("^[:._]+", "", suffix)
+      if (nzchar(suffix)) {
+        return(paste0(unname(congo_var_labels[parent]), ": ", suffix))
+      }
+      return(unname(congo_var_labels[parent]))
+    }
+
+    value
+  }, character(1L))
+}
+
+make_importance_plot <- function(importance_dt, title, fill, top_n = 10L) {
+  importance_dt <- as.data.table(importance_dt)
+  if (!nrow(importance_dt) || !"importance" %in% names(importance_dt)) {
+    return(
+      ggplot() +
+        annotate("text", x = 0, y = 0, label = "Not available") +
+        labs(title = title) +
+        theme_void(base_size = 10)
+    )
+  }
+
+  importance_dt <- importance_dt[is.finite(importance) & importance != 0]
+  if (!nrow(importance_dt)) {
+    return(
+      ggplot() +
+        annotate("text", x = 0, y = 0, label = "No non-zero importance") +
+        labs(title = title) +
+        theme_void(base_size = 10)
+    )
+  }
+
+  importance_dt[, variable_label := format_variable_label(variable)]
+  setorder(importance_dt, -importance)
+  importance_dt <- head(importance_dt, top_n)
+  importance_dt[, variable_label := make.unique(variable_label)]
+  importance_dt[, variable_label := factor(variable_label, levels = rev(variable_label))]
+
+  ggplot(importance_dt, aes(x = importance, y = variable_label)) +
+    geom_col(fill = fill, width = 0.68) +
+    labs(title = title, x = "Importance", y = NULL) +
+    theme_minimal(base_size = 10) +
+    theme(
+      plot.title = element_text(face = "bold", size = 10),
+      panel.grid.minor = element_blank()
+    )
+}
+
+extract_surrogate_importance <- function(surrogate_object) {
+  if (is.null(surrogate_object) ||
+      !length(surrogate_object) ||
+      is.null(surrogate_object$fit$variable.importance)) {
+    return(data.table(variable = character(), importance = numeric()))
+  }
+
+  importance <- surrogate_object$fit$variable.importance
+  data.table(
+    variable = names(importance),
+    importance = as.numeric(importance)
+  )[order(-importance)]
+}
+```
+
+# 4. Results
+
+The results section reports only the objects needed to answer the main technical
+question: whether inequality-oriented recursive partitioning identifies
+subgroup structure that is visible, stable, and comparable with classical
+decomposition output. Full generated outputs are moved to the appendix.
+
+## 4.1 Exploratory Data Analysis
+
+```{r results-outcome-distribution, fig.width=6.5, fig.height=3}
+#| label: fig-results-outcome-distribution
+#| fig-cap: "Distribution of under-five mortality in the DRC analysis data."
+outcome_gg <- ggplot(
+    drc_results_objects$outcome_distribution,
+    aes(x = outcome_label, y = weighted_percent)
+) +
+    geom_col(fill = "#3268A8", width = 0.58) +
+    geom_text(aes(label = sprintf("%.1f%%", weighted_percent)),
+        vjust = -0.35, size = 3.3
+    ) +
+    labs(x = NULL, y = "Weighted percent") +
+    theme_minimal(base_size = 11) +
+    theme(panel.grid.minor = element_blank())
+
+
+```
+
+```{r results-wealth-distribution, fig.width=10.5, fig.height=4.5}
+#| label: fig-results-wealth-distribution
+#| fig-cap: "Under-five mortality distribution and DHS wealth index in the DRC analysis data."
+wealth_by_outcome_dt <- copy(congo_model_dt)
+wealth_by_outcome_dt[, outcome_label := fifelse(
+    deadu5_num == 1,
+    outcome_labels[["died"]],
+    outcome_labels[["alive"]]
+)]
+
+wealth_distr <- ggplot(
+    wealth_by_outcome_dt,
+    aes(x = wealth, weight = sample_weight)
+) +
+    geom_histogram(
+        bins = 35, fill = "#3268A8",
+        color = "white", linewidth = 0.2
+    ) +
+    # facet_wrap(~ outcome_label, ncol = 1, scales = "free_y") +
+    labs(x = "Wealth index", y = "Weighted count") +
+    theme_minimal(base_size = 11) +
+    theme(
+        panel.grid.minor = element_blank(),
+        strip.text = element_text(face = "bold")
+    )
+grid.arrange(outcome_gg, wealth_distr, ncol = 2)
+```
+
+
+
+## 4.2 Application of developed tree models to the DRC DHS Data
+
+### 4.2.1 Comparison of Indirect Decomposition Results
+
+Categorical predictors enter the regression decomposition as separate one-hot
+terms. The predictive ranger is fitted on the same design-matrix terms, so the
+comparison table reports categorical levels at the same granularity instead of
+collapsing them back to their parent variable.
+
+```{r results-method-comparison}
+#| label: tbl-results-method-comparison
+#| tbl-cap: "Regression and predictive-forest SHAP percentage contributions by criterion."
+method_comparison_report <- copy(drc_results_objects$method_comparison[
+    ,
+    .(
+        variable = variable_label,
+        regression_ci_pct_contribution,
+        regression_cig_pct_contribution,
+        regression_cic_pct_contribution,
+        forest_shap_ci_pct_contribution,
+        forest_shap_cig_pct_contribution,
+        forest_shap_cic_pct_contribution,
+        forest_shap_l_pct_contribution
+    )
+])
+
+setnames(
+    method_comparison_report,
+    c(
+        "variable",
+        "regression_ci_pct_contribution",
+        "regression_cig_pct_contribution",
+        "regression_cic_pct_contribution",
+        "forest_shap_ci_pct_contribution",
+        "forest_shap_cig_pct_contribution",
+        "forest_shap_cic_pct_contribution",
+        "forest_shap_l_pct_contribution"
+    ),
+    c(
+        "Variable",
+        "CI (%)",
+        "CIg (%)",
+        "CIc (%)",
+        "CI (%)",
+        "CIg (%)",
+        "CIc (%)",
+        "L (%)"
+    )
+)
+
+method_comparison_table <- report_compact_table(
+    method_comparison_report,
+    digits = 3,
+    align = c("l", rep("r", 7L)),
+    caption = "Regression and predictive-forest SHAP percentage contributions by criterion",
+    column_widths = c("3.4cm", rep("1.35cm", 7L))
+)
+
+
+method_comparison_table <- kableExtra::add_header_above(
+    method_comparison_table,
+    c(" " = 1, "Regression" = 3, "Predictive-forest SHAP" = 4),
+    bold = TRUE
+)
+
+
+method_comparison_table
+```
+
+### 4.2.2 Root-Node Inequality
+
+```{r results-root-ci}
+#| label: tbl-results-root-ci
+#| tbl-cap: "Root-node inequality in under-five mortality by concentration-index criterion."
+
+root_ci_report <- copy(drc_results_objects$root_ci)
+root_ci_report[, root_node := "Full sample"]
+root_ci_report <- dcast(
+  root_ci_report,
+  root_node ~ criterion,
+  value.var = "estimate"
+)
+setcolorder(root_ci_report, intersect(c("root_node", "CI", "CIg", "CIc", "L"), names(root_ci_report)))
+setnames(root_ci_report, "root_node", "Root node")
+
+report_compact_table(
+  root_ci_report,
+  digits = 4,
+  align = c("l", rep("r", ncol(root_ci_report) - 1L)),
+  caption = "Root-node inequality in under-five mortality by concentration-index criterion",
+  column_widths = c("3.2cm", rep("2cm", ncol(root_ci_report) - 1L))
+)
+```
+
+### 4.2.3 Selected Concentration-Index Tree
+
+```{r results-selected-tree, fig.width=14, fig.height=9}
+#| label: fig-results-selected-ci-tree
+#| fig-cap: "Selected concentration-index tree for under-five mortality in the DRC."
+#| fig-pos: "H"
+
+ci_report_tree_plot(
+  fit = selected_tree_fit,
+  data = congo_model_dt,
+  outcome_name = "deadu5_num",
+  outcome_label = "U5 death",
+  ci_type = selected_tree_type,
+  var_labels = congo_var_labels
+)
+```
+
+
+```{r results-selected-model-variable-importance, fig.width=12, fig.height=4.4}
+#| label: fig-results-selected-model-variable-importance
+#| fig-cap: "Variable importance for the selected concentration-index tree and forest."
+#| fig-pos: "H"
+
+selected_tree_importance <- copy(drc_results_objects$tree_variable_importance[
+  criterion == selected_tree_type
+])
+selected_forest_importance <- copy(drc_results_objects$forest_variable_importance[
+  criterion == selected_tree_type
+])
+
+tree_importance_plot <- make_importance_plot(
+  selected_tree_importance,
+  title = paste("Selected tree:", selected_tree_type),
+  fill = "#2F6F9F"
+)
+forest_importance_plot <- make_importance_plot(
+  selected_forest_importance,
+  title = paste("Selected forest:", selected_tree_type),
+  fill = "#4B7F52"
+)
+
+gridExtra::grid.arrange(tree_importance_plot, forest_importance_plot, ncol = 2)
+```
+
+### Surrogate Tree Comparison
+
+```{r results-surrogate-tree, fig.width=14, fig.height=8.5}
+#| label: fig-results-surrogate-tree
+#| fig-cap: "Surrogate tree summarising the selected concentration-index forest predictions."
+#| fig-pos: "H"
+
+selected_forest_surrogate <- drc_results_objects$selected_forest_surrogate
+
+if (is.null(selected_forest_surrogate) || !length(selected_forest_surrogate)) {
+  ggplot() +
+    annotate("text", x = 0, y = 0, label = "Run Generate_DRC_Results_Objects.qmd with run_forest: true") +
+    theme_void(base_size = 11)
+} else {
+  ci_report_tree_plot(
+    fit = selected_forest_surrogate$fit,
+    data = selected_forest_surrogate$data,
+    outcome_name = selected_forest_surrogate$prediction_name,
+    outcome_label = "Forest predicted U5 death",
+    ci_type = selected_tree_type,
+    var_labels = congo_var_labels,
+    fontsize = 10
+  )
+}
+```
+
+```{r results-surrogate-variable-importance, fig.width=7.2, fig.height=4.2}
+#| label: fig-results-surrogate-variable-importance
+#| fig-cap: "Variable importance for the surrogate tree of the selected concentration-index forest."
+#| fig-pos: "H"
+
+surrogate_importance <- extract_surrogate_importance(
+  drc_results_objects$selected_forest_surrogate
+)
+
+make_importance_plot(
+  surrogate_importance,
+  title = paste("Surrogate tree:", selected_tree_type),
+  fill = "#8B5A2B"
+)
+```
+
+## 4.3 Simulation Study
+
+### 4.3.1 Recovery of the Simulated Subgroup Structure
+
+```{r results-simulation-validation}
+#| label: tbl-results-simulation-validation
+#| tbl-cap: "Positive-control validation of recovery of the planted subgroup."
+
+report_compact_table(
+  drc_results_objects$simulation_validation,
+  caption = "Positive-control validation of recovery of the planted subgroup"
+)
+```
+
+```{r results-simulation-tree, fig.width=13, fig.height=8}
+#| label: fig-results-simulation-tree
+#| fig-cap: "Tree recovered from simulated data with a known subgroup-generating mechanism."
+
+plot_known_subgroup_tree(
+  fit = known_subgroup_fit,
+  data = known_subgroup_sim_dt,
+  type = selected_tree_type
+)
+```
+
+# Appendix
+
+## Results
+
+### Appendix R1: Exploratory Data Outputs
+
+```{r appendix-weighted-baseline-table}
+#| label: tbl-appendix-weighted-baseline
+#| tbl-cap: "Weighted distribution of analysis variables by under-five mortality status."
+
+if (!requireNamespace("table1", quietly = TRUE)) {
+  stop("Install table1 to render the weighted appendix baseline table.", call. = FALSE)
+}
+
+baseline_dt <- copy(as.data.table(drc_results_objects$raw_congo_model_dt))
+baseline_labels <- drc_results_objects$raw_congo_var_labels
+baseline_vars <- setdiff(drc_results_objects$raw_congo_predictors, "reg")
+baseline_dt[, u5_mortality := factor(
+  fifelse(deadu5_num == 1, outcome_labels[["died"]], outcome_labels[["alive"]]),
+  levels = c(outcome_labels[["alive"]], outcome_labels[["died"]])
+)]
+
+baseline_table_df <- as.data.frame(baseline_dt[, c(baseline_vars, "u5_mortality"), with = FALSE])
+for (variable in baseline_vars) {
+  table1::label(baseline_table_df[[variable]]) <- unname(baseline_labels[variable])
+}
+
+baseline_weights <- baseline_dt$sample_weight
+render_weighted_categorical <- function(x, ...) {
+  row_index <- table1:::indices.indexed(x)
+  if (is.null(row_index)) {
+    row_index <- seq_along(x)
+  }
+
+  keep <- !is.na(x)
+  x_keep <- x[keep]
+  w_keep <- baseline_weights[row_index][keep]
+  levels_keep <- if (is.factor(x)) levels(x) else sort(unique(as.character(x_keep)))
+
+  out <- vapply(levels_keep, function(level) {
+    weighted_n <- sum(w_keep[as.character(x_keep) == level], na.rm = TRUE)
+    weighted_denominator <- sum(w_keep, na.rm = TRUE)
+    weighted_percent <- if (weighted_denominator > 0) {
+      100 * weighted_n / weighted_denominator
+    } else {
+      NA_real_
+    }
+    sprintf(
+      "%s (%.1f%%)",
+      format(round(weighted_n, 1), big.mark = ",", scientific = FALSE),
+      weighted_percent
+    )
+  }, character(1L))
+  names(out) <- levels_keep
+  c(" " = "", out)
+}
+
+render_weighted_strata <- function(strata, ...) {
+  out <- vapply(seq_along(strata), function(i) {
+    row_index <- table1:::indices.indexed(strata[[i]])
+    weighted_n <- sum(baseline_weights[row_index], na.rm = TRUE)
+    sprintf(
+      "%s\n(weighted N=%s)",
+      names(strata)[i],
+      format(round(weighted_n), big.mark = ",", scientific = FALSE)
+    )
+  }, character(1L))
+  names(out) <- out
+  out
+}
+
+baseline_formula <- as.formula(
+  paste("~", paste(baseline_vars, collapse = " + "), "| u5_mortality")
+)
+baseline_table1 <- table1::table1(
+  baseline_formula,
+  data = table1::indexed(baseline_table_df),
+  overall = "Overall",
+  rowlabelhead = "Variable",
+  render.categorical = render_weighted_categorical,
+  render.strat = render_weighted_strata
+)
+baseline_table_out <- as.data.frame(baseline_table1)
+names(baseline_table_out) <- c(
+  "Variable",
+  outcome_labels[["alive"]],
+  outcome_labels[["died"]],
+  "Overall"
+)
+
+baseline_table_kable <- report_compact_table(
+  baseline_table_out,
+  caption = "Weighted distribution of analysis variables by under-five mortality status",
+  align = c("l", "r", "r", "r"),
+  column_widths = c("4.5cm", rep("3.1cm", 3L)),
+  escape = TRUE,
+  bold_header = FALSE
+)
+
+if (requireNamespace("kableExtra", quietly = TRUE)) {
+  baseline_table_kable <- kableExtra::add_header_above(
+    baseline_table_kable,
+    c(" " = 1, "Under-five mortality" = 2, "Overall" = 1),
+    bold = TRUE
+  )
+  baseline_table_kable <- kableExtra::row_spec(baseline_table_kable, 0, bold = TRUE)
+}
+
+baseline_table_kable
+```
+
+```{r appendix-province-mortality-distribution, fig.width=9.2, fig.height=6.2}
+#| label: fig-appendix-province-mortality-distribution
+#| fig-cap: "Weighted province distribution by under-five mortality status."
+
+province_plot_dt <- copy(as.data.table(drc_results_objects$raw_congo_model_dt))
+province_plot_dt[, u5_mortality := fifelse(
+  deadu5_num == 1,
+  outcome_labels[["died"]],
+  outcome_labels[["alive"]]
+)]
+province_plot_dt <- province_plot_dt[
+  ,
+  .(weighted_n = sum(sample_weight, na.rm = TRUE)),
+  by = .(reg, u5_mortality)
+]
+province_plot_dt[
+  ,
+  weighted_percent := 100 * weighted_n / sum(weighted_n),
+  by = reg
+]
+province_order <- province_plot_dt[
+  u5_mortality == outcome_labels[["died"]]
+][
+  order(-weighted_percent)
+]$reg
+province_plot_dt[, reg := factor(reg, levels = province_order)]
+
+ggplot(
+  province_plot_dt,
+  aes(x = reg, y = weighted_percent, fill = u5_mortality)
+) +
+  geom_col(width = 0.72) +
+  coord_flip() +
+  scale_fill_manual(
+    values = setNames(c("#3268A8", "#B94E48"), c(outcome_labels[["alive"]], outcome_labels[["died"]]))
+  ) +
+  labs(x = NULL, y = "Weighted percent within province", fill = NULL) +
+  theme_minimal(base_size = 11) +
+  theme(
+    panel.grid.minor = element_blank(),
+    legend.position = "top"
+  )
+```
+
+### Appendix R2: Regression and Predictive-Forest Details
+
+```{r appendix-regression-model-summary}
+#| label: tbl-appendix-regression-model-summary
+#| tbl-cap: "Survey-weighted regression model summary."
+
+regression_summary_out <- copy(drc_results_objects$regression_model_summary)
+if (!nrow(regression_summary_out) || "note" %in% names(regression_summary_out)) {
+  regression_summary_out <- data.table(
+    note = "Run Generate_DRC_Results_Objects.qmd after installing broom."
+  )
+} else {
+  regression_summary_out <- regression_summary_out[
+    ,
+    .(
+      term = term_label,
+      estimate,
+      std_error = std.error,
+      statistic,
+      p_value = format.pval(p.value, digits = 3, eps = 0.001),
+      conf_low = conf.low,
+      conf_high = conf.high
+    )
+  ]
+  setnames(
+    regression_summary_out,
+    c("term", "estimate", "std_error", "statistic", "p_value", "conf_low", "conf_high"),
+    c("Term", "Estimate", "Std. error", "Statistic", "p-value", "Conf. low", "Conf. high")
+  )
+}
+
+report_compact_table(
+  regression_summary_out,
+  digits = 3,
+  caption = "Survey-weighted regression model summary",
+  column_widths = c("4.5cm", rep(NA_character_, 6L))
+)
+```
+
+```{r appendix-ranger-cross-validation}
+#| label: tbl-appendix-ranger-cross-validation
+#| tbl-cap: "Cross-validation results for the predictive ranger model."
+
+ranger_cv_out <- copy(drc_results_objects$predictive_forest_tuning)
+if (!nrow(ranger_cv_out)) {
+  ranger_cv_out <- data.table(
+    note = "Run Generate_DRC_Results_Objects.qmd with run_shap: true to tune the predictive ranger."
+  )
+} else {
+  ranger_cv_out[
+    ,
+    rank := if (.BY$.metric == "mn_log_loss") {
+      frank(mean, ties.method = "first")
+    } else {
+      frank(-mean, ties.method = "first")
+    },
+    by = .metric
+  ]
+  ranger_cv_out <- ranger_cv_out[
+    order(.metric, rank),
+    .(
+      metric = .metric,
+      mtry,
+      min_n,
+      mean,
+      std_error = std_err,
+      folds = n,
+      rank
+    )
+  ]
+  setnames(
+    ranger_cv_out,
+    c("metric", "mtry", "min_n", "mean", "std_error", "folds", "rank"),
+    c("Metric", "mtry", "min_n", "Mean", "Std. error", "Folds", "Rank")
+  )
+}
+
+report_compact_table(
+  ranger_cv_out,
+  digits = 4,
+  caption = "Cross-validation results for the predictive ranger model",
+  column_widths = c("2.4cm", rep(NA_character_, 6L))
+)
+```
+
+```{r appendix-shap-summary-plot, fig.width=8.2, fig.height=5.8}
+#| label: fig-appendix-shap-summary
+#| fig-cap: "SHAP summary plot for the predictive ranger model."
+
+shap_plot_dt <- copy(as.data.table(drc_results_objects$shap_summary_long))
+if (!nrow(shap_plot_dt)) {
+  ggplot() +
+    annotate(
+      "text",
+      x = 0,
+      y = 0,
+      label = "Run Generate_DRC_Results_Objects.qmd with run_shap: true to compute SHAP values."
+    ) +
+    theme_void(base_size = 11)
+} else {
+  top_shap_features <- shap_plot_dt[
+    ,
+    .(mean_abs_shap = mean(abs(shap_value), na.rm = TRUE)),
+    by = .(feature, feature_label)
+  ][
+    order(-mean_abs_shap)
+  ][
+    seq_len(min(.N, 12L))
+  ]
+  shap_plot_dt <- shap_plot_dt[feature %in% top_shap_features$feature]
+  shap_plot_dt <- merge(
+    shap_plot_dt,
+    top_shap_features[, .(feature, feature_label, mean_abs_shap)],
+    by = c("feature", "feature_label"),
+    all.x = TRUE,
+    sort = FALSE
+  )
+  top_shap_features[
+    ,
+    feature_axis_label := sprintf("%s", feature_label)
+  ]
+  shap_plot_dt <- merge(
+    shap_plot_dt,
+    top_shap_features[, .(feature, feature_axis_label)],
+    by = "feature",
+    all.x = TRUE,
+    sort = FALSE
+  )
+  shap_plot_dt[
+    ,
+    feature_axis_label := factor(
+      feature_axis_label,
+      levels = rev(top_shap_features$feature_axis_label)
+    )
+  ]
+
+  ggplot(
+    shap_plot_dt,
+    aes(x = shap_value, y = feature_axis_label, color = feature_value_scaled)
+  ) +
+    geom_vline(xintercept = 0, color = "black", linewidth = 0.35) +
+    geom_point(
+      position = position_jitter(width = 0, height = 0.18),
+      size = 1.25,
+      alpha = 0.75
+    ) +
+    scale_color_gradient(
+      name = "Feature value",
+      low = "#FDBE3B",
+      high = "#6A00C2",
+      breaks = c(0, 1),
+      labels = c("Low", "High")
+    ) +
+    labs(x = "SHAP value (impact on model output)", y = NULL) +
+    theme_minimal(base_size = 11) +
+    theme(
+      panel.grid.minor = element_blank(),
+      legend.position = "bottom",
+      legend.title = element_text(size = 9),
+      legend.text = element_text(size = 8)
+    )
+}
+```
+
+### Appendix R3: Concentration-Index Tree Details
+
+```{r appendix-tree-selection}
+#| label: tbl-appendix-tree-selection
+#| tbl-cap: "Selection metrics for fitted concentration-index trees."
+
+tree_selection_out <- copy(drc_results_objects$tree_selection)
+tree_selection_out <- tree_selection_out[
+  ,
+  .(
+    criterion = type,
+    root_objective = mean_root_objective,
+    train_gain = mean_train_gain,
+    train_relative_gain = mean_train_relative_gain,
+    validation_relative_gain = mean_validation_relative_gain,
+    terminal_nodes
+  )
+]
+setnames(
+  tree_selection_out,
+  c(
+    "criterion",
+    "root_objective",
+    "train_gain",
+    "train_relative_gain",
+    "validation_relative_gain",
+    "terminal_nodes"
+  ),
+  c(
+    "Criterion",
+    "Root objective",
+    "Train gain",
+    "Train gain/root",
+    "Validation gain/root",
+    "Terminal nodes"
+  )
+)
+
+report_compact_table(
+  tree_selection_out,
+  digits = 4,
+  caption = "Selection metrics for fitted concentration-index trees",
+  column_widths = c("1.6cm", rep("2cm", 5L))
+)
+```
+
+```{r appendix-ci-tree-ci, fig.width=7.2, fig.height=5.0}
+#| label: fig-appendix-ci-tree-ci
+#| fig-cap: "Concentration-index tree fitted with the CI criterion."
+#| fig-pos: "H"
+
+if (isTRUE(params$render_appendix_tree_plots) && "CI" %in% names(tree_models_by_type)) {
+  ci_report_tree_plot(
+    fit = tree_models_by_type[["CI"]],
+    data = congo_model_dt,
+    outcome_name = "deadu5_num",
+    outcome_label = "U5 death",
+    ci_type = "CI",
+    var_labels = congo_var_labels,
+    fontsize = 5.8
+  )
+}
+```
+
+```{r appendix-ci-tree-cig, fig.width=7.2, fig.height=5.0}
+#| label: fig-appendix-ci-tree-cig
+#| fig-cap: "Concentration-index tree fitted with the CIg criterion."
+#| fig-pos: "H"
+
+if (isTRUE(params$render_appendix_tree_plots) && "CIg" %in% names(tree_models_by_type)) {
+  ci_report_tree_plot(
+    fit = tree_models_by_type[["CIg"]],
+    data = congo_model_dt,
+    outcome_name = "deadu5_num",
+    outcome_label = "U5 death",
+    ci_type = "CIg",
+    var_labels = congo_var_labels,
+    fontsize = 5.8
+  )
+}
+```
+
+```{r appendix-ci-tree-cic, fig.width=7.2, fig.height=5.0}
+#| label: fig-appendix-ci-tree-cic
+#| fig-cap: "Concentration-index tree fitted with the CIc criterion."
+#| fig-pos: "H"
+
+if (isTRUE(params$render_appendix_tree_plots) && "CIc" %in% names(tree_models_by_type)) {
+  ci_report_tree_plot(
+    fit = tree_models_by_type[["CIc"]],
+    data = congo_model_dt,
+    outcome_name = "deadu5_num",
+    outcome_label = "U5 death",
+    ci_type = "CIc",
+    var_labels = congo_var_labels,
+    fontsize = 5.8
+  )
+}
+```
+
+```{r appendix-ci-tree-l, fig.width=7.2, fig.height=5.0}
+#| label: fig-appendix-ci-tree-l
+#| fig-cap: "Concentration-index tree fitted with the L criterion."
+#| fig-pos: "H"
+
+if (isTRUE(params$render_appendix_tree_plots) && "L" %in% names(tree_models_by_type)) {
+  ci_report_tree_plot(
+    fit = tree_models_by_type[["L"]],
+    data = congo_model_dt,
+    outcome_name = "deadu5_num",
+    outcome_label = "U5 death",
+    ci_type = "L",
+    var_labels = congo_var_labels,
+    fontsize = 5.8
+  )
+}
+```
+
+### Appendix R4: Concentration-Index Forest Details
+
+```{r appendix-forest-selection}
+#| label: tbl-appendix-forest-selection
+#| tbl-cap: "Selection metrics for fitted concentration-index forests."
+
+forest_selection_out <- copy(drc_results_objects$forest_selection)
+if (is.null(forest_selection_out) || !nrow(forest_selection_out)) {
+  forest_selection_out <- data.table(
+    note = "Run Generate_DRC_Results_Objects.qmd with RUN_FOREST=true"
+  )
+} else {
+  forest_selection_out <- forest_selection_out[
+    ,
+    .(
+      criterion = type,
+      trees = ntree,
+      mtry,
+      root_objective = mean_root_objective,
+      train_gain = mean_train_gain,
+      train_relative_gain = mean_train_relative_gain,
+      validation_relative_gain = mean_validation_relative_gain,
+      mean_terminal_nodes,
+      mean_max_depth
+    )
+  ]
+  setnames(
+    forest_selection_out,
+    c(
+      "criterion",
+      "trees",
+      "mtry",
+      "root_objective",
+      "train_gain",
+      "train_relative_gain",
+      "validation_relative_gain",
+      "mean_terminal_nodes",
+      "mean_max_depth"
+    ),
+    c(
+      "Criterion",
+      "Trees",
+      "mtry",
+      "Root objective",
+      "Train gain",
+      "Train gain/root",
+      "Validation gain/root",
+      "Mean terminal nodes",
+      "Mean max depth"
+    )
+  )
+}
+
+report_compact_table(
+  forest_selection_out,
+  digits = 4,
+  caption = "Selection metrics for fitted concentration-index forests"
+)
+```
+
+```{r appendix-forest-variable-importance}
+#| label: tbl-appendix-forest-variable-importance
+#| tbl-cap: "Forest variable importance by concentration-index criterion."
+
+forest_importance_out <- copy(drc_results_objects$forest_variable_importance)
+if (!nrow(forest_importance_out)) {
+  forest_importance_out <- data.table(
+    note = "Run Generate_DRC_Results_Objects.qmd with run_forest: true"
+  )
+} else {
+  forest_importance_out[, variable_label := format_variable_label(variable)]
+  forest_importance_out <- forest_importance_out[
+    ,
+    .(criterion, rank, variable = variable_label, importance)
+  ]
+}
+
+report_compact_table(
+  forest_importance_out,
+  digits = 4,
+  caption = "Forest variable importance by concentration-index criterion"
+)
+```
+
+```{r appendix-surrogate-variable-importance}
+#| label: tbl-appendix-surrogate-variable-importance
+#| tbl-cap: "Surrogate-tree variable importance for the selected concentration-index forest."
+
+surrogate_importance_out <- extract_surrogate_importance(
+  drc_results_objects$selected_forest_surrogate
+)
+if (!nrow(surrogate_importance_out)) {
+  surrogate_importance_out <- data.table(
+    note = "Run Generate_DRC_Results_Objects.qmd with RUN_FOREST=true"
+  )
+} else {
+  surrogate_importance_out[, variable_label := format_variable_label(variable)]
+  surrogate_importance_out[
+    ,
+    rank := seq_len(.N)
+  ]
+  surrogate_importance_out <- surrogate_importance_out[
+    ,
+    .(rank, variable = variable_label, importance)
+  ]
+}
+
+report_compact_table(
+  surrogate_importance_out,
+  digits = 4,
+  caption = "Surrogate-tree variable importance for the selected concentration-index forest"
+)
+```
+
+### Appendix R5: Implementation Status
+
+Implemented in the report: selected concentration-index tree and selected
+forest/surrogate-tree variable-importance plots in the results section; tree
+selection metrics, forest training-screen metrics, ranger cross-validation,
+SHAP summary plot, forest variable importance, and surrogate-tree variable
+importance in the appendix.
+
+To implement for the final analysis run: rerun the generator with `RUN_CV=true`
+to populate cross-validated tree validation columns, and run forest tuning if
+cross-validated concentration-index forest validation metrics are needed rather
+than the current fixed-control training-screen metrics.

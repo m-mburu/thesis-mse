@@ -1,0 +1,77 @@
+# History files
+.Rhistory
+.Rapp.history
+
+# Session data files
+.RData
+.RDataTmp
+
+# User-specific files
+.Ruserdata
+
+# Example code in package build process
+*-Ex.R
+
+# Output files from R CMD build
+/*.tar.gz
+
+# Output files from R CMD check
+/*.Rcheck/
+
+# RStudio files
+.Rproj.user/
+
+# Produced vignettes
+vignettes/*.html
+vignettes/*.pdf
+
+# OAuth2 token
+.httr-oauth
+
+# knitr and Quarto cache directories
+*_cache/
+/cache/
+.quarto/
+
+# Temporary files created by R Markdown
+*.utf8.md
+*.knit.md
+*.rmarkdown
+
+# R environment variables
+.Renviron
+
+# Translation temp files
+po/*~
+
+# RStudio Connect folder
+rsconnect/
+
+# Data files that should not be committed
+data/*.csv
+data/*.xlsx
+data/*.rds
+data/*.RData
+data/*.rda
+data/*.dta
+data/*.sav
+data/downloaded/
+
+# Local config
+R/cookies_local.R
+.positai
+
+# Office temporary lock files
+~$*
+
+# Local render byproducts
+Rplots.pdf
+/*.aux
+/*.log
+/*.out
+/*.tex
+/*.toc
+
+# Local reference documents
+Masterthesis-Guidelinesstudents2025-2026.pdf
+docs/awesome_table_in_pdf.pdf

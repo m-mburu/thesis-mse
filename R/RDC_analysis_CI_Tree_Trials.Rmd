@@ -1,0 +1,1401 @@
+---
+title: "Analysis RDC data"
+author: "Niko Speybroeck"
+date: "2025-09-14"
+output:
+  html_document:
+    theme: journal
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+library(openxlsx)
+library(tableone)
+library(dplyr)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+
+## RDC Analysis (Congo Example)
+
+```{r}
+
+remove(list=ls())	# remove any existing list or vector
+library(foreign)	# necessary to import the Stata file
+
+all <- readRDS("01_DATA/RDC_DHS_2007.rds")
+
+# to have children <5 only (same as taking the file "Children's Recode") 
+all$agech<-all$v008-all$b3	
+all<-subset(all, agech<60)
+
+############################################################## define variables and categories
+
+# rename variables
+
+library(reshape)
+
+# Respondent's basic data
+all <- rename(all,c(v000="countrycode"))		# e.g. CD5 = Congo Democratic Republic
+all <- rename(all,c(v001="cluster"))		# sample point
+all <- rename(all,c(v002="household"))		# household number
+all <- rename(all,c(v003="mother"))			# number in the household
+all <- rename(all,c(v005="weight"))			# sample weight + 6 decimals
+all <- rename(all,c(v007="studyyear"))		# year of interviw
+all <- rename(all,c(v008="dateinterview"))	# date of interview (century month code)
+# used to calculate intervals between events. CMC = (Year?1900)*12 + Month 
+all <- rename(all,c(v011="datebirthmother"))	# date of birth (CMC)
+all <- rename(all,c(v021="PSU"))			# primary sampling unit (~cluster)
+all <- rename(all,c(v101="region"))			# region of residence
+all <- rename(all,c(v102="typeresidence"))	# type of place of residence (urban/rural)	
+all <- rename(all,c(v130="religion"))		# country-specific
+all <- rename(all,c(v131="ethnicity"))		# country-specific
+all <- rename(all,c(v133="educyears"))		# education in single years
+all <- rename(all,c(v134="placeresidence"))	# large cities/small cities/towns/countryside
+all <- rename(all,c(v149="educlevel"))		# educational achievement
+all <- rename(all,c(v190="quintile"))		# wealth quintiles
+all <- rename(all,c(v191="wealth"))			# wealth index factor score + 5 decimals
+
+# Reproduction: each respondent's child (up to 20) ordered in reverse order such as the 
+# last birth is given first 
+all <- rename(all,c(b3="datebirthchild"))		# date of birth (CMC)
+all <- rename(all,c(b4="sex"))			# sex
+all <- rename(all,c(b5="alive"))			# child alive or not at the time of interview
+all <- rename(all,c(b7="agedeath"))			# age at death of the child in completed months
+all <- rename(all,c(b11="birthinterval"))		# preceding birth interval (except first birth)
+
+# Maternity: relate to births in the three/five years preceding interview
+all <- rename(all,c(m2a="ancdoctor"))		# prenatal care (anc) by a doctor
+all <- rename(all,c(m2b="ancnurse"))		# prenatal care by a nurse or midwife
+all <- rename(all,c(m3a="doctor"))			# delivery assisted with a doctor
+all <- rename(all,c(m3b="nurse"))			# delivery assisted with a nurse or midwife
+all <- rename(all,c(m5="breastfeeding"))		# duration of breastfeeding in months
+all <- rename(all,c(m14="ancvisits"))		# number of anc visits during pregnancy
+all <- rename(all,c(m19="birthweight"))		# weight of child at birth in kg + 3 decimals 
+all <- rename(all,c(h9="measles"))			# received measles vaccination
+all <- rename(all,c(hw3="height"))			# height in cm + 1 decimal
+all <- rename(all,c(hw70="zscore"))			# height-for-age standard deviation (WHO) 
+# + 2 decimals
+
+# Other health issues
+all <- rename(all,c(v481="insurance"))		# covered by health insurance
+
+# Marriage of the respondent
+all <- rename(all,c(v501="maritalstatus"))	# current marital status 
+all <- rename(all,c(v502="marriedcurrent"))	# currently, formerly, or never married
+all <- rename(all,c(v504="livewithpartner"))	# the partner lives in the household 
+
+# Partner's characteristics (ever-married women) and woman's work
+all <- rename(all,c(v704="pemployed"))		# current/last partner's most recent occupation
+all <- rename(all,c(v705="poccup"))			# standardised partner's occupation groups
+all <- rename(all,c(v715="peducyears"))		# most recent partner's education in years
+all <- rename(all,c(v717="moccup"))			# standardised respondent's occupation groups
+# women who are currently working or who have worked in the last 12 months
+all <- rename(all,c(v729="peduclevel"))		# educational achievement of the partner
+all <- rename(all,c(v731="employed"))		# the respondent worked in the last 12 months
+
+#################################################################### preparation of variables
+
+# define variables' categories and calculate indicators
+# "a,b,c,d..." are added before some categories to order it and specify the reference for 
+# the regression analysis 
+
+# sampling weights must be divided by 1000000 (6 decimals) 
+all$weight<-all$weight/1000000 
+
+# Wealth and quintiles
+# wealth must be divided by 100000 (5 decimals) 
+all$wealth<-all$wealth/100000 
+all$quint<-NULL
+all$quint[all$quintile==1]<-"b low"
+all$quint[all$quintile==2]<-"b low"
+all$quint[all$quintile==3]<-"a high"
+all$quint[all$quintile==4]<-"a high"
+all$quint[all$quintile==5]<-"a high"
+
+# Country, regions and type of residence
+all$country<-as.factor(all$countrycode)
+all$countryc<-as.numeric(all$country)
+all$country<-NULL
+all$country[all$countryc==1]<-"DRCongo"
+
+all$country<-as.factor(all$country)
+all$region[all$country=="DRCongo"&all$region==10]<-1
+all$region[all$country=="DRCongo"&all$region==20]<-2
+all$region[all$country=="DRCongo"&all$region==30]<-3
+all$region[all$country=="DRCongo"&all$region==40]<-4
+all$region[all$country=="DRCongo"&all$region==50]<-5
+all$region[all$country=="DRCongo"&all$region==61]<-6
+all$region[all$country=="DRCongo"&all$region==62]<-7
+all$region[all$country=="DRCongo"&all$region==63]<-8
+all$region[all$country=="DRCongo"&all$region==70]<-9
+all$region[all$country=="DRCongo"&all$region==80]<-10
+all$region[all$country=="DRCongo"&all$region==90]<-11
+
+all$rural<-NULL
+all$rural[all$typeresidence==1]<-0
+all$rural[all$typeresidence==2]<-1
+
+all$region<-as.numeric(all$region)
+all$reg<-NULL
+all$reg[all$country=="DRCongo"&all$region==1]<-"Kinshasa"
+all$reg[all$country=="DRCongo"&all$region==2]<-"Bas-Congo"
+all$reg[all$country=="DRCongo"&all$region==3]<-"Bandundu"
+all$reg[all$country=="DRCongo"&all$region==4]<-"Equateur"
+all$reg[all$country=="DRCongo"&all$region==5]<-"Orientale"
+all$reg[all$country=="DRCongo"&all$region==6]<-"Nord-Kivu"
+all$reg[all$country=="DRCongo"&all$region==7]<-"Maniema"
+all$reg[all$country=="DRCongo"&all$region==8]<-"Sud-Kivu"
+all$reg[all$country=="DRCongo"&all$region==9]<-"Katanga"
+all$reg[all$country=="DRCongo"&all$region==10]<-"Kasai Oriental"
+all$reg[all$country=="DRCongo"&all$region==11]<-"Kasai Occidental"
+
+# Parent's education and occupation
+all$educlev<-NULL
+all$educlev[all$educlevel==0]<- "f no education"
+all$educlev[all$educlevel==1]<- "e inc.primary"
+all$educlev[all$educlevel==2]<- "d primary"
+all$educlev[all$educlevel==3]<- "c inc.secondary"
+all$educlev[all$educlevel==4]<- "b secondary"
+all$educlev[all$educlevel==5]<- "a higher"
+all$educlev[all$educlevel==8]<- NA
+all$educlev[all$educlevel==9]<- NA
+all$ed<-NULL
+all$ed[all$educlevel==0]<- "b no education"
+all$ed[all$educlevel==1]<- "b no education"
+all$ed[all$educlevel==2]<- "a education"
+all$ed[all$educlevel==3]<- "a education"
+all$ed[all$educlevel==4]<- "a education"
+all$ed[all$educlevel==5]<- "a education"
+all$ed[all$educlevel==8]<- NA
+all$ed[all$educlevel==9]<- NA
+all$peduclev<-NULL
+all$peduclev[all$peduclevel==0]<- "f no education"
+all$peduclev[all$peduclevel==1]<- "e inc.primary"
+all$peduclev[all$peduclevel==2]<- "d primary"
+all$peduclev[all$peduclevel==3]<- "c inc.secondary"
+all$peduclev[all$peduclevel==4]<- "b secondary"
+all$peduclev[all$peduclevel==5]<- "a higher"
+all$peduclev[all$peduclevel==8]<- NA
+all$peduclev[all$peduclevel==9]<- NA
+all$ped<-NULL
+all$ped[all$peduclevel==0]<- "b no education"
+all$ped[all$peduclevel==1]<- "b no education"
+all$ped[all$peduclevel==2]<- "a education"
+all$ped[all$peduclevel==3]<- "a education"
+all$ped[all$peduclevel==4]<- "a education"
+all$ped[all$peduclevel==5]<- "a education"
+all$ped[all$peduclevel==8]<- NA
+all$ped[all$peduclevel==9]<- NA
+all$educyears[all$educyears>90]<-NA
+all$peducyears[all$peducyears>90]<-NA
+all$moccup[all$employed==0]<-0
+all$mocc<-NULL
+all$mocc[all$moccup==0]<-"c Household, unskilled manual, not working"
+all$mocc[all$moccup==1]<-"a other"
+all$mocc[all$moccup==2]<-"a other"
+all$mocc[all$moccup==3]<-"a other"
+all$mocc[all$moccup==4|all$moccup==5|all$moccup==10]<-"d Agriculture"
+all$mocc[all$moccup==6]<-"c Household, unskilled manual, not working"
+all$mocc[all$moccup==7]<-"a other"
+all$mocc[all$moccup==8]<-"a other"
+all$mocc[all$moccup==9]<-"c Household, unskilled manual, not working"
+all$mocc[all$moccup==96]<-"a other"
+all$mocc[all$moccup==97]<-"c Household, unskilled manual, not working"
+all$mocc[all$moccup>=98]<-NA
+all$poccup[all$pemployed==0]<-0
+all$pocc<-NULL
+all$pocc[all$poccup==0]<-"c Household, unskilled manual, not working"
+all$pocc[all$poccup==1]<-"a other"
+all$pocc[all$poccup==2]<-"a other"
+all$pocc[all$poccup==3]<-"a other"
+all$pocc[all$poccup==4|all$poccup==5|all$poccup==10]<-"d Agriculture"
+all$pocc[all$poccup==6]<-"c Household, unskilled manual, not working"
+all$pocc[all$poccup==7]<-"a other"
+all$pocc[all$poccup==8]<-"a other"
+all$pocc[all$poccup==9]<-"c Household, unskilled manual, not working"
+all$pocc[all$poccup==96]<-"a other"
+all$pocc[all$poccup==97]<-"c Household, unskilled manual, not working"
+all$pocc[all$poccup>=98]<-NA
+
+# mother's age and marital status
+all$agemother<-NULL
+all$agemother<-(all$datebirthchild-all$datebirthmother)/15
+all$agemother<-as.integer(all$agemother)
+all$agemoth<-NULL
+all$agemoth[all$agemother<20]<-"less than 20"
+all$agemoth[all$agemother>=20]<-"a20 or more"
+all$agemoth<-as.factor(all$agemoth)
+all$maritalstatus[all$maritalstatus==0]<-"never married"
+all$maritalstatus[all$maritalstatus==1]<-"married"
+all$maritalstatus[all$maritalstatus==2]<-"living together"
+all$maritalstatus[all$maritalstatus==3]<-"widowed"
+all$maritalstatus[all$maritalstatus==4]<-"divorced"
+all$maritalstatus[all$maritalstatus==5]<-"not living together"
+all$maritalstatus[all$maritalstatus==9]<-NA
+all$married<-NULL
+all$married[all$marriedcurrent==1]<-1
+all$married[all$marriedcurrent==0]<-0
+all$married[all$marriedcurrent==9]<-NA
+
+# Child characteristics
+all$male<-NULL
+all$male[all$sex==1]<-1
+all$male[all$sex==2]<-0
+all$birthw<-NULL
+all$birthw[all$birthweight>=9000]<-NA
+all$lowbirthw<-NULL
+all$lowbirthw[all$birthw<2500]<-1
+all$lowbirthw[all$birthw>=2500]<-0
+all$agechild<-NULL
+all$agechild<-all$dateinterview - all$datebirthchild
+all$birth<-NULL
+all$birth[all$bord==1]<-"a first"
+all$birth[(all$bord==2|all$bord==3|all$bord==4)&all$birthinterval<24]<-"b 2-4 short"
+all$birth[(all$bord==2|all$bord==3|all$bord==4)&all$birthinterval>=24]<-"c 2-4 long"
+all$birth[all$bord>4&all$birthinterval<24]<-"d 5+ short"
+all$birth[all$bord>4&all$birthinterval>=24]<-"e 5+ long"
+all$deadu5<-NULL
+all$deadu5[all$alive==0 &all$agedeath<60]<-1
+all$deadu5[all$alive==1]<-0
+all$deadu1<-NULL
+all$deadu1[all$alive==0 &all$agedeath<12]<-1
+all$deadu1[all$alive==1|all$agedeath>=12]<-0
+all$zscore<-all$zscore/100		# zscore must be divided by 100 (2 decimals) 
+all$vmeasles<-NULL
+all$vmeasles[all$measles==0]<-0
+all$vmeasles[all$measles==1|all$measles==2 | all$measles==3]<-1
+
+# Birth characteristics
+all$anc<-NULL
+all$anc[(all$ancdoctor==0&all$ancnurse==0)]<-"b no or few skilled anc"
+all$anc[(all$ancvisits>=1&all$ancvisits<4)&	
+          (all$ancdoctor==1|all$ancnurse==1)]<-"b no or few skilled anc"
+all$anc[(all$ancvisits>=4&all$ancvisits<98)&
+          (all$ancdoctor==1|all$ancnurse==1)]<-"a 4+ skilled anc"
+all$unskilled<-NULL
+all$unskilled[all$doctor==0&all$nurse==0]<-1
+all$unskilled[all$doctor==1|all$nurse==1]<-0
+all$skilled<-NULL
+all$skilled[all$doctor==0&all$nurse==0]<-0
+all$skilled[all$doctor==1|all$nurse==1]<-1
+all$breastfed<-NULL
+all$breastfed[all$breastfeeding<=6]<- "<=6 months"
+all$breastfed[all$breastfeeding>6&all$breastfeeding<93]<- ">6 months"
+all$breastfed[all$breastfeeding==94]<-"never breastfed"
+all$breastfed[all$breastfeeding>=95]<-NA
+all$breast<-NULL
+all$breast[all$breastfeeding<=93]<- 1
+all$breast[all$breastfeeding==94]<-0
+all$breast[all$breastfeeding>=95]<-NA
+
+# change variables' type for the regression analysis
+
+all$caseid<-as.factor(all$caseid)
+all$countryc<-as.factor(all$countryc)
+all$cluster<-as.integer(all$cluster)
+all$household<-as.integer(all$household)
+all$mother<-as.integer(all$mother) 
+all$studyyear<-as.factor(all$studyyear)
+all$PSU<-as.integer(all$PSU)
+all$quint<-as.factor(all$quint)
+all$quintile<-as.factor(all$quintile)
+all$educyears<-as.integer(all$educyears)
+all$agedeath<-as.integer(all$agedeath)
+all$male<-as.logical(all$male)
+all$ed<-as.factor(all$ed)
+all$ped<-as.factor(all$ped)
+all$wealth<-as.numeric(all$wealth)
+all$region<-as.factor(all$region)
+all$reg<-as.factor(all$reg)
+all$rural<-as.logical(all$rural)
+all$mocc<-as.factor(all$mocc)
+all$pocc<-as.factor(all$pocc)
+all$anc<-as.factor(all$anc)
+all$birth<-as.factor(all$birth)
+all$deadu5<-as.logical(all$deadu5)
+all$maritalstatus<-as.factor(all$maritalstatus)
+all$employed<-as.factor(all$employed)
+all$moccup<-as.factor(all$moccup)
+all$vmeasles<-as.logical(all$vmeasles)
+all$unskilled<-as.logical(all$unskilled)
+all$skilled<-as.logical(all$skilled)
+all$breastfed<-as.factor(all$breastfed)
+all$agechild<-as.integer(all$agechild)
+
+# subset of children with no NA for deadu5
+all<-subset(all, deadu5==T |deadu5==F)
+
+DRCongo<-all[,c("caseid","deadu5","agechild", "wealth","quint", "quintile","unskilled", 
+             "male", "birth","agemoth", "rural", "region","reg", "ed","ped", "mocc", "pocc", "PSU", 
+             "household","country","weight")]
+
+
+DRCongo <- na.omit(DRCongo)
+
+###################################################################### survey design
+library(survey)
+my.svydesign2 <- function(data ){ 
+  name=paste(deparse(substitute(data)),'.dta')
+  write.dta(data,file=name)
+  svydesign(id=as.formula("~PSU+household"), weight=as.formula("~weight"),data=data)
+}
+
+####################################################################################### analyses
+# descriptive analysis with the survey design
+options(digits=2)
+
+# This should give the decomposition results for RDC (second appearance for C) in Table 3 https://jech.bmj.com/content/67/8/667
+rownames(DRCongo) = NULL ### HERE 
+
+
+
+
+DRCongoc<-my.svydesign2(DRCongo)
+
+# table(DRCongo$deadu5 )
+fmla <- "as.numeric(deadu5) ~ quint + unskilled + male + birth + agemoth + rural + 
+  ed + ped + mocc + pocc + region"
+m<-svyglm( as.formula(fmla),DRCongoc, family=quasibinomial, data=DRCongo)
+
+# m<-glm( as.formula(fmla),family=quasibinomial, data=DRCongo)
+
+summary(svyglm(as.formula(fmla),DRCongoc, family=quasibinomial))$coef %>%
+ kable("html", caption = "Coeffcients Table 2 in https://jech.bmj.com/content/67/8/667") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+
+# devtools::install_github("kdevkdev/rineq")
+
+library(rineq)
+```
+
+```{r results='hide'}
+# This is the one!!
+sink(tempfile())
+c<-rineq::contribution(m,DRCongo$wealth)	
+summary <- as.data.frame(summary(c))
+summary$Corrected <- NULL
+
+df <- as.data.frame(summary(c))
+
+sink()
+```
+
+```{r}
+summary %>%
+ kable("html", caption = "Decomposition Contributions (WDW) Table 3 in https://jech.bmj.com/content/67/8/667") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+
+# plot(c, decreasing = FALSE, horiz = TRUE)
+
+# Extract the summary into a data frame
+df$Variable <- rownames(df)  # add variable names as a column
+
+# remove rows like 'residual' if desired
+df <- subset(df, Variable != "residual")
+
+# Arrange variables by Contribution (%)
+df <- df[order(df$`Contribution (%)`), ]  # increasing order
+df$Variable <- factor(df$Variable, levels = df$Variable) # preserve ordering
+
+ggplot(df, aes(x = `Contribution (%)`, y = Variable)) +
+  geom_col(fill = "steelblue") +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.5) +
+  labs(
+    title = "Decomposition of Contributions",
+    x = "Contribution (%)",
+    y = "Variable"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid.major.y = element_blank())
+
+
+
+
+```
+
+
+## FIRST METHOD
+
+```{r, fig.height=8, fig.width=9}
+
+
+
+# =============================================================================
+# Custom rpart method: regression tree minimizing the (weighted) concentration
+# index within subgroups.
+#
+# Response is passed as cbind(outcome, rank_var), where rank_var is the
+# socioeconomic ranking variable (e.g. income, wealth index).
+#
+# Splitting criterion: at each node, deviance is defined as
+#       |CI(node)| * sum(weights in node)
+# and rpart picks the split that maximises
+#       parent_deviance - (left_deviance + right_deviance).
+#
+# Usage:
+#   fit <- rpart(cbind(health, income) ~ age + educ + region,
+#                data    = df,
+#                method  = ci_method,
+#                control = rpart.control(minbucket = 30, cp = 0.001,
+#                                        maxdepth = 6, xval = 10))
+#   print(fit); plot(fit); text(fit, use.n = TRUE)
+# =============================================================================
+ 
+library(rpart)
+ 
+# ---- Helper: weighted concentration index -----------------------------------
+# y       : outcome variable (typically non-negative)
+# rank_var: socioeconomic ranking variable (e.g. income)
+# wt      : case weights
+ci_weighted <- function(y, rank_var, wt) {
+  if (length(y) < 2L || sum(wt) <= 0) return(0)
+  ord <- order(rank_var)
+  y   <- y[ord];   rank_var <- rank_var[ord];   wt <- wt[ord]
+  W   <- sum(wt)
+  cw  <- cumsum(wt) - 0.5 * wt          # mid-point fractional rank
+  R   <- cw / W
+  mu  <- sum(wt * y) / W
+  if (mu == 0) return(0)
+  2 / mu * sum(wt * (y - mu) * (R - 0.5)) / W
+}
+ 
+# ---- 1. init: declare response structure ------------------------------------
+ci_init <- function(y, offset, parms = NULL, wt) {
+  if (!is.matrix(y) || ncol(y) != 2)
+    stop("Response must be cbind(outcome, rank_var).")
+  if (missing(wt) || is.null(wt)) wt <- rep(1, nrow(y))
+ 
+  # Long label used by summary(fit) and print(fit)
+  sfun <- function(yval, dev, wt, ylevel, digits) {
+    if (is.matrix(yval)) {
+      paste0("mean=", format(signif(yval[, 1], digits)),
+             ", CI=", format(signif(yval[, 2], digits)),
+             ", n=",  round(wt))
+    } else {
+      paste0("mean=", format(signif(yval[1], digits)),
+             ", CI=", format(signif(yval[2], digits)),
+             ", n=",  round(wt))
+    }
+  }
+  environment(sfun) <- .GlobalEnv
+ 
+  # Short label used by text(fit) on the plot
+  tfun <- function(yval, dev, wt, ylevel, digits, n, use.n) {
+    mu <- if (is.matrix(yval)) yval[, 1] else yval[1]
+    ci <- if (is.matrix(yval)) yval[, 2] else yval[2]
+    lab <- paste0(format(signif(mu, digits)),
+                  "\nCI=", format(signif(ci, digits)))
+    if (!missing(use.n) && isTRUE(use.n)) lab <- paste0(lab, "\nn=", n)
+    lab
+  }
+  environment(tfun) <- .GlobalEnv
+ 
+  list(y = y, parms = parms, numresp = 2, numy = 2,
+       summary = sfun, text = tfun)
+}
+ 
+# ---- 2. eval: node "deviance" = |CI| weighted by node mass ------------------
+ci_eval <- function(y, wt, parms = NULL) {
+  outcome <- y[, 1]
+  rnk     <- y[, 2]
+  ci      <- ci_weighted(outcome, rnk, wt)
+  # label = c(mean outcome, CI);  deviance = |CI| * sum(wt)
+  list(label = c(sum(wt * outcome) / sum(wt), ci),
+       deviance = abs(ci) * sum(wt))
+}
+ 
+# ---- 3. split: how to evaluate a candidate split ----------------------------
+ci_split <- function(y, wt, x, parms = NULL, continuous) {
+  outcome <- y[, 1]
+  rnk     <- y[, 2]
+  n       <- length(outcome)
+  parent_dev <- abs(ci_weighted(outcome, rnk, wt)) * sum(wt)
+ 
+  if (continuous) {
+    # rpart has already sorted observations by x for continuous splits
+    goodness  <- numeric(n - 1)
+    direction <- numeric(n - 1)
+    for (i in seq_len(n - 1)) {
+      left  <- seq_len(i)
+      right <- (i + 1):n
+      wL <- sum(wt[left]);  wR <- sum(wt[right])
+      if (wL == 0 || wR == 0) next
+      dL <- abs(ci_weighted(outcome[left],  rnk[left],  wt[left]))  * wL
+      dR <- abs(ci_weighted(outcome[right], rnk[right], wt[right])) * wR
+      goodness[i]  <- parent_dev - (dL + dR)
+      # direction sign: rpart convention (mean_right - mean_left)
+      direction[i] <- sign(sum(wt[right] * outcome[right]) / wR -
+                           sum(wt[left]  * outcome[left])  / wL)
+      if (direction[i] == 0) direction[i] <- 1
+    }
+    list(goodness = pmax(goodness, 0), direction = direction)
+  } else {
+    # Categorical predictor: order levels by their weighted mean outcome
+    lvls  <- sort(unique(x))
+    means <- sapply(lvls, function(L) {
+      idx <- x == L
+      if (sum(wt[idx]) == 0) return(0)
+      sum(wt[idx] * outcome[idx]) / sum(wt[idx])
+    })
+    ord <- order(means)
+    xo  <- match(x, lvls[ord])
+    goodness <- numeric(length(lvls) - 1)
+    for (k in seq_len(length(lvls) - 1)) {
+      left  <- xo <= k
+      right <- !left
+      wL <- sum(wt[left]);  wR <- sum(wt[right])
+      if (wL == 0 || wR == 0) next
+      dL <- abs(ci_weighted(outcome[left],  rnk[left],  wt[left]))  * wL
+      dR <- abs(ci_weighted(outcome[right], rnk[right], wt[right])) * wR
+      goodness[k] <- parent_dev - (dL + dR)
+    }
+    list(goodness = pmax(goodness, 0), direction = ord)
+  }
+}
+ 
+# ---- Bundle the method ------------------------------------------------------
+ci_method <- list(eval = ci_eval, split = ci_split, init = ci_init)
+ 
+# ---- Example usage ----------------------------------------------------------
+# fit <- rpart(cbind(health, income) ~ age + educ + region,
+#              data    = df,
+#              method  = ci_method,
+#              control = rpart.control(minbucket = 30, cp = 0.001,
+#                                      maxdepth = 6, xval = 10))
+# print(fit)
+# plot(fit); text(fit, use.n = TRUE)
+# printcp(fit)
+
+
+m<-svyglm( as.formula(fmla),DRCongoc, family=quasibinomial, data=DRCongo)
+
+fit <- rpart(cbind(as.numeric(deadu5), wealth) ~ quint + unskilled + male + birth + agemoth + rural + 
+  ed + ped + mocc + pocc + region,
+             data    = DRCongo,
+             method  = ci_method,
+             control = rpart.control(minbucket = 30, cp = 0.001,
+                                     maxdepth = 6, xval = 10))
+
+print(fit); 
+
+# plot(fit); text(fit, use.n = TRUE)
+
+library(rpartScore)
+library(rpart.plot)
+
+print("HERE IS YOUR FIRST PLOT")
+
+rpart.plot(fit)
+
+
+```
+
+## SECOND METHOD
+
+
+```{r}
+print("now CHATGPT")
+print("now CHATGPT")
+print("now CHATGPT")
+
+library(rpart)
+
+library(rpart)
+
+# ============================================================
+# Custom rpart method:
+# Regression-tree-like splitting to create subgroups with
+# lower within-node concentration index.
+#
+# Response must be:
+#   cbind(outcome, ses_or_rank) ~ predictors
+#
+# outcome     = non-negative health/outcome variable
+# ses_or_rank = socioeconomic variable used to rank individuals
+#
+# The tree minimises a weighted node impurity:
+#
+#   node impurity = node weight * loss(CI)
+#
+# where loss(CI) is |CI| by default.
+# ============================================================
+
+make_ci_rpart_method <- function(
+  loss = c("absolute", "squared", "positive", "negative"),
+  rerank_within_node = TRUE,
+  maxcat_enum = 12L,
+  eps = 1e-12,
+  allow_negative = FALSE
+) {
+
+  loss <- match.arg(loss)
+
+  # ------------------------------------------------------------
+  # Encode settings numerically because rpart passes parms internally.
+  # ------------------------------------------------------------
+
+  loss_codes <- c(
+    absolute = 1,  # minimise |CI|
+    squared  = 2,  # minimise CI^2
+    positive = 3,  # minimise max(CI, 0)
+    negative = 4   # minimise max(-CI, 0)
+  )
+
+  p0 <- c(
+    loss = unname(loss_codes[loss]),
+    rerank = as.numeric(rerank_within_node),
+    maxcat = as.numeric(maxcat_enum),
+    eps = as.numeric(eps),
+    allow_negative = as.numeric(allow_negative)
+  )
+
+  normalise_parms <- function(parms = NULL) {
+
+    p <- p0
+
+    if (!is.null(parms) && length(parms) > 0L) {
+
+      if (is.list(parms)) {
+
+        if (!is.null(parms$loss) && is.character(parms$loss)) {
+          parms$loss <- unname(loss_codes[
+            match.arg(parms$loss, names(loss_codes))
+          ])
+        }
+
+        if (!is.null(parms$rerank_within_node)) {
+          parms$rerank <- as.numeric(parms$rerank_within_node)
+          parms$rerank_within_node <- NULL
+        }
+
+        if (!is.null(parms$maxcat_enum)) {
+          parms$maxcat <- as.numeric(parms$maxcat_enum)
+          parms$maxcat_enum <- NULL
+        }
+
+        u <- unlist(parms, use.names = TRUE)
+
+      } else {
+        u <- parms
+      }
+
+      if (!is.null(names(u))) {
+        keep <- intersect(names(u), names(p))
+        if (length(keep) > 0L) {
+          p[keep] <- suppressWarnings(as.numeric(u[keep]))
+        }
+      }
+    }
+
+    if (!is.finite(p["loss"]) || !(round(p["loss"]) %in% 1:4)) {
+      p["loss"] <- p0["loss"]
+    }
+    p["loss"] <- round(p["loss"])
+
+    if (!is.finite(p["rerank"])) {
+      p["rerank"] <- p0["rerank"]
+    }
+    p["rerank"] <- as.numeric(p["rerank"] > 0)
+
+    if (!is.finite(p["maxcat"]) || p["maxcat"] < 2) {
+      p["maxcat"] <- p0["maxcat"]
+    }
+    p["maxcat"] <- max(2, round(p["maxcat"]))
+
+    if (!is.finite(p["eps"]) || p["eps"] <= 0) {
+      p["eps"] <- p0["eps"]
+    }
+
+    if (!is.finite(p["allow_negative"])) {
+      p["allow_negative"] <- p0["allow_negative"]
+    }
+    p["allow_negative"] <- as.numeric(p["allow_negative"] > 0)
+
+    p
+  }
+
+  # ------------------------------------------------------------
+  # Weighted fractional mid-rank in [0, 1].
+  #
+  # With equal weights and no ties this gives:
+  #   R_i = (i - 0.5) / n
+  #
+  # With ties, all tied observations receive the midpoint rank
+  # of their combined weighted interval.
+  # ------------------------------------------------------------
+
+  weighted_midrank01 <- function(ses, wt) {
+
+    n <- length(ses)
+
+    if (n == 0L) {
+      return(numeric(0))
+    }
+
+    o <- order(ses)
+    ses_o <- ses[o]
+    wt_o <- wt[o]
+
+    W <- sum(wt_o)
+
+    if (!is.finite(W) || W <= 0) {
+      return(rep(NA_real_, n))
+    }
+
+    starts <- c(1L, which(diff(ses_o) != 0) + 1L)
+    ends <- c(starts[-1L] - 1L, n)
+
+    cw <- c(0, cumsum(wt_o))
+    r_o <- numeric(n)
+
+    for (j in seq_along(starts)) {
+
+      a <- starts[j]
+      b <- ends[j]
+
+      r_o[a:b] <- ((cw[a] + cw[b + 1L]) / 2) / W
+    }
+
+    r <- numeric(n)
+    r[o] <- r_o
+
+    r
+  }
+
+  # ------------------------------------------------------------
+  # Concentration index.
+  #
+  # CI = 2 * cov_w(y, R) / mean_w(y)
+  #
+  # If rerank_within_node = TRUE, R is recomputed inside each node.
+  # If FALSE, the second response column is assumed to already be
+  # the rank variable to use.
+  # ------------------------------------------------------------
+
+  concentration_index <- function(y, ses, wt, parms) {
+
+    ok <- is.finite(y) &
+      is.finite(ses) &
+      is.finite(wt) &
+      wt > 0
+
+    y <- y[ok]
+    ses <- ses[ok]
+    wt <- wt[ok]
+
+    if (length(y) <= 1L || sum(wt) <= 0) {
+      return(0)
+    }
+
+    W <- sum(wt)
+    mu <- sum(wt * y) / W
+
+    # CI is undefined if mean outcome is zero.
+    # For non-negative outcomes, this usually means no burden in the node.
+    if (!is.finite(mu) || abs(mu) < parms["eps"]) {
+      return(0)
+    }
+
+    R <- if (parms["rerank"] > 0.5) {
+      weighted_midrank01(ses, wt)
+    } else {
+      ses
+    }
+
+    Rbar <- sum(wt * R) / W
+
+    cov_yR <- sum(wt * (y - mu) * (R - Rbar)) / W
+
+    ci <- 2 * cov_yR / mu
+
+    if (is.finite(ci)) {
+      ci
+    } else {
+      0
+    }
+  }
+
+  # ------------------------------------------------------------
+  # Loss function applied to the concentration index.
+  # Must be non-negative because rpart's impurity/deviance should
+  # behave like a risk measure.
+  # ------------------------------------------------------------
+
+  loss_value <- function(ci, parms) {
+
+    code <- as.integer(round(parms["loss"]))
+
+    if (code == 1L) {
+      return(abs(ci))
+    }
+
+    if (code == 2L) {
+      return(ci^2)
+    }
+
+    if (code == 3L) {
+      return(max(ci, 0))
+    }
+
+    if (code == 4L) {
+      return(max(-ci, 0))
+    }
+
+    abs(ci)
+  }
+
+  # ------------------------------------------------------------
+  # Node impurity.
+  #
+  # This is what the tree tries to reduce.
+  # ------------------------------------------------------------
+
+  node_risk <- function(y, wt, parms) {
+
+    W <- sum(wt)
+
+    if (!is.finite(W) || W <= 0) {
+      return(0)
+    }
+
+    ci <- concentration_index(
+      y = y[, 1],
+      ses = y[, 2],
+      wt = wt,
+      parms = parms
+    )
+
+    W * loss_value(ci, parms)
+  }
+
+  # ------------------------------------------------------------
+  # 1. init function
+  # ------------------------------------------------------------
+
+  init_ci <- function(y, offset, parms = NULL, wt) {
+
+    parms <- normalise_parms(parms)
+
+    if (!is.matrix(y) || ncol(y) != 2L) {
+      stop(
+        "Use a two-column response: ",
+        "cbind(outcome, ses_or_rank) ~ predictors."
+      )
+    }
+
+    if (length(offset)) {
+      warning("Offset ignored for this CI-based rpart method.")
+    }
+
+    y <- cbind(
+      outcome = as.numeric(y[, 1]),
+      ses = as.numeric(y[, 2])
+    )
+
+    if (any(!is.finite(y))) {
+      stop("Outcome and SES/rank response columns must be finite.")
+    }
+
+    if (!as.logical(parms["allow_negative"]) && any(y[, 1] < 0)) {
+      stop(
+        "Negative outcome values found. ",
+        "The standard concentration index is intended for non-negative outcomes. ",
+        "Set allow_negative = TRUE only if this is intentional."
+      )
+    }
+
+    # ------------------------------------------------------------
+    # Display helpers.
+    # These are deliberately robust to extra arguments passed by
+    # different rpart versions, such as nsmall.
+    # ------------------------------------------------------------
+
+    sfun <- function(yval, dev, wt, ylevel = NULL,
+                     digits = getOption("digits"),
+                     nsmall = NULL, ...) {
+
+      as_yval_matrix <- function(z) {
+        if (is.null(dim(z))) {
+          matrix(z, nrow = 1L)
+        } else {
+          as.matrix(z)
+        }
+      }
+
+      pad3 <- function(z) {
+        z <- as.numeric(z)
+        c(z, rep(NA_real_, max(0L, 3L - length(z))))[1:3]
+      }
+
+      fmt <- function(z) {
+        digits <- max(1L, as.integer(digits))
+        if (is.null(nsmall)) {
+          format(signif(as.numeric(z), digits), trim = TRUE)
+        } else {
+          format(signif(as.numeric(z), digits), trim = TRUE, nsmall = nsmall)
+        }
+      }
+
+      M <- as_yval_matrix(yval)
+      out <- character(nrow(M))
+
+      for (i in seq_len(nrow(M))) {
+
+        yy <- pad3(M[i, ])
+
+        dev_wt <- NA_real_
+
+        if (
+          length(dev) >= i &&
+            length(wt) >= i &&
+            is.finite(wt[i]) &&
+            wt[i] > 0
+        ) {
+          dev_wt <- dev[i] / wt[i]
+        }
+
+        out[i] <- paste0(
+          "mean=", fmt(yy[1]),
+          ", CI=", fmt(yy[2]),
+          ", loss=", fmt(yy[3]),
+          ", dev/wt=", fmt(dev_wt)
+        )
+      }
+
+      out
+    }
+
+    pfun <- function(yval, ylevel = NULL,
+                     digits = getOption("digits"),
+                     nsmall = NULL, ...) {
+
+      as_yval_matrix <- function(z) {
+        if (is.null(dim(z))) {
+          matrix(z, nrow = 1L)
+        } else {
+          as.matrix(z)
+        }
+      }
+
+      pad3 <- function(z) {
+        z <- as.numeric(z)
+        c(z, rep(NA_real_, max(0L, 3L - length(z))))[1:3]
+      }
+
+      fmt <- function(z) {
+        digits <- max(1L, as.integer(digits))
+        if (is.null(nsmall)) {
+          format(signif(as.numeric(z), digits), trim = TRUE)
+        } else {
+          format(signif(as.numeric(z), digits), trim = TRUE, nsmall = nsmall)
+        }
+      }
+
+      M <- as_yval_matrix(yval)
+      out <- character(nrow(M))
+
+      for (i in seq_len(nrow(M))) {
+
+        yy <- pad3(M[i, ])
+
+        out[i] <- paste0(
+          "mean=", fmt(yy[1]),
+          ", CI=", fmt(yy[2]),
+          ", loss=", fmt(yy[3])
+        )
+      }
+
+      out
+    }
+
+    tfun <- function(yval, dev = NULL, wt = NULL, ylevel = NULL,
+                     digits = getOption("digits") - 3L,
+                     n = NULL, use.n = FALSE,
+                     nsmall = NULL, ...) {
+
+      as_yval_matrix <- function(z) {
+        if (is.null(dim(z))) {
+          matrix(z, nrow = 1L)
+        } else {
+          as.matrix(z)
+        }
+      }
+
+      pad3 <- function(z) {
+        z <- as.numeric(z)
+        c(z, rep(NA_real_, max(0L, 3L - length(z))))[1:3]
+      }
+
+      fmt <- function(z) {
+        digits <- max(1L, as.integer(digits))
+        if (is.null(nsmall)) {
+          format(signif(as.numeric(z), digits), trim = TRUE)
+        } else {
+          format(signif(as.numeric(z), digits), trim = TRUE, nsmall = nsmall)
+        }
+      }
+
+      M <- as_yval_matrix(yval)
+      out <- character(nrow(M))
+
+      for (i in seq_len(nrow(M))) {
+
+        yy <- pad3(M[i, ])
+
+        out[i] <- paste0(
+          "CI=", fmt(yy[2]),
+          "\nmean=", fmt(yy[1])
+        )
+
+        if (isTRUE(use.n) && length(n) >= i) {
+          out[i] <- paste0(out[i], "\nn=", n[i])
+        }
+      }
+
+      out
+    }
+
+    # Avoid storing the full local environment inside the rpart object.
+    # These display functions are self-contained.
+    environment(sfun) <- .GlobalEnv
+    environment(pfun) <- .GlobalEnv
+    environment(tfun) <- .GlobalEnv
+
+    list(
+      y = y,
+      parms = parms,
+      numresp = 3L,  # mean outcome, signed CI, loss
+      numy = 2L,     # outcome + SES/rank
+      summary = sfun,
+      print = pfun,
+      text = tfun
+    )
+  }
+
+  # ------------------------------------------------------------
+  # 2. eval function
+  #
+  # Called once per node.
+  # Returns:
+  #   label    = values printed/stored for the node
+  #   deviance = node impurity
+  # ------------------------------------------------------------
+
+  eval_ci <- function(y, wt, parms) {
+
+    parms <- normalise_parms(parms)
+
+    W <- sum(wt)
+
+    mean_y <- if (W > 0) {
+      sum(wt * y[, 1]) / W
+    } else {
+      NA_real_
+    }
+
+    ci <- concentration_index(
+      y = y[, 1],
+      ses = y[, 2],
+      wt = wt,
+      parms = parms
+    )
+
+    loss <- loss_value(ci, parms)
+    dev <- W * loss
+
+    list(
+      label = c(
+        mean_y = mean_y,
+        CI = ci,
+        loss = loss
+      ),
+      deviance = dev
+    )
+  }
+
+  # ------------------------------------------------------------
+  # 3. split function
+  #
+  # Called for each candidate splitting variable.
+  # For continuous x:
+  #   returns goodness and direction of length n - 1.
+  #
+  # For categorical x:
+  #   returns goodness of length k - 1 and direction of length k,
+  #   where direction gives an ordering of the categories.
+  # ------------------------------------------------------------
+
+  split_ci <- function(y, wt, x, parms, continuous) {
+
+    parms <- normalise_parms(parms)
+
+    n <- nrow(y)
+
+    parent_risk <- node_risk(y, wt, parms)
+
+    if (
+      !is.finite(parent_risk) ||
+        parent_risk <= parms["eps"] ||
+        n <= 1L
+    ) {
+
+      if (continuous) {
+
+        return(list(
+          goodness = rep(0, max(0L, n - 1L)),
+          direction = rep(-1, max(0L, n - 1L))
+        ))
+
+      } else {
+
+        cats <- sort(unique(x))
+
+        return(list(
+          goodness = rep(0, max(0L, length(cats) - 1L)),
+          direction = cats
+        ))
+      }
+    }
+
+    split_gain <- function(left) {
+
+      if (!any(left) || all(left)) {
+        return(0)
+      }
+
+      left_risk <- node_risk(
+        y = y[left, , drop = FALSE],
+        wt = wt[left],
+        parms = parms
+      )
+
+      right_risk <- node_risk(
+        y = y[!left, , drop = FALSE],
+        wt = wt[!left],
+        parms = parms
+      )
+
+      gain <- parent_risk - left_risk - right_risk
+
+      # Relative goodness: larger is better; 0 means no useful split.
+      max(0, gain / parent_risk)
+    }
+
+    if (continuous) {
+
+      # For continuous variables, rpart supplies x, y and wt already
+      # sorted by x. The candidate split i is:
+      #   observations 1:i versus observations (i+1):n.
+      goodness <- numeric(n - 1L)
+
+      for (i in seq_len(n - 1L)) {
+
+        if (x[i] < x[i + 1L]) {
+
+          left <- seq_len(n) <= i
+          goodness[i] <- split_gain(left)
+
+        } else {
+
+          goodness[i] <- 0
+        }
+      }
+
+      list(
+        goodness = goodness,
+        direction = rep(-1, n - 1L)
+      )
+
+    } else {
+
+      # Categorical predictor.
+      # rpart expects:
+      #   goodness: length k - 1
+      #   direction: length k, giving the category order.
+
+      cats <- sort(unique(x))
+      m <- length(cats)
+
+      if (m <= 1L) {
+        return(list(
+          goodness = numeric(0),
+          direction = cats
+        ))
+      }
+
+      goodness_for_order <- function(ord) {
+
+        g <- numeric(m - 1L)
+
+        for (j in seq_len(m - 1L)) {
+
+          left_cats <- ord[seq_len(j)]
+          left <- x %in% left_cats
+
+          g[j] <- split_gain(left)
+        }
+
+        g
+      }
+
+      if (m <= parms["maxcat"]) {
+
+        # Exact search over all binary partitions, up to maxcat_enum levels.
+        # To avoid duplicate complements, force cats[1] to be on the left.
+
+        best_g <- 0
+        best_left <- cats[1L]
+
+        max_mask <- 2^(m - 1L) - 2L
+
+        for (mask in 0:max_mask) {
+
+          bits <- as.logical(
+            as.integer(intToBits(mask))[seq_len(m - 1L)]
+          )
+
+          left_cats <- cats[c(TRUE, bits)]
+          left <- x %in% left_cats
+
+          g <- split_gain(left)
+
+          if (g > best_g) {
+            best_g <- g
+            best_left <- left_cats
+          }
+        }
+
+        ord <- c(best_left, setdiff(cats, best_left))
+        goodness <- goodness_for_order(ord)
+
+      } else {
+
+        # Heuristic for high-cardinality factors:
+        # order levels by their within-level signed CI, then scan ordered splits.
+
+        score <- vapply(
+          cats,
+          function(k) {
+            idx <- x == k
+            concentration_index(
+              y = y[idx, 1],
+              ses = y[idx, 2],
+              wt = wt[idx],
+              parms = parms
+            )
+          },
+          numeric(1)
+        )
+
+        mean_score <- vapply(
+          cats,
+          function(k) {
+            idx <- x == k
+            Wk <- sum(wt[idx])
+            if (Wk > 0) {
+              sum(wt[idx] * y[idx, 1]) / Wk
+            } else {
+              mean(y[idx, 1])
+            }
+          },
+          numeric(1)
+        )
+
+        ord <- cats[order(score, mean_score)]
+        goodness <- goodness_for_order(ord)
+      }
+
+      list(
+        goodness = goodness,
+        direction = ord
+      )
+    }
+  }
+
+  list(
+    init = init_ci,
+    eval = eval_ci,
+    split = split_ci
+  )
+}
+
+```
+
+
+```{r}
+
+
+
+# Example variables:
+#   dat$health        = non-negative health outcome, disease count, prevalence indicator, etc.
+#   dat$income        = socioeconomic ordering variable
+#   dat$survey_weight = optional sampling weight
+#
+# The second column of cbind() is used only to compute ranks/CI.
+# Do not include it on the RHS unless you really want the tree to split on SES itself.
+
+ci_method2 <- make_ci_rpart_method(
+  loss = "absolute",          # minimise average |CI|
+  rerank_within_node = TRUE,  # compute CI ranks within each node/subgroup
+  maxcat_enum = 12            # exact search for factors up to 12 observed levels
+)
+
+
+
+fit_ci <- rpart(
+  cbind(as.numeric(deadu5), wealth) ~ quint + unskilled + male + birth + agemoth + rural + 
+  ed + ped + mocc + pocc + region,
+  data = DRCongo,
+ # weights = survey_weight,
+  method = ci_method2,
+  control = rpart.control(
+    minsplit = 580,
+    minbucket = 280,
+    cp = 0.001,
+    xval = 0
+  ),
+  model = TRUE,
+  y = TRUE
+)
+
+print("HERE IS YOUR SECOND PLOT")
+
+# rpart.plot(fit_ci)
+
+
+print(fit_ci)
+summary(fit_ci)
+
+plot(fit_ci, uniform = TRUE, margin = 0.1)
+text(fit_ci, use.n = TRUE, cex = 0.8)
+
+
+
+
+node_y <- fit_ci$frame$yval2
+colnames(node_y) <- c("mean_y", "CI", "CI_loss")
+
+node_table <- cbind(
+  node = rownames(fit_ci$frame),
+  fit_ci$frame[, c("var", "n", "wt", "dev")],
+  as.data.frame(node_y)
+)
+
+leaf_table <- subset(node_table, var == "<leaf>")
+
+leaf_table[order(abs(leaf_table$CI)), ]
+
+
+```
+
+
+
+
+
+
+
