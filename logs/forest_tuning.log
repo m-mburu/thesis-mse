@@ -1,0 +1,10 @@
+[2026-05-31 17:27:22] Forest tuning: 4 grid rows, 4 criteria, 10 folds (~160 fold-level fits). 
+[2026-05-31 17:27:22] Forest tuning: starting batch 1/4, grid rows 1-1 (1 rows). 
+[2026-05-31 17:33:19] Forest tuning: completed batch 1/4 in 6.0 minutes. 25.0% complete (1/4 grid rows). 
+[2026-05-31 17:33:19] Forest tuning: starting batch 2/4, grid rows 2-2 (1 rows). 
+[2026-05-31 17:37:36] Forest tuning: completed batch 2/4 in 4.3 minutes. 50.0% complete (2/4 grid rows). 
+[2026-05-31 17:37:36] Forest tuning: starting batch 3/4, grid rows 3-3 (1 rows). 
+[2026-05-31 17:41:25] Forest tuning: completed batch 3/4 in 3.8 minutes. 75.0% complete (3/4 grid rows). 
+[2026-05-31 17:41:25] Forest tuning: starting batch 4/4, grid rows 4-4 (1 rows). 
+[2026-05-31 17:44:44] Forest tuning: completed batch 4/4 in 3.3 minutes. 100.0% complete (4/4 grid rows). 
+[2026-05-31 17:44:44] Forest tuning: finished all batches. 
