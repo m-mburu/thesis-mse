@@ -631,6 +631,8 @@ ggplot(
 
 ### Appendix R2: Regression and Predictive-Forest Details
 
+#### Regression model summary
+
 ```{r appendix-regression-model-summary}
 #| label: tbl-appendix-regression-model-summary
 #| tbl-cap: "Survey-weighted regression model summary."
@@ -668,6 +670,37 @@ report_compact_table(
 )
 ```
 
+#### Predictive ranger tuning results
+
+```{r appendix-ranger-sampling-summary}
+#| label: tbl-appendix-ranger-sampling-summary
+#| tbl-cap: "Weighted class distribution before and after ranger undersampling."
+
+ranger_sampling_out <- copy(drc_results_objects$predictive_forest_sampling %||% data.table())
+if (!nrow(ranger_sampling_out)) {
+  ranger_sampling_out <- data.table(
+    note = "Run Generate_DRC_Results_Objects.qmd with run_shap: true to build the predictive ranger sample."
+  )
+} else {
+  ranger_sampling_out <- ranger_sampling_out[
+    ,
+    .(
+      Sample = sample,
+      Outcome = outcome,
+      Rows = rows,
+      `Weighted N` = weighted_n,
+      `Weighted percent` = weighted_percent
+    )
+  ]
+}
+
+report_compact_table(
+  ranger_sampling_out,
+  digits = 2,
+  caption = "Weighted class distribution before and after ranger undersampling"
+)
+```
+
 ```{r appendix-ranger-cross-validation}
 #| label: tbl-appendix-ranger-cross-validation
 #| tbl-cap: "Cross-validation results for the predictive ranger model."
@@ -680,17 +713,13 @@ if (!nrow(ranger_cv_out)) {
 } else {
   ranger_cv_out[
     ,
-    rank := if (.BY$.metric == "mn_log_loss") {
-      frank(mean, ties.method = "first")
-    } else {
-      frank(-mean, ties.method = "first")
-    },
+    rank := frank(-mean, ties.method = "first"),
     by = .metric
   ]
   ranger_cv_out <- ranger_cv_out[
     order(.metric, rank),
     .(
-      metric = .metric,
+      metric = fifelse(.metric == "sens", "sensitivity", .metric),
       mtry,
       min_n,
       mean,
@@ -714,7 +743,8 @@ report_compact_table(
 )
 ```
 
-```{r appendix-shap-summary-plot, fig.width=8.2, fig.height=5.8}
+#### Predictive ranger SHAP summary plot
+```{r appendix-shap-summary-plot, fig.width=6.2, fig.height=5.8}
 #| label: fig-appendix-shap-summary
 #| fig-cap: "SHAP summary plot for the predictive ranger model."
 
@@ -736,7 +766,7 @@ if (!nrow(shap_plot_dt)) {
   ][
     order(-mean_abs_shap)
   ][
-    seq_len(min(.N, 12L))
+    seq_len(min(.N, 16L))
   ]
   shap_plot_dt <- shap_plot_dt[feature %in% top_shap_features$feature]
   shap_plot_dt <- merge(
@@ -787,13 +817,15 @@ if (!nrow(shap_plot_dt)) {
     theme(
       panel.grid.minor = element_blank(),
       legend.position = "bottom",
-      legend.title = element_text(size = 9),
-      legend.text = element_text(size = 8)
+      legend.title = element_text(size = 11),
+      legend.text = element_text(size = 11)
     )
 }
 ```
 
 ### Appendix R3: Concentration-Index Tree Details
+
+#### Tree tuning and selection details
 
 ```{r appendix-tree-best-controls}
 #| label: tbl-appendix-tree-best-controls
@@ -813,6 +845,8 @@ report_compact_table(
 )
 ```
 
+#### Tree fit and selection summaries
+
 ```{r appendix-tree-selected-setting-summary}
 #| label: tbl-appendix-tree-selected-setting-summary
 #| tbl-cap: "Tree summary for the selected settings."
@@ -831,6 +865,7 @@ report_compact_table(
 )
 ```
 
+#### Tree selection metrics
 ```{r appendix-tree-selection}
 #| label: tbl-appendix-tree-selection
 #| tbl-cap: "Selection metrics for fitted concentration-index trees."
@@ -878,89 +913,35 @@ report_compact_table(
 )
 ```
 
-```{r appendix-tree-complexity-metrics}
-#| label: tbl-appendix-tree-complexity-metrics
-#| tbl-cap: "Collected tree complexity metrics from cross-validation."
+#### Tree validation plots
 
-tree_complexity_out <- copy(drc_results_objects$tree_complexity_metrics %||% data.table())
-if (!nrow(tree_complexity_out)) {
-  tree_complexity_out <- data.table(
-    note = "Run Generate_DRC_Results_Objects.qmd with RUN_CV=true"
-  )
-} else {
-  tree_complexity_out <- tree_complexity_out[
-    ,
-    .(
-      type,
-      maxdepth,
-      min_relative_gain,
-      mean_terminal_nodes,
-      mean_train_relative_gain,
-      mean_validation_relative_gain,
-      std_err_validation_relative_gain
-    )
-  ]
-}
-
-report_compact_table(
-  tree_complexity_out,
-  digits = 4,
-  caption = "Collected tree complexity metrics from cross-validation"
-)
-```
-
-```{r appendix-tree-validation-path-table}
-#| label: tbl-appendix-tree-validation-path
-#| tbl-cap: "Average tree validation percentage and complexity by minimum relative split gain."
-
-tree_path_out <- copy(drc_results_objects$tree_min_relative_gain_path %||% data.table())
-if (!nrow(tree_path_out)) {
-  tree_path_out <- data.table(
-    note = "Run Generate_DRC_Results_Objects.qmd with RUN_CV=true"
-  )
-} else {
-  tree_path_out <- tree_path_out[
-    ,
-    .(
-      type,
-      min_relative_gain,
-      n_settings,
-      mean_root_objective,
-      mean_validation_gain,
-      validation_percent_from_mean_root,
-      mean_terminal_nodes,
-      validation_percent_gain,
-      validation_percent_se,
-      selected
-    )
-  ]
-}
-
-report_compact_table(
-  tree_path_out,
-  digits = 4,
-  caption = "Average tree validation percentage and complexity by minimum relative split gain"
-)
-```
-
-```{r appendix-tree-validation-path-plots, fig.width=12, fig.height=4.8}
+```{r appendix-tree-validation-path-plots, fig.width= 6.3, fig.height=3.8}
 #| label: fig-appendix-tree-validation-path
 #| fig-cap: "Tree validation gain and complexity by minimum relative split gain."
 #| fig-pos: "H"
-
 tree_path_plot_dt <- copy(drc_results_objects$tree_min_relative_gain_path %||% data.table())
-gridExtra::grid.arrange(
-  plot_validation_percent_gain_path(
+
+plot_validation_percent_gain_path(
     tree_path_plot_dt,
     title = "Tree Validation Gain (% Root)"
-  ),
-  plot_terminal_nodes_path(
-    tree_path_plot_dt,
-    title = "Tree Complexity"
-  ),
-  ncol = 2
 )
 ```
+
+#### Tree complexity plots
+
+```{r}
+#| label: fig-appendix-tree-complexity-path
+#| fig-cap: "Tree complexity by number of terminal nodes."
+#| fig-pos: "H"
+#| fig-width: 6.3
+#| fig-height: 3.8
+plot_terminal_nodes_path(
+    tree_path_plot_dt,
+    title = "Tree Complexity"
+)
+```
+
+
 
 ```{r appendix-tree-variable-importance-plot, fig.width=10, fig.height=7}
 #| label: fig-appendix-tree-variable-importance
@@ -1048,6 +1029,8 @@ if (isTRUE(params$render_appendix_tree_plots) && "L" %in% names(tree_models_by_t
 
 ### Appendix R4: Concentration-Index Forest Details
 
+#### Forest tuning and selection details
+
 ```{r appendix-forest-best-controls}
 #| label: tbl-appendix-forest-best-controls
 #| tbl-cap: "Best forest hyperparameters selected by validation gain within each impurity criterion."
@@ -1065,6 +1048,8 @@ report_compact_table(
   caption = "Best forest hyperparameters selected by validation gain within each impurity criterion"
 )
 ```
+
+#### Forest fit and selection summaries
 
 ```{r appendix-forest-selected-setting-summary}
 #| label: tbl-appendix-forest-selected-setting-summary
@@ -1084,150 +1069,35 @@ report_compact_table(
 )
 ```
 
-```{r appendix-forest-selection}
-#| label: tbl-appendix-forest-selection
-#| tbl-cap: "Selection metrics for fitted concentration-index forests."
 
-forest_selection_out <- copy(drc_results_objects$forest_selection)
-if (is.null(forest_selection_out) || !nrow(forest_selection_out)) {
-  forest_selection_out <- data.table(
-    note = "Run Generate_DRC_Results_Objects.qmd with RUN_FOREST=true"
-  )
-} else {
-  forest_selection_out <- forest_selection_out[
-    ,
-    .(
-      criterion = type,
-      trees = ntree,
-      mtry,
-      root_objective = mean_root_objective,
-      train_gain = mean_train_gain,
-      train_relative_gain = mean_train_relative_gain,
-      validation_gain = mean_validation_gain,
-      validation_relative_gain = mean_validation_relative_gain,
-      mean_terminal_nodes,
-      mean_max_depth
-    )
-  ]
-  setnames(
-    forest_selection_out,
-    c(
-      "criterion",
-      "trees",
-      "mtry",
-      "root_objective",
-      "train_gain",
-      "train_relative_gain",
-      "validation_gain",
-      "validation_relative_gain",
-      "mean_terminal_nodes",
-      "mean_max_depth"
-    ),
-    c(
-      "Criterion",
-      "Trees",
-      "mtry",
-      "Root objective",
-      "Train gain",
-      "Train gain/root",
-      "Validation gain",
-      "Validation gain/root",
-      "Mean terminal nodes",
-      "Mean max depth"
-    )
-  )
-}
+#### Forest validation plots
 
-report_compact_table(
-  forest_selection_out,
-  digits = 4,
-  caption = "Selection metrics for fitted concentration-index forests"
-)
-```
-
-```{r appendix-forest-complexity-metrics}
-#| label: tbl-appendix-forest-complexity-metrics
-#| tbl-cap: "Collected forest complexity metrics from cross-validation."
-
-forest_complexity_out <- copy(drc_results_objects$forest_complexity_metrics %||% data.table())
-if (!nrow(forest_complexity_out)) {
-  forest_complexity_out <- data.table(
-    note = "Run Generate_DRC_Results_Objects.qmd with RUN_FOREST_CV=true"
-  )
-} else {
-  forest_complexity_out <- forest_complexity_out[
-    ,
-    .(
-      type,
-      ntree,
-      maxdepth,
-      min_relative_gain,
-      mean_terminal_nodes,
-      mean_train_relative_gain,
-      mean_validation_relative_gain,
-      std_err_validation_relative_gain
-    )
-  ]
-}
-
-report_compact_table(
-  forest_complexity_out,
-  digits = 4,
-  caption = "Collected forest complexity metrics from cross-validation"
-)
-```
-
-```{r appendix-forest-validation-path-table}
-#| label: tbl-appendix-forest-validation-path
-#| tbl-cap: "Average forest validation percentage and complexity by minimum relative split gain."
-
-forest_path_out <- copy(drc_results_objects$forest_min_relative_gain_path %||% data.table())
-if (!nrow(forest_path_out)) {
-  forest_path_out <- data.table(
-    note = "Run Generate_DRC_Results_Objects.qmd with RUN_FOREST_CV=true"
-  )
-} else {
-  forest_path_out <- forest_path_out[
-    ,
-    .(
-      type,
-      min_relative_gain,
-      n_settings,
-      mean_root_objective,
-      mean_validation_gain,
-      validation_percent_from_mean_root,
-      mean_terminal_nodes,
-      validation_percent_gain,
-      validation_percent_se,
-      selected
-    )
-  ]
-}
-
-report_compact_table(
-  forest_path_out,
-  digits = 4,
-  caption = "Average forest validation percentage and complexity by minimum relative split gain"
-)
-```
-
-```{r appendix-forest-validation-path-plots, fig.width=12, fig.height=4.8}
+```{r appendix-forest-validation-path-plots, fig.width=6.3, fig.height=3.8}
 #| label: fig-appendix-forest-validation-path
 #| fig-cap: "Forest validation gain and complexity by minimum relative split gain."
 #| fig-pos: "H"
 
 forest_path_plot_dt <- copy(drc_results_objects$forest_min_relative_gain_path %||% data.table())
-gridExtra::grid.arrange(
-  plot_validation_percent_gain_path(
-    forest_path_plot_dt,
-    title = "Forest Validation Gain (% Root)"
-  ),
+
+plot_validation_percent_gain_path(
+  forest_path_plot_dt,
+  title = "Forest Validation Gain (% Root)"
+)
+```
+
+#### Forest complexity plots
+
+```{r}
+#| label: fig-appendix-forest-complexity-path
+#| fig-cap: "Forest complexity by number of terminal nodes."
+#| fig-pos: "H"
+#| fig-width: 6.3
+#| fig-height: 3.8
+
   plot_terminal_nodes_path(
     forest_path_plot_dt,
     title = "Forest Complexity"
-  ),
-  ncol = 2
-)
+  )
 ```
 
 ```{r appendix-forest-variable-importance-plot, fig.width=10, fig.height=7}
@@ -1287,68 +1157,14 @@ if (!identical(selected_tree_type, "L")) {
 }
 ```
 
-```{r appendix-forest-variable-importance}
-#| label: tbl-appendix-forest-variable-importance
-#| tbl-cap: "Forest variable importance by concentration-index criterion."
-
-forest_importance_out <- copy(drc_results_objects$forest_variable_importance)
-if (!nrow(forest_importance_out)) {
-  forest_importance_out <- data.table(
-    note = "Run Generate_DRC_Results_Objects.qmd with run_forest: true"
-  )
-} else {
-  forest_importance_out[, variable_label := format_variable_label(variable)]
-  forest_importance_out <- forest_importance_out[
-    ,
-    .(criterion, rank, variable = variable_label, importance)
-  ]
-}
-
-report_compact_table(
-  forest_importance_out,
-  digits = 4,
-  caption = "Forest variable importance by concentration-index criterion"
-)
-```
-
-```{r appendix-surrogate-variable-importance}
-#| label: tbl-appendix-surrogate-variable-importance
-#| tbl-cap: "Surrogate-tree variable importance for the selected concentration-index forest."
-
-surrogate_importance_out <- extract_surrogate_importance(
-  drc_results_objects$selected_forest_surrogate
-)
-if (!nrow(surrogate_importance_out)) {
-  surrogate_importance_out <- data.table(
-    note = "Run Generate_DRC_Results_Objects.qmd with RUN_FOREST=true"
-  )
-} else {
-  surrogate_importance_out[, variable_label := format_variable_label(variable)]
-  surrogate_importance_out[
-    ,
-    rank := seq_len(.N)
-  ]
-  surrogate_importance_out <- surrogate_importance_out[
-    ,
-    .(rank, variable = variable_label, importance)
-  ]
-}
-
-report_compact_table(
-  surrogate_importance_out,
-  digits = 4,
-  caption = "Surrogate-tree variable importance for the selected concentration-index forest"
-)
-```
-
 ### Appendix R5: Implementation Status
 
 Implemented in the report: selected concentration-index tree and selected
 forest/surrogate-tree variable-importance plots in the results section; tree
 and concentration-index forest best-control tables, selected-setting validation
-summaries, complexity metrics, validation-path plots, and variable-importance
-outputs by criterion in the appendix; ranger cross-validation and SHAP summary
-outputs in the appendix.
+summaries, selection metrics, validation and complexity plots, and
+variable-importance plots by criterion in the appendix; ranger cross-validation
+and SHAP summary outputs in the appendix.
 
 To implement for the final analysis run: rerun the generator with `RUN_CV=true`
 and `RUN_FOREST_CV=true` when the full cross-validation objects should be
