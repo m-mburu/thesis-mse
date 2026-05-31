@@ -442,7 +442,7 @@ plot_validation_percent_gain_path <- function(path_dt, title) {
       ggplot2::ggplot() +
         ggplot2::annotate("text", x = 0, y = 0, label = "No finite tuning metrics") +
         ggplot2::labs(title = title, x = NULL, y = NULL) +
-        ggplot2::theme_void(base_size = 12)
+        ggplot2::theme_void(base_size = 11)
     )
   }
 
@@ -484,7 +484,7 @@ plot_validation_percent_gain_path <- function(path_dt, title) {
       y = "Validation gain (% root)",
       title = title
     ) +
-    ggplot2::theme_minimal(base_size = 12) +
+    ggplot2::theme_minimal(base_size = 11) +
     ggplot2::theme(panel.grid.minor = ggplot2::element_blank())
 }
 
@@ -495,7 +495,7 @@ plot_terminal_nodes_path <- function(path_dt, title) {
       ggplot2::ggplot() +
         ggplot2::annotate("text", x = 0, y = 0, label = "No finite tuning metrics") +
         ggplot2::labs(title = title, x = NULL, y = NULL) +
-        ggplot2::theme_void(base_size = 12)
+        ggplot2::theme_void(base_size = 11)
     )
   }
 
@@ -535,7 +535,7 @@ plot_terminal_nodes_path <- function(path_dt, title) {
       y = "Mean terminal nodes",
       title = title
     ) +
-    ggplot2::theme_minimal(base_size = 12) +
+    ggplot2::theme_minimal(base_size = 11) +
     ggplot2::theme(panel.grid.minor = ggplot2::element_blank())
 }
 
@@ -581,7 +581,7 @@ plot_variable_importance <- function(importance_dt, title, var_labels = NULL) {
       ggplot2::ggplot() +
         ggplot2::annotate("text", x = 0, y = 0, label = "No variable importance available") +
         ggplot2::labs(title = title, x = NULL, y = NULL) +
-        ggplot2::theme_void(base_size = 12)
+        ggplot2::theme_void(base_size = 11)
     )
   }
 
@@ -611,7 +611,7 @@ plot_variable_importance <- function(importance_dt, title, var_labels = NULL) {
     ggplot2::facet_wrap(ggplot2::vars(criterion), scales = "free_y", ncol = 2) +
     ggplot2::scale_x_discrete(labels = function(x) sub("^.* \\| ", "", x)) +
     ggplot2::labs(x = NULL, y = "Total split gain", title = title) +
-    ggplot2::theme_minimal(base_size = 12) +
+    ggplot2::theme_minimal(base_size = 11) +
     ggplot2::theme(panel.grid.minor = ggplot2::element_blank())
 }
 

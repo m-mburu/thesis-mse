@@ -1,8 +1,7 @@
 params <-
-list(run_cv = FALSE, run_forest = FALSE, run_shap = FALSE, shap_n = 300L, 
-    shap_nsim = 8L)
+list(run_cv = FALSE, run_forest = FALSE, run_forest_cv = FALSE, 
+    run_shap = FALSE, shap_n = 300L, shap_nsim = 8L)
 
-## ----setup--------------------------------------------------------------------
 knitr::opts_chunk$set(
   fig.width = 9,
   fig.height = 5.5,
@@ -16,17 +15,16 @@ library(grid)
 library(knitr)
 library(ineqTrees)
 library(partykit)
+library(here)
 
-source(file.path("R", "report_helpers.R"))
-source(file.path("R", "ci_known_subgroup_demo.R"))
-source(file.path("R", "ci_rpart_comparison_methods.R"))
+source(here("R", "report_helpers.R"))
+source(here("R", "ci_known_subgroup_demo.R"))
+source(here("R", "ci_rpart_comparison_methods.R"))
 
 if (requireNamespace("kableExtra", quietly = TRUE)) {
   kableExtra::use_latex_packages()
 }
 
-
-## ----env-flag-helper----------------------------------------------------------
 env_flag <- function(name, default = FALSE) {
   value <- Sys.getenv(name, unset = NA_character_)
   if (is.na(value) || !nzchar(value)) {
@@ -35,18 +33,15 @@ env_flag <- function(name, default = FALSE) {
   tolower(value) %in% c("1", "true", "yes", "y")
 }
 
-
-## ----env-int-helper-----------------------------------------------------------
 env_int <- function(name, default) {
   value <- suppressWarnings(as.integer(Sys.getenv(name, unset = NA_character_)))
   if (is.na(value)) default else value
 }
 
-
-## ----runtime-parameter-config-------------------------------------------------
 default_params <- list(
   run_cv = FALSE,
   run_forest = FALSE,
+  run_forest_cv = FALSE,
   run_shap = FALSE,
   shap_n = 300L,
   shap_nsim = 8L
@@ -60,12 +55,11 @@ runtime_params <- if (!exists("params", inherits = FALSE)) {
 
 runtime_params$run_cv <- env_flag("RUN_CV", runtime_params$run_cv)
 runtime_params$run_forest <- env_flag("RUN_FOREST", runtime_params$run_forest)
+runtime_params$run_forest_cv <- env_flag("RUN_FOREST_CV", runtime_params$run_forest_cv)
 runtime_params$run_shap <- env_flag("RUN_SHAP", runtime_params$run_shap)
 runtime_params$shap_n <- env_int("SHAP_N", runtime_params$shap_n)
 runtime_params$shap_nsim <- env_int("SHAP_NSIM", runtime_params$shap_nsim)
 
-
-## ----criterion-config---------------------------------------------------------
 criterion_types <- c("CI", "CIg", "CIc", "L")
 rineq_ci_types <- c("CI", "CIg", "CIc", "CIw")
 results_object_file <- file.path("data", "drc_report_results_objects.rda")
@@ -83,8 +77,6 @@ main_tree_control <- ineqTrees::ci_tree_control(
   min_relative_gain = 0.20
 )
 
-
-## ----map-model-terms-helper---------------------------------------------------
 map_model_terms_to_predictors <- function(term_names, predictors) {
   vapply(term_names, function(term) {
     hit <- predictors[term == predictors | startsWith(term, predictors)]
@@ -92,8 +84,6 @@ map_model_terms_to_predictors <- function(term_names, predictors) {
   }, character(1L))
 }
 
-
-## ----canonicalize-model-terms-helper------------------------------------------
 canonicalize_model_terms <- function(term_names, reference_terms) {
   if (!length(term_names) || !length(reference_terms)) {
     return(term_names)
@@ -118,8 +108,6 @@ canonicalize_model_terms <- function(term_names, reference_terms) {
   out
 }
 
-
-## ----rank-from-named-vector-helper--------------------------------------------
 rank_from_named_vector <- function(x, method_name) {
   if (is.null(x) || !length(x)) {
     return(data.table(variable = character(), method = method_name, rank = integer()))
@@ -134,8 +122,6 @@ rank_from_named_vector <- function(x, method_name) {
   ]
 }
 
-
-## ----load-analysis-data-------------------------------------------------------
 load(file.path("data", "congo_model_data.rda"))
 
 raw_congo_model_dt <- as.data.table(congo_model_dt)
@@ -206,8 +192,6 @@ congo_ci_formula <- stats::as.formula(
   paste("cbind(wealth, deadu5_num) ~", paste(congo_predictors, collapse = " + "))
 )
 
-
-## ----format-variable-label-helper---------------------------------------------
 canonicalize_regression_terms <- function(term_names) {
   vapply(term_names, function(term) {
     parent <- map_model_terms_to_predictors(term, raw_congo_predictors)
@@ -254,8 +238,6 @@ format_variable_label <- function(x) {
 
 
 
-
-## ----build-descriptive-objects------------------------------------------------
 outcome_plot_dt <- congo_model_dt[
   ,
   .(weighted_n = sum(sample_weight)),
@@ -314,8 +296,6 @@ drc_data_summary_table <- data.table(
 
 
 
-
-## ----fit-classical-model------------------------------------------------------
 if (!requireNamespace("survey", quietly = TRUE)) {
   stop("Install survey to build the classical decomposition objects.", call. = FALSE)
 }
@@ -339,8 +319,6 @@ linear_decomp_fit <- survey::svyglm(
 
 
 
-
-## ----extract-classical-model-components---------------------------------------
 linear_x <- stats::model.matrix(linear_decomp_formula, data = raw_congo_model_dt)
 linear_beta <- stats::coef(linear_decomp_fit)
 linear_terms <- setdiff(colnames(linear_x), "(Intercept)")
@@ -380,8 +358,6 @@ if (requireNamespace("broom", quietly = TRUE)) {
   )
 }
 
-
-## ----decomposition-to-table-helper--------------------------------------------
 decomposition_to_table <- function(object, digits = 4L) {
   data.table(
     term = names(object$rel_contribution),
@@ -395,8 +371,6 @@ decomposition_to_table <- function(object, digits = 4L) {
   )
 }
 
-
-## ----summarise-rineq-decomposition-helper-------------------------------------
 summarise_rineq_decomposition <- function(object, method_name) {
   out <- merge(
     linear_term_info,
@@ -444,8 +418,6 @@ summarise_rineq_decomposition <- function(object, method_name) {
   out[order(-abs(regression_pct_contribution))]
 }
 
-
-## ----build-rineq-ci-decomposition---------------------------------------------
 rineq_ci_decomp <- rineq::decomposition(
   outcome = raw_congo_model_dt$deadu5_num,
   betas = unname(linear_beta[linear_terms]),
@@ -460,8 +432,6 @@ classical_ci_table <- summarise_rineq_decomposition(rineq_ci_decomp, "CI")
 
 
 
-
-## ----build-rineq-cig-decomposition--------------------------------------------
 rineq_cig_decomp <- rineq::decomposition(
   outcome = raw_congo_model_dt$deadu5_num,
   betas = unname(linear_beta[linear_terms]),
@@ -476,8 +446,6 @@ classical_cig_table <- summarise_rineq_decomposition(rineq_cig_decomp, "CIg")
 
 
 
-
-## ----build-rineq-cic-decomposition--------------------------------------------
 rineq_cic_decomp <- rineq::decomposition(
   outcome = raw_congo_model_dt$deadu5_num,
   betas = unname(linear_beta[linear_terms]),
@@ -492,8 +460,6 @@ classical_cic_table <- summarise_rineq_decomposition(rineq_cic_decomp, "CIc")
 
 
 
-
-## ----build-rineq-ciw-decomposition--------------------------------------------
 rineq_ciw_decomp <- rineq::decomposition(
   outcome = raw_congo_model_dt$deadu5_num,
   betas = unname(linear_beta[linear_terms]),
@@ -508,8 +474,6 @@ classical_ciw_table <- summarise_rineq_decomposition(rineq_ciw_decomp, "CIw")
 
 
 
-
-## ----assemble-rineq-objects---------------------------------------------------
 rineq_decomp_by_type <- list(
   CI = rineq_ci_decomp,
   CIg = rineq_cig_decomp,
@@ -536,8 +500,6 @@ classical_decomposition_table <- rbindlist(
   fill = TRUE
 )
 
-
-## ----build-tree-objects-------------------------------------------------------
 if (isTRUE(runtime_params$run_cv)) {
   tree_grid <- as.data.table(ineqTrees::ci_tree_control_grid(
     minsplit = 500L,
@@ -568,9 +530,19 @@ if (isTRUE(runtime_params$run_cv)) {
   tree_selection_table <- ineqTrees::ci_fit_summary_table(
     tree_tuning,
     selected = tree_best_by_type,
-    metrics = c("validation_gain", "relative_validation_gain"),
-    include_percent = TRUE
+    metrics = c(
+      "train_gain",
+      "validation_gain",
+      "train_relative_gain",
+      "relative_validation_gain"
+    ),
+    include_percent = FALSE
   )
+  tree_selection_table[
+    tree_best_by_type,
+    terminal_nodes := i.mean_terminal_nodes,
+    on = c("type", "grid_id")
+  ]
   tree_selection_table[, selection_basis := "10-fold cross-validation"]
 
   tree_models_by_type <- setNames(
@@ -653,12 +625,76 @@ all_tree_terminal_summaries <- rbindlist(lapply(names(tree_models_by_type), func
 
 tree_variable_importance <- collect_variable_importance(tree_models_by_type)
 
+tree_best_controls <- if (!is.null(tree_best_by_type) && nrow(tree_best_by_type)) {
+  tree_best_by_type[
+    ,
+    .(type, minsplit, minbucket, minprob, maxdepth, min_gain, min_relative_gain)
+  ]
+} else {
+  data.table(
+    type = criterion_types,
+    minsplit = main_tree_control$minsplit,
+    minbucket = main_tree_control$minbucket,
+    minprob = main_tree_control$minprob,
+    maxdepth = main_tree_control$maxdepth,
+    min_gain = main_tree_control$min_gain,
+    min_relative_gain = main_tree_control$min_relative_gain
+  )
+}
+
+tree_complexity_metrics <- if (!is.null(tree_tuning)) {
+  collect_complexity_metrics(tree_tuning)
+} else {
+  data.table()
+}
+
+tree_min_relative_gain_path <- if (nrow(tree_complexity_metrics)) {
+  min_relative_gain_path(tree_complexity_metrics, selected = tree_best_by_type)
+} else {
+  data.table()
+}
+
+tree_report_metrics <- c(
+  "type",
+  "mean_root_objective",
+  "mean_train_gain",
+  "std_err_train_gain",
+  "mean_train_relative_gain",
+  "std_err_train_relative_gain",
+  "mean_validation_gain",
+  "std_err_validation_gain",
+  "mean_validation_relative_gain",
+  "std_err_validation_relative_gain"
+)
+
+tree_fit_wide <- if (!is.null(tree_tuning)) {
+  ineqTrees::ci_fit_summary_table(
+    tree_tuning,
+    selected = tree_best_by_type,
+    metrics = c(
+      "train_gain",
+      "validation_gain",
+      "train_relative_gain",
+      "relative_validation_gain"
+    ),
+    include_percent = FALSE
+  )[, ..tree_report_metrics]
+} else {
+  out <- copy(tree_selection_table)
+  for (col in tree_report_metrics) {
+    if (!col %in% names(out)) {
+      out[, (col) := NA_real_]
+    }
+  }
+  out[, ..tree_report_metrics]
+}
+
+tree_fit_table <- fit_summary_long(tree_fit_wide)
 
 
 
 
 
-## ----build-rpart-comparison---------------------------------------------------
 if (requireNamespace("rpart", quietly = TRUE)) {
   lecturer_rpart_models <- fit_ci_rpart_comparison(
     data = congo_model_dt,
@@ -679,69 +715,197 @@ if (requireNamespace("rpart", quietly = TRUE)) {
 
 
 
-
-## ----build-forest-objects-----------------------------------------------------
 if (isTRUE(runtime_params$run_forest)) {
+  if (isTRUE(runtime_params$run_forest_cv)) {
+    forest_grid <- as.data.table(ineqTrees::ci_tree_control_grid(
+      minsplit = 500L,
+      minbucket = 250L,
+      minprob = 0.01,
+      maxdepth = 10L,
+      min_gain = 0.00001,
+      min_relative_gain = c(0.05, 0.10, 0.20, 0.30),
+      mtry = max(1L, floor(sqrt(length(congo_predictors)))),
+      ntree = 100L
+    ))
+
+    forest_tuning <- run_forest_tuning_batches(
+      formula = congo_ci_formula,
+      data = congo_model_dt,
+      forest_grid = forest_grid,
+      criterion_types = criterion_types,
+      tuning_metrics = c("validation_gain", "relative_validation_gain"),
+      tuning_selection_metric = "relative_validation_gain",
+      rank_name = "wealth",
+      outcome_name = "deadu5_num",
+      weights = congo_model_dt$sample_weight,
+      folds = 10L,
+      workers = 4L,
+      progress_steps = min(20L, nrow(forest_grid)),
+      log_file = file.path("logs", "forest_tuning.log"),
+      seed = 20260508,
+      perturb = list(replace = FALSE, fraction = 0.7)
+    )
+    forest_best_by_type <- ineqTrees::ci_select_best(
+      forest_tuning,
+      metric = "relative_validation_gain"
+    )
+    forest_fit_controls <- forest_best_by_type
+  } else {
+    forest_tuning <- NULL
+    forest_best_by_type <- NULL
+    forest_fit_controls <- data.table(
+      type = criterion_types,
+      minsplit = main_tree_control$minsplit,
+      minbucket = main_tree_control$minbucket,
+      minprob = main_tree_control$minprob,
+      maxdepth = main_tree_control$maxdepth,
+      min_gain = main_tree_control$min_gain,
+      min_relative_gain = main_tree_control$min_relative_gain,
+      mtry = max(1L, floor(sqrt(length(congo_predictors)))),
+      ntree = 100L
+    )
+  }
+
   forest_models_by_type <- setNames(
-    lapply(criterion_types, function(type) {
+    lapply(seq_len(nrow(forest_fit_controls)), function(i) {
+      setting <- forest_fit_controls[i]
       ineqTrees::ci_forest(
         formula = congo_ci_formula,
         data = congo_model_dt,
         rank_name = "wealth",
         outcome_name = "deadu5_num",
         weights = congo_model_dt$sample_weight,
-        type = type,
-        control = main_tree_control,
-        ntree = 100L,
-        mtry = max(1L, floor(sqrt(length(congo_predictors)))),
+        type = setting$type[1L],
+        control = ineqTrees::ci_control_from_row(setting),
+        ntree = setting$ntree[1L],
+        mtry = setting$mtry[1L],
         perturb = list(replace = FALSE, fraction = 0.7)
       )
     }),
-    criterion_types
+    forest_fit_controls$type
   )
   selected_forest_fit <- forest_models_by_type[[selected_tree_type]]
   forest_variable_importance <- collect_variable_importance(forest_models_by_type)
-  forest_selection_table <- rbindlist(lapply(names(forest_models_by_type), function(type) {
-    fit <- forest_models_by_type[[type]]
-    root_impurity <- ineqTrees::ci_root_impurity(
-      data = congo_model_dt,
-      rank_name = "wealth",
-      outcome_name = "deadu5_num",
-      weights = congo_model_dt$sample_weight,
-      type = type
+
+  forest_complexity_metrics <- if (!is.null(forest_tuning)) {
+    collect_complexity_metrics(forest_tuning)
+  } else {
+    data.table()
+  }
+
+  forest_min_relative_gain_path <- if (nrow(forest_complexity_metrics)) {
+    min_relative_gain_path(forest_complexity_metrics, selected = forest_best_by_type)
+  } else {
+    data.table()
+  }
+
+  forest_report_metrics <- c(
+    "type",
+    "mean_root_objective",
+    "mean_train_gain",
+    "std_err_train_gain",
+    "mean_train_relative_gain",
+    "std_err_train_relative_gain",
+    "mean_validation_gain",
+    "std_err_validation_gain",
+    "mean_validation_relative_gain",
+    "std_err_validation_relative_gain"
+  )
+
+  if (!is.null(forest_tuning)) {
+    forest_selection_table <- ineqTrees::ci_fit_summary_table(
+      forest_tuning,
+      selected = forest_best_by_type,
+      metrics = c(
+        "train_gain",
+        "validation_gain",
+        "train_relative_gain",
+        "relative_validation_gain"
+      ),
+      include_percent = FALSE
     )
-    training_gain <- ineqTrees::ci_forest_validation_gain(
-      fit = fit,
-      new_data = congo_model_dt,
-      rank_name = "wealth",
-      outcome_name = "deadu5_num",
-      weights = congo_model_dt$sample_weight,
-      type = type,
-      root_impurity = root_impurity
-    )
-    forest_summary <- as.data.table(ineqTrees::ci_forest_summary(fit))
-    forest_summary[
-      ,
-      .(
-        type,
-        ntree,
-        mtry,
-        mean_root_objective = root_impurity,
-        mean_train_gain = training_gain,
-        mean_train_relative_gain = training_gain / abs(root_impurity),
-        mean_validation_gain = NA_real_,
-        mean_validation_relative_gain = NA_real_,
-        mean_terminal_nodes,
-        mean_max_depth,
-        selection_basis = "fixed-control training screen"
+    if (!all(c("ntree", "mtry") %in% names(forest_selection_table))) {
+      forest_selection_table <- merge(
+        forest_selection_table,
+        forest_fit_controls[, .(type, ntree, mtry)],
+        by = "type",
+        all.x = TRUE,
+        sort = FALSE
       )
+    }
+    forest_selection_table[
+      forest_fit_controls,
+      `:=`(
+        mean_terminal_nodes = i.mean_terminal_nodes,
+        mean_max_depth = i.maxdepth
+      ),
+      on = "type"
     ]
-  }), fill = TRUE)
+    forest_selection_table[, selection_basis := "10-fold cross-validation"]
+  } else {
+    forest_selection_table <- rbindlist(lapply(names(forest_models_by_type), function(type) {
+      fit <- forest_models_by_type[[type]]
+      root_impurity <- ineqTrees::ci_root_impurity(
+        data = congo_model_dt,
+        rank_name = "wealth",
+        outcome_name = "deadu5_num",
+        weights = congo_model_dt$sample_weight,
+        type = type
+      )
+      training_gain <- ineqTrees::ci_forest_validation_gain(
+        fit = fit,
+        new_data = congo_model_dt,
+        rank_name = "wealth",
+        outcome_name = "deadu5_num",
+        weights = congo_model_dt$sample_weight,
+        type = type,
+        root_impurity = root_impurity
+      )
+      forest_summary <- as.data.table(ineqTrees::ci_forest_summary(fit))
+      forest_summary[
+        ,
+        .(
+          type,
+          ntree,
+          mtry,
+          mean_root_objective = root_impurity,
+          mean_train_gain = training_gain,
+          mean_train_relative_gain = training_gain / abs(root_impurity),
+          mean_validation_gain = NA_real_,
+          mean_validation_relative_gain = NA_real_,
+          mean_terminal_nodes,
+          mean_max_depth,
+          selection_basis = "fixed-control training screen"
+        )
+      ]
+    }), fill = TRUE)
+  }
+
+  forest_fit_wide <- copy(forest_selection_table)
+  for (col in forest_report_metrics) {
+    if (!col %in% names(forest_fit_wide)) {
+      forest_fit_wide[, (col) := NA_real_]
+    }
+  }
+  forest_fit_wide <- forest_fit_wide[, ..forest_report_metrics]
+  forest_fit_table <- fit_summary_long(forest_fit_wide)
+  forest_best_controls <- forest_fit_controls[
+    ,
+    .(type, ntree, mtry, minsplit, minbucket, minprob, maxdepth, min_gain, min_relative_gain)
+  ]
+
   forest_surrogate_control <- main_tree_control
   forest_surrogate_control$minsplit <- 1000L
   forest_surrogate_control$minbucket <- 500L
   forest_surrogate_control$maxdepth <- 10L
   forest_surrogate_control$min_relative_gain <- 0.20
+  forest_surrogates_by_type <- lapply(forest_models_by_type, function(fit) {
+    ineqTrees::ci_forest_surrogate(
+      forest_fit = fit,
+      type = fit$type,
+      control = forest_surrogate_control
+    )
+  })
   selected_forest_surrogate <- ineqTrees::ci_forest_surrogate(
     forest_fit = selected_forest_fit,
     type = selected_tree_type,
@@ -752,7 +916,15 @@ if (isTRUE(runtime_params$run_forest)) {
   )
 } else {
   forest_models_by_type <- list()
+  forest_tuning <- NULL
+  forest_best_by_type <- NULL
+  forest_best_controls <- data.table()
+  forest_complexity_metrics <- data.table()
+  forest_min_relative_gain_path <- data.table()
+  forest_fit_wide <- data.table()
+  forest_fit_table <- data.table()
   selected_forest_fit <- NULL
+  forest_surrogates_by_type <- list()
   selected_forest_surrogate <- NULL
   selected_forest_surrogate_summary <- data.table()
   forest_selection_table <- data.table(
@@ -776,8 +948,6 @@ if (isTRUE(runtime_params$run_forest)) {
   )
 }
 
-
-## ----check-predictive-model-packages------------------------------------------
 if (isTRUE(runtime_params$run_shap)) {
   required_predictive_packages <- c(
     "dials",
@@ -803,8 +973,6 @@ if (isTRUE(runtime_params$run_shap)) {
   }
 }
 
-
-## ----build-ranger-analysis-data-----------------------------------------------
 if (isTRUE(runtime_params$run_shap)) {
   set.seed(20260528)
   ranger_dt <- copy(congo_model_dt)
@@ -836,16 +1004,12 @@ if (isTRUE(runtime_params$run_shap)) {
   ranger_fit_df <- data.frame()
 }
 
-
-## ----build-ranger-recipe------------------------------------------------------
 if (isTRUE(runtime_params$run_shap)) {
   ranger_recipe <- recipes::recipe(deadu5_factor ~ ., data = ranger_fit_df)
 } else {
   ranger_recipe <- NULL
 }
 
-
-## ----build-ranger-model-spec--------------------------------------------------
 if (isTRUE(runtime_params$run_shap)) {
   ranger_model_spec <- parsnip::rand_forest(
     mtry = tune::tune(),
@@ -858,8 +1022,6 @@ if (isTRUE(runtime_params$run_shap)) {
   ranger_model_spec <- NULL
 }
 
-
-## ----build-ranger-resamples---------------------------------------------------
 if (isTRUE(runtime_params$run_shap)) {
   ranger_resamples <- rsample::vfold_cv(
     ranger_fit_df,
@@ -870,8 +1032,6 @@ if (isTRUE(runtime_params$run_shap)) {
   ranger_resamples <- NULL
 }
 
-
-## ----build-ranger-workflow----------------------------------------------------
 if (isTRUE(runtime_params$run_shap)) {
   ranger_workflow <- workflows::workflow() |>
     workflows::add_model(ranger_model_spec) |>
@@ -881,8 +1041,6 @@ if (isTRUE(runtime_params$run_shap)) {
   ranger_workflow <- NULL
 }
 
-
-## ----build-ranger-grid--------------------------------------------------------
 if (isTRUE(runtime_params$run_shap)) {
   ranger_parameter_set <- hardhat::extract_parameter_set_dials(ranger_workflow) |>
     update(
@@ -898,8 +1056,6 @@ if (isTRUE(runtime_params$run_shap)) {
   ranger_grid <- data.frame()
 }
 
-
-## ----tune-ranger-model--------------------------------------------------------
 if (isTRUE(runtime_params$run_shap)) {
   ranger_metric_set <- yardstick::metric_set(yardstick::mn_log_loss, yardstick::roc_auc)
   ranger_tune_results <- tune::tune_grid(
@@ -917,8 +1073,6 @@ if (isTRUE(runtime_params$run_shap)) {
 
 
 
-
-## ----select-best-ranger-model-------------------------------------------------
 if (isTRUE(runtime_params$run_shap)) {
   selected_ranger_setting <- tune::select_best(ranger_tune_results, metric = "mn_log_loss")
 } else {
@@ -927,8 +1081,6 @@ if (isTRUE(runtime_params$run_shap)) {
 
 
 
-
-## ----fit-selected-ranger-model------------------------------------------------
 if (isTRUE(runtime_params$run_shap)) {
   final_ranger_workflow <- tune::finalize_workflow(ranger_workflow, selected_ranger_setting)
   predictive_forest_fit <- workflows::fit(final_ranger_workflow, data = ranger_fit_df)
@@ -937,14 +1089,10 @@ if (isTRUE(runtime_params$run_shap)) {
   predictive_forest_fit <- NULL
 }
 
-
-## ----predict-ranger-risk-helper-----------------------------------------------
 predict_ranger_risk <- function(object, newdata) {
   predict(object, new_data = as.data.frame(newdata), type = "prob")$.pred_Died
 }
 
-
-## ----prepare-shap-data--------------------------------------------------------
 if (isTRUE(runtime_params$run_shap)) {
   shap_rows <- sort(sample.int(nrow(ranger_fit_df), min(runtime_params$shap_n, nrow(ranger_fit_df))))
   shap_x_background <- ranger_fit_df[, ranger_predictor_terms, drop = FALSE]
@@ -957,8 +1105,6 @@ if (isTRUE(runtime_params$run_shap)) {
   shap_prediction <- numeric()
 }
 
-
-## ----compute-fastshap-values--------------------------------------------------
 if (isTRUE(runtime_params$run_shap)) {
   selected_forest_shap <- fastshap::explain(
     object = predictive_forest_fit,
@@ -1043,8 +1189,6 @@ if (isTRUE(runtime_params$run_shap)) {
   shap_summary_long <- data.table()
 }
 
-
-## ----build-shap-ci-decomposition----------------------------------------------
 if (isTRUE(runtime_params$run_shap)) {
   shap_ci_decomp <- ineqTrees::shap_conc_decomp(
     shap = selected_forest_shap,
@@ -1059,8 +1203,6 @@ if (isTRUE(runtime_params$run_shap)) {
 
 
 
-
-## ----build-shap-cig-decomposition---------------------------------------------
 if (isTRUE(runtime_params$run_shap)) {
   shap_cig_decomp <- ineqTrees::shap_conc_decomp(
     shap = selected_forest_shap,
@@ -1075,8 +1217,6 @@ if (isTRUE(runtime_params$run_shap)) {
 
 
 
-
-## ----build-shap-cic-decomposition---------------------------------------------
 if (isTRUE(runtime_params$run_shap)) {
   shap_cic_decomp <- ineqTrees::shap_conc_decomp(
     shap = selected_forest_shap,
@@ -1091,8 +1231,6 @@ if (isTRUE(runtime_params$run_shap)) {
 
 
 
-
-## ----build-shap-l-decomposition-----------------------------------------------
 if (isTRUE(runtime_params$run_shap)) {
   shap_l_decomp <- ineqTrees::shap_conc_decomp(
     shap = selected_forest_shap,
@@ -1107,8 +1245,6 @@ if (isTRUE(runtime_params$run_shap)) {
 
 
 
-
-## ----assemble-shap-objects----------------------------------------------------
 if (isTRUE(runtime_params$run_shap)) {
   selected_shap_contributions <- rbindlist(list(
     as.data.table(shap_ci_decomp$contributions)[, criterion := "CI"],
@@ -1139,8 +1275,6 @@ if (isTRUE(runtime_params$run_shap)) {
 
 
 
-
-## ----build-method-comparison--------------------------------------------------
 linear_rank <- classical_decomposition_table[
   criterion == "CI"
 ][
@@ -1259,8 +1393,6 @@ importance_wide <- importance_wide[rank <= 10L]
 
 
 
-
-## ----build-simulation-objects-------------------------------------------------
 sim_file <- file.path("data", "known_subgroup_sim_data.rda")
 if (file.exists(sim_file)) {
   load(sim_file)
@@ -1278,8 +1410,6 @@ if (file.exists(sim_file)) {
 
 
 
-
-## ----save-results-objects-----------------------------------------------------
 drc_results_objects <- list(
   generation_params = runtime_params,
   outcome_labels = outcome_labels,
@@ -1298,7 +1428,13 @@ drc_results_objects <- list(
   regression_model_summary = regression_model_summary,
   classical_decomposition = classical_decomposition_table,
   rineq_summary = rineq_summary,
+  tree_tuning = tree_tuning,
+  tree_best_by_type = tree_best_by_type,
+  tree_best_controls = tree_best_controls,
   tree_selection = tree_selection_table,
+  tree_fit_table = tree_fit_table,
+  tree_complexity_metrics = tree_complexity_metrics,
+  tree_min_relative_gain_path = tree_min_relative_gain_path,
   tree_models_by_type = tree_models_by_type,
   selected_tree_type = selected_tree_type,
   selected_tree_fit = selected_tree_fit,
@@ -1307,7 +1443,14 @@ drc_results_objects <- list(
   tree_variable_importance = tree_variable_importance,
   lecturer_rpart_models = lecturer_rpart_models,
   lecturer_rpart_summary = lecturer_rpart_summary,
+  forest_tuning = forest_tuning,
+  forest_best_by_type = forest_best_by_type,
+  forest_best_controls = forest_best_controls,
+  forest_fit_table = forest_fit_table,
+  forest_complexity_metrics = forest_complexity_metrics,
+  forest_min_relative_gain_path = forest_min_relative_gain_path,
   selected_forest_fit = selected_forest_fit,
+  forest_surrogates_by_type = forest_surrogates_by_type,
   selected_forest_surrogate = selected_forest_surrogate,
   selected_forest_surrogate_summary = selected_forest_surrogate_summary,
   forest_selection = forest_selection_table,
@@ -1333,4 +1476,3 @@ data.table(
   object_count = length(drc_results_objects),
   object_names = paste(names(drc_results_objects), collapse = ", ")
 )
-
