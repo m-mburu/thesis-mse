@@ -1,0 +1,23 @@
+CI tree split-engine benchmark
+Run time: 2026-06-01 11:39:17 EAT
+Data rows benchmarked: 5,000
+Repetitions per expression: 3
+Criteria: CI, CIg, CIc, L
+CSV summary: C:/Users/moses.mburu.FIND/Pictures/personal/thesis-mse/logs/ci_tree_engine_benchmark_20260601_113917.csv
+
+Median runtime comparison (seconds):
+Key: <criterion>
+   criterion median_cpp median_R median_speedup_cpp_vs_R
+      <char>      <num>    <num>                   <num>
+1:        CI     0.2372   0.4712                   1.986
+2:       CIc     0.2820   0.5361                   1.901
+3:       CIg     0.2915   0.6193                   2.124
+4:         L     0.1227   0.1518                   1.237
+   median_time_reduction_pct mean_cpp mean_R
+                       <num>    <num>  <num>
+1:                     49.66   0.5986 0.4909
+2:                     47.40   0.2938 0.5512
+3:                     52.92   0.2837 0.5953
+4:                     19.18   0.1251 0.1555
+
+Finding: the cpp split engine was 1.94x faster on median across criteria.

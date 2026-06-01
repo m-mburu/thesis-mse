@@ -80,6 +80,7 @@ selected_tree_type <- drc_results_objects$selected_tree_type
 selected_tree_fit <- drc_results_objects$selected_tree_fit
 tree_models_by_type <- drc_results_objects$tree_models_by_type
 lecturer_rpart_models <- drc_results_objects$lecturer_rpart_models
+lecturer_rpart_summary <- drc_results_objects$lecturer_rpart_summary %||% data.table()
 known_subgroup_sim_dt <- drc_results_objects$known_subgroup_sim_dt
 known_subgroup_fit <- drc_results_objects$known_subgroup_fit
 
@@ -189,6 +190,27 @@ plot_forest_surrogate <- function(type, fontsize = 6.2) {
   )
 }
 
+plot_lecturer_rpart <- function(method_name, fontsize = 4.4) {
+  fit <- lecturer_rpart_models[[method_name]]
+  if (is.null(fit) || !length(fit)) {
+    return(
+      ggplot() +
+        annotate("text", x = 0, y = 0, label = paste("No", method_name, "rpart tree available")) +
+        theme_void(base_size = 11)
+    )
+  }
+
+  ci_report_tree_plot(
+    fit = fit,
+    data = congo_model_dt,
+    outcome_name = "deadu5_num",
+    outcome_label = "U5 death",
+    ci_type = "CI",
+    var_labels = congo_var_labels,
+    fontsize = fontsize
+  )
+}
+
 plot_importance_by_criterion <- function(importance_dt, title, fill = "#3268A8") {
   plot_dt <- as.data.table(importance_dt)
   if (!nrow(plot_dt)) {
@@ -291,7 +313,47 @@ grid.arrange(outcome_gg, wealth_distr, ncol = 2)
 
 ## 4.2 Application of developed tree models to the DRC DHS Data
 
-### 4.2.1 Comparison of Indirect Decomposition Results
+### 4.2.1 Published 2007 Validation Benchmark
+
+The generated objects use the DRCongo 2007 analysis data from the previous
+validated workflow. The table below compares the published DRCongo
+concentration-index decomposition from Van Malderen et al. (2013, Table 3) with
+the regression decomposition regenerated in this report. The regenerated model
+uses the same determinant set as the published survey-GLM comparison, including
+the household-wealth group `quint`.
+
+```{r results-published-2007-comparison}
+#| label: tbl-results-published-2007-comparison
+#| tbl-cap: "Published DRCongo 2007 decomposition benchmark compared with the regenerated regression decomposition."
+
+published_comparison_report <- copy(
+  drc_results_objects$published_drc_table3_comparison %||% data.table()
+)
+if (!nrow(published_comparison_report)) {
+  published_comparison_report <- data.table(
+    note = "Render Generate_DRC_Results_Objects.qmd to build the DRCongo 2007 reference comparison."
+  )
+} else {
+  published_comparison_report <- published_comparison_report[
+    ,
+    .(
+      Determinant = determinant,
+      `Published C contribution (%)` = published_percent,
+      `Generated CI contribution (%)` = regression_pct_contribution,
+      `Difference` = difference_from_published
+    )
+  ]
+}
+
+report_compact_table(
+  published_comparison_report,
+  digits = 2,
+  caption = "Published DRCongo 2007 decomposition benchmark compared with the regenerated regression decomposition",
+  column_widths = c("4.4cm", rep("2.4cm", 3L))
+)
+```
+
+### 4.2.2 Comparison of Indirect Decomposition Results
 
 Categorical predictors enter the regression decomposition as separate one-hot
 terms. The predictive ranger is fitted on the same design-matrix terms, so the
@@ -358,7 +420,7 @@ method_comparison_table <- kableExtra::add_header_above(
 method_comparison_table
 ```
 
-### 4.2.2 Root-Node Inequality
+### 4.2.3 Root-Node Inequality
 
 ```{r results-root-ci}
 #| label: tbl-results-root-ci
@@ -383,7 +445,7 @@ report_compact_table(
 )
 ```
 
-### 4.2.3 Selected Concentration-Index Tree
+### 4.2.4 Selected Concentration-Index Tree
 
 ```{r results-selected-tree, fig.width=12, fig.height=9}
 #| label: fig-results-selected-ci-tree
@@ -1024,6 +1086,53 @@ if (isTRUE(params$render_appendix_tree_plots) && "L" %in% names(tree_models_by_t
     var_labels = congo_var_labels,
     fontsize = 5.8
   )
+}
+```
+
+#### Lecturer rpart comparison trees
+
+The lecturer-style `rpart` fits are converted to partykit trees before plotting,
+so the figures use the same terminal-node summaries as the concentration-index
+tree plots.
+
+```{r appendix-lecturer-rpart-summary}
+#| label: tbl-appendix-lecturer-rpart-summary
+#| tbl-cap: "Terminal-node summaries for the lecturer rpart comparison trees."
+
+lecturer_rpart_summary_out <- copy(lecturer_rpart_summary)
+if ("is_terminal" %in% names(lecturer_rpart_summary_out)) {
+  lecturer_rpart_summary_out <- lecturer_rpart_summary_out[is_terminal == TRUE]
+}
+if (!nrow(lecturer_rpart_summary_out)) {
+  lecturer_rpart_summary_out <- data.table(
+    note = "Run Generate_DRC_Results_Objects.qmd after installing rpart."
+  )
+}
+
+# report_compact_table(
+#   lecturer_rpart_summary_out,
+#   digits = 4,
+#   caption = "Terminal-node summaries for the lecturer rpart comparison trees"
+# )
+```
+
+```{r appendix-lecturer-rpart-simple, fig.width=9, fig.height=8}
+#| label: fig-appendix-lecturer-rpart-simple
+#| fig-cap: "Lecturer rpart comparison tree using absolute CI impurity."
+#| fig-pos: "H"
+
+if (isTRUE(params$render_appendix_tree_plots) && "simple_abs" %in% names(lecturer_rpart_models)) {
+  plot_lecturer_rpart("simple_abs", fontsize = 11)
+}
+```
+
+```{r appendix-lecturer-rpart-robust, fig.width=9, fig.height=8}
+#| label: fig-appendix-lecturer-rpart-robust
+#| fig-cap: "Lecturer rpart comparison tree using robust absolute CI impurity."
+#| fig-pos: "H"
+
+if (isTRUE(params$render_appendix_tree_plots) && "robust_abs" %in% names(lecturer_rpart_models)) {
+  plot_lecturer_rpart("robust_abs", fontsize = 11)
 }
 ```
 

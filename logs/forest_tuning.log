@@ -1,8 +1,26 @@
-[2026-05-31 21:09:57] Forest tuning: 3 grid rows, 4 criteria, 10 folds (~120 fold-level fits). 
-[2026-05-31 21:09:57] Forest tuning: starting batch 1/3, grid rows 1-1 (1 rows). 
-[2026-05-31 21:25:41] Forest tuning: completed batch 1/3 in 15.7 minutes. 33.3% complete (1/3 grid rows). 
-[2026-05-31 21:25:41] Forest tuning: starting batch 2/3, grid rows 2-2 (1 rows). 
-[2026-05-31 21:37:41] Forest tuning: completed batch 2/3 in 12.0 minutes. 66.7% complete (2/3 grid rows). 
-[2026-05-31 21:37:41] Forest tuning: starting batch 3/3, grid rows 3-3 (1 rows). 
-[2026-05-31 21:48:58] Forest tuning: completed batch 3/3 in 11.3 minutes. 100.0% complete (3/3 grid rows). 
-[2026-05-31 21:48:58] Forest tuning: finished all batches. 
+[2026-06-01 18:39:55] Forest tuning: 12 grid rows, 4 criteria, 10 folds (~480 fold-level fits). 
+[2026-06-01 18:39:55] Forest tuning: starting batch 1/12, grid rows 1-1 (1 rows). 
+[2026-06-01 18:42:30] Forest tuning: completed batch 1/12 in 2.6 minutes. 8.3% complete (1/12 grid rows). 
+[2026-06-01 18:42:30] Forest tuning: starting batch 2/12, grid rows 2-2 (1 rows). 
+[2026-06-01 18:44:55] Forest tuning: completed batch 2/12 in 2.4 minutes. 16.7% complete (2/12 grid rows). 
+[2026-06-01 18:44:55] Forest tuning: starting batch 3/12, grid rows 3-3 (1 rows). 
+[2026-06-01 18:48:06] Forest tuning: completed batch 3/12 in 3.2 minutes. 25.0% complete (3/12 grid rows). 
+[2026-06-01 18:48:06] Forest tuning: starting batch 4/12, grid rows 4-4 (1 rows). 
+[2026-06-01 18:50:41] Forest tuning: completed batch 4/12 in 2.6 minutes. 33.3% complete (4/12 grid rows). 
+[2026-06-01 18:50:41] Forest tuning: starting batch 5/12, grid rows 5-5 (1 rows). 
+[2026-06-01 18:56:24] Forest tuning: completed batch 5/12 in 5.7 minutes. 41.7% complete (5/12 grid rows). 
+[2026-06-01 18:56:24] Forest tuning: starting batch 6/12, grid rows 6-6 (1 rows). 
+[2026-06-01 19:01:52] Forest tuning: completed batch 6/12 in 5.5 minutes. 50.0% complete (6/12 grid rows). 
+[2026-06-01 19:01:52] Forest tuning: starting batch 7/12, grid rows 7-7 (1 rows). 
+[2026-06-01 19:06:31] Forest tuning: completed batch 7/12 in 4.6 minutes. 58.3% complete (7/12 grid rows). 
+[2026-06-01 19:06:31] Forest tuning: starting batch 8/12, grid rows 8-8 (1 rows). 
+[2026-06-01 19:10:07] Forest tuning: completed batch 8/12 in 3.6 minutes. 66.7% complete (8/12 grid rows). 
+[2026-06-01 19:10:07] Forest tuning: starting batch 9/12, grid rows 9-9 (1 rows). 
+[2026-06-01 19:17:31] Forest tuning: completed batch 9/12 in 7.4 minutes. 75.0% complete (9/12 grid rows). 
+[2026-06-01 19:17:31] Forest tuning: starting batch 10/12, grid rows 10-10 (1 rows). 
+[2026-06-01 19:25:20] Forest tuning: completed batch 10/12 in 7.8 minutes. 83.3% complete (10/12 grid rows). 
+[2026-06-01 19:25:20] Forest tuning: starting batch 11/12, grid rows 11-11 (1 rows). 
+[2026-06-01 19:31:39] Forest tuning: completed batch 11/12 in 6.3 minutes. 91.7% complete (11/12 grid rows). 
+[2026-06-01 19:31:39] Forest tuning: starting batch 12/12, grid rows 12-12 (1 rows). 
+[2026-06-01 19:36:58] Forest tuning: completed batch 12/12 in 5.3 minutes. 100.0% complete (12/12 grid rows). 
+[2026-06-01 19:36:58] Forest tuning: finished all batches. 
