@@ -265,8 +265,24 @@ ci_report_tree_plot <- function(
   stopifnot(requireNamespace("grid", quietly = TRUE))
   stopifnot(requireNamespace("ineqTrees", quietly = TRUE))
 
+  if (inherits(fit, "rpart")) {
+    if (!requireNamespace("partykit", quietly = TRUE)) {
+      stop("Install partykit to plot rpart trees with ci_report_tree_plot().",
+           call. = FALSE)
+    }
+    fit <- partykit::as.party(fit)
+  }
+
   ci_fun <- ineqTrees::ci_factory(ci_type)
-  plot(
+  plot_fun <- if (inherits(fit, "ci_tree")) {
+    plot
+  } else if (inherits(fit, "party")) {
+    getFromNamespace("plot.ci_tree", "ineqTrees")
+  } else {
+    plot
+  }
+
+  plot_fun(
     fit,
     gp = grid::gpar(fontsize = fontsize),
     data = as.data.frame(data),
