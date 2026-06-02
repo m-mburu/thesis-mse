@@ -266,7 +266,11 @@ tree_inner_panel_compact_labeled <- function(
 
   function(node) {
     lab <- extract_label(node)
-    label_lines <- strwrap(lab$label, width = max_chars)
+    label_lines <- unlist(lapply(
+      strsplit(lab$label, "\n", fixed = TRUE)[[1L]],
+      strwrap,
+      width = max_chars
+    ))
     if (!length(label_lines)) {
       label_lines <- ""
     }
@@ -1008,7 +1012,11 @@ ci_report_tree_plot <- function(
   var_labels = NULL,
   rank_name = "wealth",
   weight_name = "sample_weight",
-  fontsize = 11
+  fontsize = 11,
+  terminal_width_lines = 6,
+  terminal_height_lines = 4,
+  tnex = 1,
+  edge_max_chars = 24
 ) {
   stopifnot(requireNamespace("grid", quietly = TRUE))
   stopifnot(requireNamespace("ineqTrees", quietly = TRUE))
@@ -1054,9 +1062,9 @@ ci_report_tree_plot <- function(
       }
     ),
     stat_labels = list(
-      weighted_n = "weighted n",
+      weighted_n = "n",
       outcome = outcome_label,
-      mean_rank = paste("mean", rank_name),
+      mean_rank = if (identical(rank_name, "wealth")) "wealth" else rank_name,
       ci = ci_type
     ),
     stat_formatters = list(
@@ -1071,13 +1079,156 @@ ci_report_tree_plot <- function(
     ),
     terminal_fill = "#d9d9d9",
     edge_panel = tree_edge_panel_values_only,
+    ep_args = list(max_chars = edge_max_chars),
     inner_panel = tree_inner_panel_compact_labeled,
-    tp_args = list(width_lines = 11, height_lines = 5.2),
-    tnex = 0.85
+    ip_args = list(var_labels = var_labels),
+    tp_args = list(
+      width_lines = terminal_width_lines,
+      height_lines = terminal_height_lines
+    ),
+    tnex = tnex
   )
 }
 
 demo_tree_plot <- ci_report_tree_plot
+
+#' Plot a concentration-index tree with ggparty.
+ci_tree_gg <- function(
+  fit,
+  data,
+  outcome_name,
+  outcome_label = "Outcome",
+  ci_type = "CI",
+  var_labels = NULL,
+  rank_name = "wealth",
+  weight_name = "sample_weight",
+  horizontal = FALSE,
+  terminal_space = NULL,
+  inner_text_size = 3.4,
+  terminal_text_size = 3.0,
+  edge_text_size = 3.0,
+  label_padding = grid::unit(0.18, "lines"),
+  terminal_padding = grid::unit(0.20, "lines"),
+  inner_fill = "white",
+  terminal_fill = "#d9d9d9",
+  edge_colour = "#303030",
+  base_size = 11
+) {
+  stopifnot(requireNamespace("data.table", quietly = TRUE))
+  stopifnot(requireNamespace("ggplot2", quietly = TRUE))
+  stopifnot(requireNamespace("ggparty", quietly = TRUE))
+  stopifnot(requireNamespace("grid", quietly = TRUE))
+  stopifnot(requireNamespace("ineqTrees", quietly = TRUE))
+  stopifnot(requireNamespace("partykit", quietly = TRUE))
+
+  if (inherits(fit, "rpart")) {
+    fit <- partykit::as.party(fit)
+  }
+
+  dt <- data.table::as.data.table(data)
+  node_id <- as.integer(partykit::predict.party(
+    fit,
+    newdata = as.data.frame(dt),
+    type = "node"
+  ))
+  ci_fun <- ineqTrees::ci_factory(ci_type)
+
+  terminal_stats <- dt[
+    ,
+    {
+      w <- .SD[[weight_name]]
+      y <- .SD[[outcome_name]]
+      rank <- .SD[[rank_name]]
+      list(
+        weighted_n = sum(w, na.rm = TRUE),
+        outcome = weighted_mean_safe(y, w),
+        mean_rank = weighted_mean_safe(rank, w),
+        ci = ci_fun(cbind(rank, y), w)
+      )
+    },
+    by = .(node_id),
+    .SDcols = unique(c(weight_name, outcome_name, rank_name))
+  ]
+  terminal_stats[
+    ,
+    node_label := sprintf(
+      "n = %s\n%s = %.1f%%\n%s = %.2f\n%s = %.3f",
+      format(round(weighted_n), big.mark = ",", scientific = FALSE),
+      outcome_label,
+      100 * outcome,
+      if (identical(rank_name, "wealth")) "wealth" else rank_name,
+      mean_rank,
+      ci_type,
+      ci
+    )
+  ]
+  terminal_label_lookup <- stats::setNames(
+    terminal_stats$node_label,
+    terminal_stats$node_id
+  )
+
+  pretty_split <- function(value) {
+    if (is.na(value) || !nzchar(value)) {
+      return(NA_character_)
+    }
+    if (!is.null(var_labels) && value %in% names(var_labels)) {
+      return(unname(var_labels[value]))
+    }
+    gsub("_", " ", value)
+  }
+
+  add_vars <- list(
+    node_label = function(data, node) {
+      label <- terminal_label_lookup[as.character(data$id)]
+      if (is.na(label)) "" else unname(label)
+    },
+    splitvar_label = function(data, node) {
+      pretty_split(data$splitvar)
+    }
+  )
+
+  gg_args <- list(
+    party = fit,
+    horizontal = horizontal,
+    add_vars = add_vars
+  )
+  if (!is.null(terminal_space)) {
+    gg_args$terminal_space <- terminal_space
+  }
+
+  do.call(ggparty::ggparty, gg_args) +
+    ggparty::geom_edge(colour = edge_colour, linewidth = 0.35) +
+    ggparty::geom_edge_label(
+      ggplot2::aes(label = breaks_label),
+      size = edge_text_size,
+      fill = "white",
+      max_length = 24,
+      parse = FALSE
+    ) +
+    ggparty::geom_node_label(
+      ggplot2::aes(label = splitvar_label),
+      ids = "inner",
+      size = inner_text_size,
+      label.padding = label_padding,
+      label.r = grid::unit(0.10, "lines"),
+      label.size = 0.25,
+      label.fill = inner_fill
+    ) +
+    ggparty::geom_node_label(
+      ggplot2::aes(label = node_label),
+      ids = "terminal",
+      size = terminal_text_size,
+      label.padding = terminal_padding,
+      label.r = grid::unit(0.08, "lines"),
+      label.size = 0.25,
+      label.fill = terminal_fill
+    ) +
+    ggplot2::theme_void(base_size = base_size) +
+    ggplot2::theme(
+      plot.margin = ggplot2::margin(12, 16, 12, 16),
+      plot.background = ggplot2::element_rect(fill = "white", colour = NA)
+    )
+}
 
 #' Collect tuning complexity and performance metrics into one table.
 collect_complexity_metrics <- function(tuning) {

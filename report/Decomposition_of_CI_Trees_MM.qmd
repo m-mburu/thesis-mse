@@ -51,6 +51,7 @@ knitr::opts_chunk$set(
   message = FALSE
 )
 
+library(tidyverse)
 library(gridExtra)
 library(data.table)
 library(ggplot2)
@@ -76,7 +77,10 @@ if (!exists("params", inherits = FALSE)) {
 results_object_file <- here("data", "drc_report_results_objects.rda")
 report_results <- load_drc_report_results(results_object_file)
 list2env(report_results, envir = environment())
+var_labels <- str_wrap(congo_var_labels, width = 25)
+
 ```
+
 
 # 4. Results
 
@@ -238,9 +242,25 @@ report_compact_table(
 )
 ```
 
+#### Tree validation plots
+
+```{r appendix-tree-validation-path-plots, fig.width= 6.3, fig.height=3.8}
+#| label: fig-appendix-tree-validation-path
+#| fig-cap: "Tree validation gain and complexity by minimum relative split gain."
+#| fig-pos: "H"
+tree_path_plot_dt <- copy(drc_results_objects$tree_min_relative_gain_path %||% data.table())
+
+plot_validation_percent_gain_path(
+    tree_path_plot_dt,
+    title = "Tree Validation Gain (% Root)"
+)
+```
+
+
+
 ### 4.2.4 Selected Concentration-Index Tree
 
-```{r results-selected-tree, fig.width=14, fig.height=9}
+```{r results-selected-tree, fig.width=9, fig.height=5, out.width="100%"}
 #| label: fig-results-selected-ci-tree
 #| fig-cap: "Selected concentration-index tree for under-five mortality in the DRC."
 #| fig-pos: "H"
@@ -249,16 +269,37 @@ ci_report_tree_plot(
   fit = selected_tree_fit,
   data = congo_model_dt,
   outcome_name = "deadu5_num",
-  outcome_label = "U5 death",
+  outcome_label = "U5",
   ci_type = selected_tree_type,
-  var_labels = congo_var_labels,
-  fontsize = 11
+  var_labels = congo_var_labels
 )
 ```
 
+
+
+
+```{r appendix-ci-tree-ci, fig.width=9, fig.height=5.0}
+#| label: fig-appendix-ci-tree-ci
+#| fig-cap: "Concentration-index tree fitted with the CI criterion."
+#| fig-pos: "H"
+
+
+  ci_report_tree_plot(
+    fit = tree_models_by_type[["CI"]],
+    data = congo_model_dt,
+    outcome_name = "deadu5_num",
+    outcome_label = "U5",
+    ci_type = "CI",
+    var_labels = congo_var_labels,
+    fontsize = 11
+  )
+
+```
+
+
 ### Surrogate Tree Comparison
 
-```{r results-surrogate-tree, fig.width=14, fig.height=9}
+```{r results-surrogate-tree, fig.width=11.5, fig.height=7, out.width="100%"}
 #| label: fig-results-surrogate-tree
 #| fig-cap: "Surrogate tree summarising the selected concentration-index forest predictions."
 #| fig-pos: "H"
@@ -269,9 +310,9 @@ ci_report_tree_plot(
     fit = selected_forest_surrogate$fit,
     data = selected_forest_surrogate$data,
     outcome_name = selected_forest_surrogate$prediction_name,
-    outcome_label = "U5 death",
+    outcome_label = "U5",
     ci_type = selected_tree_type,
-    var_labels = congo_var_labels,
+    var_labels = var_labels,
     fontsize = 11
 )
 ```
@@ -666,19 +707,20 @@ report_compact_table(
 )
 ```
 
-#### Tree validation plots
 
-```{r appendix-tree-validation-path-plots, fig.width= 6.3, fig.height=3.8}
-#| label: fig-appendix-tree-validation-path
-#| fig-cap: "Tree validation gain and complexity by minimum relative split gain."
+```{r appendix-tree-variable-importance-plot, fig.width=10, fig.height=7}
+#| label: fig-appendix-tree-variable-importance
+#| fig-cap: "Top tree variables by concentration-index criterion."
 #| fig-pos: "H"
-tree_path_plot_dt <- copy(drc_results_objects$tree_min_relative_gain_path %||% data.table())
 
-plot_validation_percent_gain_path(
-    tree_path_plot_dt,
-    title = "Tree Validation Gain (% Root)"
+plot_importance_by_criterion(
+  drc_results_objects$tree_variable_importance,
+  "Top Tree Variables by Concentration-Index Criterion",
+  fill = "#3268A8"
 )
 ```
+
+
 
 #### Tree complexity plots
 
@@ -695,38 +737,7 @@ plot_terminal_nodes_path(
 ```
 
 
-
-```{r appendix-tree-variable-importance-plot, fig.width=10, fig.height=7}
-#| label: fig-appendix-tree-variable-importance
-#| fig-cap: "Top tree variables by concentration-index criterion."
-#| fig-pos: "H"
-
-plot_importance_by_criterion(
-  drc_results_objects$tree_variable_importance,
-  "Top Tree Variables by Concentration-Index Criterion",
-  fill = "#3268A8"
-)
-```
-
-```{r appendix-ci-tree-ci, fig.width=7.2, fig.height=5.0}
-#| label: fig-appendix-ci-tree-ci
-#| fig-cap: "Concentration-index tree fitted with the CI criterion."
-#| fig-pos: "H"
-
-if (isTRUE(params$render_appendix_tree_plots) && "CI" %in% names(tree_models_by_type)) {
-  ci_report_tree_plot(
-    fit = tree_models_by_type[["CI"]],
-    data = congo_model_dt,
-    outcome_name = "deadu5_num",
-    outcome_label = "U5 death",
-    ci_type = "CI",
-    var_labels = congo_var_labels,
-    fontsize = 5.8
-  )
-}
-```
-
-```{r appendix-ci-tree-cig, fig.width=7.2, fig.height=5.0}
+```{r appendix-ci-tree-cig, fig.width=9, fig.height=5.0}
 #| label: fig-appendix-ci-tree-cig
 #| fig-cap: "Concentration-index tree fitted with the CIg criterion."
 #| fig-pos: "H"
@@ -736,15 +747,15 @@ if (isTRUE(params$render_appendix_tree_plots) && "CIg" %in% names(tree_models_by
     fit = tree_models_by_type[["CIg"]],
     data = congo_model_dt,
     outcome_name = "deadu5_num",
-    outcome_label = "U5 death",
+    outcome_label = "U5",
     ci_type = "CIg",
     var_labels = congo_var_labels,
-    fontsize = 5.8
+    fontsize = 11
   )
 }
 ```
 
-```{r appendix-ci-tree-cic, fig.width=7.2, fig.height=5.0}
+```{r appendix-ci-tree-cic, fig.width=9, fig.height=5.0}
 #| label: fig-appendix-ci-tree-cic
 #| fig-cap: "Concentration-index tree fitted with the CIc criterion."
 #| fig-pos: "H"
@@ -757,25 +768,7 @@ if (isTRUE(params$render_appendix_tree_plots) && "CIc" %in% names(tree_models_by
     outcome_label = "U5 death",
     ci_type = "CIc",
     var_labels = congo_var_labels,
-    fontsize = 5.8
-  )
-}
-```
-
-```{r appendix-ci-tree-l, fig.width=7.2, fig.height=5.0}
-#| label: fig-appendix-ci-tree-l
-#| fig-cap: "Concentration-index tree fitted with the L criterion."
-#| fig-pos: "H"
-
-if (isTRUE(params$render_appendix_tree_plots) && "L" %in% names(tree_models_by_type)) {
-  ci_report_tree_plot(
-    fit = tree_models_by_type[["L"]],
-    data = congo_model_dt,
-    outcome_name = "deadu5_num",
-    outcome_label = "U5 death",
-    ci_type = "L",
-    var_labels = congo_var_labels,
-    fontsize = 5.8
+    fontsize = 11
   )
 }
 ```
