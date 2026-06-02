@@ -22,6 +22,122 @@ ci_sim_feature_labels <- function() {
   )
 }
 
+ci_sim_simple_predictors <- function() {
+  c("mother_education", "residence", "child_sex", "province")
+}
+
+ci_sim_simple_feature_labels <- function() {
+  c(
+    mother_education = "Mother's education",
+    residence = "Residence",
+    child_sex = "Child sex",
+    province = "Province"
+  )
+}
+
+ci_sim_simple_province_labels <- function() {
+  c("Kinshasa", "Kongo Central", "Kasai", "Nord-Kivu")
+}
+
+ci_sim_make_simple_data <- function(
+    n = 1000L,
+    scenario = c("null_random", "known_subgroup"),
+    seed = 20260602,
+    outcome_name = "health_outcome") {
+  stopifnot(requireNamespace("data.table", quietly = TRUE))
+  scenario <- match.arg(scenario)
+  set.seed(seed)
+
+  dt <- data.table::data.table(
+    mother_education = sample(
+      c("No education", "Primary", "Secondary or higher"),
+      size = n,
+      replace = TRUE,
+      prob = c(0.30, 0.40, 0.30)
+    ),
+    residence = sample(
+      c("Urban", "Rural"),
+      size = n,
+      replace = TRUE,
+      prob = c(0.35, 0.65)
+    ),
+    child_sex = sample(c("Female", "Male"), size = n, replace = TRUE),
+    province = sample(
+      ci_sim_simple_province_labels(),
+      size = n,
+      replace = TRUE,
+      prob = c(0.25, 0.25, 0.25, 0.25)
+    ),
+    wealth = stats::runif(n),
+    sample_weight = 1
+  )
+
+  wealth_rank <- ci_sim_fractional_rank(dt$wealth)
+  poor <- wealth_rank <= 0.40
+
+  # health_outcome = 1 is an adverse health outcome in this toy example.
+  probability <- switch(
+    scenario,
+    null_random = rep(0.10, n),
+    known_subgroup = 0.05 +
+      0.20 * (dt$residence == "Rural" & dt$province == "Kasai" & poor) +
+      0.12 * (dt$mother_education == "No education" & poor) +
+      0.08 * (dt$residence == "Rural" & dt$province == "Nord-Kivu")
+  )
+  probability <- pmin(pmax(probability, 0.01), 0.60)
+
+  dt[, (outcome_name) := stats::rbinom(.N, size = 1L, prob = probability)]
+  dt[, `:=`(
+    true_probability = probability,
+    scenario = scenario,
+    wealth_group = factor(
+      ifelse(poor, "Poorer 40%", "Richer 60%"),
+      levels = c("Poorer 40%", "Richer 60%")
+    ),
+    mother_education = factor(
+      mother_education,
+      levels = c("Secondary or higher", "Primary", "No education")
+    ),
+    residence = factor(residence, levels = c("Urban", "Rural")),
+    child_sex = factor(child_sex, levels = c("Female", "Male")),
+    province = factor(province, levels = ci_sim_simple_province_labels())
+  )]
+
+  data.table::setcolorder(
+    dt,
+    c(
+      ci_sim_simple_predictors(),
+      "wealth",
+      "wealth_group",
+      outcome_name,
+      "true_probability",
+      "scenario",
+      "sample_weight"
+    )
+  )
+  dt
+}
+
+ci_sim_make_simple_examples <- function(
+    n = 1000L,
+    seed = 20260602,
+    outcome_name = "health_outcome") {
+  list(
+    random_no_relationship = ci_sim_make_simple_data(
+      n = n,
+      scenario = "null_random",
+      seed = seed,
+      outcome_name = outcome_name
+    ),
+    subgroup_relationship = ci_sim_make_simple_data(
+      n = n,
+      scenario = "known_subgroup",
+      seed = seed + 1L,
+      outcome_name = outcome_name
+    )
+  )
+}
+
 ci_sim_province_labels <- function() {
   c(
     "1" = "Kinshasa", "2" = "Kwango", "3" = "Kwilu",

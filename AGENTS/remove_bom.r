@@ -20,7 +20,7 @@ remove_utf8_bom <- function(path) {
 }
 
 args <- commandArgs(trailingOnly = TRUE)
-target <- if (length(args) > 0) args[1] else "Decomposition_of_CI_Trees_MM.qmd"
+target <- if (length(args) > 0) args[1] else here::here("report/methodology.qmd")
 
 remove_utf8_bom(target)
 
