@@ -13,10 +13,10 @@ known_subgroup_labels <- function() {
 make_known_subgroup_data <- function(n = 3000L, seed = 20260528) {
   stopifnot(requireNamespace("data.table", quietly = TRUE))
   set.seed(seed)
-  wealth <- stats::rbeta(n, shape1 = 1.3, shape2 = 1.3)
+  wealth <- rbeta(n, shape1 = 1.3, shape2 = 1.3)
   poor <- 1 - wealth
-  rural <- stats::runif(n) < stats::plogis(-0.8 + 2.5 * poor)
-  no_education <- stats::runif(n) < stats::plogis(-1.2 + 2.1 * poor + 0.7 * rural)
+  rural <- runif(n) < plogis(-0.8 + 2.5 * poor)
+  no_education <- runif(n) < plogis(-1.2 + 2.1 * poor + 0.7 * rural)
 
   p_kasai <- 0.10 + 0.22 * poor
   p_kasai_central <- 0.08 + 0.20 * poor
@@ -43,20 +43,20 @@ make_known_subgroup_data <- function(n = 3000L, seed = 20260528) {
     male = sample(c("Female", "Male"), n, replace = TRUE)
   )
 
-  dt[, sample_weight := stats::runif(.N, min = 0.5, max = 2.0)]
+  dt[, sample_weight := runif(.N, min = 0.5, max = 2.0)]
   dt[, planted_subgroup := rural == "Rural" &
     ed == "b no education" &
     reg %in% c("Kasai", "Kasai Central")]
 
   poor_rank <- 1 - ((data.table::frankv(dt$wealth, ties.method = "average") - 0.5) / n)
-  eta <- stats::qlogis(0.035) +
+  eta <- qlogis(0.035) +
     0.25 * (dt$rural == "Rural") +
     0.25 * (dt$ed == "b no education") +
     3.20 * dt$planted_subgroup +
     2.60 * dt$planted_subgroup * poor_rank
 
-  dt[, true_risk := pmin(pmax(stats::plogis(eta), 0.005), 0.65)]
-  dt[, deadu5_num := stats::rbinom(.N, size = 1L, prob = true_risk)]
+  dt[, true_risk := pmin(pmax(plogis(eta), 0.005), 0.65)]
+  dt[, deadu5_num := rbinom(.N, size = 1L, prob = true_risk)]
 
   factor_cols <- c("rural", "ed", "reg", "birth", "male")
   dt[, (factor_cols) := lapply(.SD, factor), .SDcols = factor_cols]
@@ -73,7 +73,7 @@ fit_known_subgroup_ci_tree <- function(
   stopifnot(requireNamespace("ineqTrees", quietly = TRUE))
 
   predictors <- names(known_subgroup_labels())
-  formula <- stats::as.formula(
+  formula <- as.formula(
     paste("cbind(wealth, deadu5_num) ~", paste(predictors, collapse = " + "))
   )
 
@@ -98,12 +98,12 @@ summarise_known_subgroup_tree <- function(fit, data) {
   stopifnot(requireNamespace("ineqTrees", quietly = TRUE))
 
   out <- data.table::as.data.table(ineqTrees::ci_tree_terminal_summary(fit))
-  node_id <- stats::predict(fit, newdata = as.data.frame(data), type = "node")
+  node_id <- predict(fit, newdata = as.data.frame(data), type = "node")
   check <- data.table::as.data.table(data)
   check[, node := as.integer(node_id)]
   check[
     ,
-    planted_subgroup_share := stats::weighted.mean(planted_subgroup, sample_weight),
+    planted_subgroup_share := weighted.mean(planted_subgroup, sample_weight),
     by = node
   ]
   planted <- unique(check[, .(node, planted_subgroup_share)])
@@ -139,8 +139,8 @@ plot_known_subgroup_tree <- function(fit, data, type = "L") {
     var_labels = known_subgroup_labels(),
     terminal_stats = list(
       n = function(df) sum(df$sample_weight, na.rm = TRUE),
-      u5_death = function(df) stats::weighted.mean(df$deadu5_num, df$sample_weight),
-      planted = function(df) stats::weighted.mean(df$planted_subgroup, df$sample_weight),
+      u5_death = function(df) weighted.mean(df$deadu5_num, df$sample_weight),
+      planted = function(df) weighted.mean(df$planted_subgroup, df$sample_weight),
       ci = function(df) ci_fun(cbind(df$wealth, df$deadu5_num), df$sample_weight)
     ),
     stat_labels = list(

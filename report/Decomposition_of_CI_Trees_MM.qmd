@@ -9,18 +9,21 @@ format:
     geometry:
       - margin=25mm
     pdf-engine: xelatex
+    keep-tex: true
     toc: false
     number-sections: true
     number-depth: 3
     fig-cap-location: bottom
     tbl-cap-location: top
-    colorlinks: false
+    colorlinks: true
     fig-pos: "H"
     tbl-pos: "H"
     fig-dpi: 500
     include-in-header:
       text: |
         \renewcommand{\baselinestretch}{1.1}
+        \usepackage{microtype}
+        \frenchspacing
         \usepackage{graphicx}
         \usepackage{xcolor}
         \usepackage{amsmath,amssymb}
@@ -36,7 +39,7 @@ execute:
   echo: false
   warning: false
   message: false
-  fig-dpi: 500
+  fig-dpi: 700
 params:
   render_appendix_tree_plots: true
 ---
@@ -63,7 +66,6 @@ library(here)
 library(kableExtra)
 use_latex_packages()
 source(here("R", "report_helpers.R"))
-source(here("R", "ci_known_subgroup_demo.R"))
 source(here("R", "ci_rpart_comparison_methods.R"))
 
 if (!exists("params", inherits = FALSE)) {
@@ -79,17 +81,32 @@ report_results <- load_drc_report_results(results_object_file)
 list2env(report_results, envir = environment())
 var_labels <- str_wrap(congo_var_labels, width = 25)
 
+simulation_plot_file <- here("simulation", "simulation_tree_plots.rda")
+if (file.exists(simulation_plot_file)) {
+  load(simulation_plot_file)
+} else {
+  simulation_tree_plots <- list()
+  simulation_tree_plot_metadata <- list()
+}
+
 ```
 
 
-# 4. Results
+# Results
 
-The results section reports only the objects needed to answer the main technical
-question: whether inequality-oriented recursive partitioning identifies
-subgroup structure that is visible, stable, and comparable with classical
-decomposition output. Full generated outputs are moved to the appendix.
+## Exploratory Data Analysis
 
-## 4.1 Exploratory Data Analysis
+From the exploratory analysis, we see a high under-five mortality rate of
+10.32% (@fig-results-wealth-distribution). This was not evenly distributed
+among subgroups. Among children who died before age five, 51.3% were from
+low-wealth households, compared with 42.8% among children alive at age five;
+65.6% had no skilled birth attendance, compared with 56.8% among those alive;
+69.3% were from rural areas, compared with 60.7% among those alive; and 67.5%
+had mothers with no education, compared with 55.2% among those alive
+(@tbl-appendix-weighted-baseline). The province distribution also shows that
+mortality was not evenly distributed across the DRC provinces, with the highest
+under-five mortality rate observed in Katanga (14.2%) and the lowest in
+Kinshasa (6.2%) (@fig-appendix-province-mortality-distribution).
 
 ```{r results-outcome-distribution, fig.width=6.5, fig.height=3}
 #| label: fig-results-outcome-distribution
@@ -139,23 +156,11 @@ grid.arrange(outcome_gg, wealth_distr, ncol = 2)
 
 
 
-## 4.2 Application of developed tree models to the DRC DHS Data
+## Decomposition of Concentration-Index
 
-### 4.2.1 Published 2007 Validation Benchmark
+### Indirect methods comparison (regression and predictive-forest SHAP)
 
-The generated objects use the DRCongo 2007 analysis data from the previous
-validated workflow. The table below compares the published DRCongo
-concentration-index decomposition from Van Malderen et al. (2013, Table 3) with
-the regression decomposition regenerated in this report. The regenerated model
-uses the same determinant set as the published survey-GLM comparison, including
-the household-wealth group `quint`.
-
-### 4.2.2 Comparison of Indirect Decomposition Results
-
-Categorical predictors enter the regression decomposition as separate one-hot
-terms. The predictive ranger is fitted on the same design-matrix terms, so the
-comparison table reports categorical levels at the same granularity instead of
-collapsing them back to their parent variable.
+From the indirect decomposition, we see that the largest regression contribution came from mother’s education: 23.1% under CI and 28.7% under CIg/CIc (@tbl-results-method-comparison). Father’s occupation in agriculture was second, contributing 17.9% under CI and 19.9% under CIg/CIc. In the predictive-forest SHAP decomposition, the contributions were less concentrated in one or two variables. Residence and household wealth each contributed about 12% under CI, CIg and CIc, followed by mother’s occupation, father’s occupation, mother’s education and skilled birth attendance. The fitted regression model is reported in @tbl-appendix-regression-model-summary. Details of the fitted predictive forest are provided in @tbl-appendix-ranger-sampling-summary and @tbl-appendix-ranger-cross-validation, and its SHAP contributions are shown in @fig-appendix-shap-summary.
 
 ```{r results-method-comparison}
 #| label: tbl-results-method-comparison
@@ -217,7 +222,7 @@ method_comparison_table <- kableExtra::add_header_above(
 method_comparison_table
 ```
 
-### 4.2.3 Root-Node Inequality
+### Root-Node Inequality
 
 ```{r results-root-ci}
 #| label: tbl-results-root-ci
@@ -258,7 +263,7 @@ plot_validation_percent_gain_path(
 
 
 
-### 4.2.4 Selected Concentration-Index Tree
+### Selected Concentration-Index Tree
 
 ```{r results-selected-tree, fig.width=9, fig.height=5, out.width="100%"}
 #| label: fig-results-selected-ci-tree
@@ -348,25 +353,57 @@ gridExtra::grid.arrange(tree_importance_plot,
 ```
 
 
-## 4.3 Simulation Study
+## Simulation Study
 
-### 4.3.1 Recovery of the Simulated Subgroup Structure
+### Recovery of the Simulated Subgroup Structure
 
+The simulation study is used as a direct check on the tree-growing rule. In the
+null simulation, wealth, the binary outcome, and the candidate subgroup
+variables are generated independently. In the positive-control simulation, the
+outcome is concentrated among poorer observations in a planted subgroup defined
+by residence, maternal education, and province. The null trees should therefore
+remain at the root node, while the positive-control tree should recover a
+readable subgroup structure.
 
-```{r results-simulation-tree, fig.width=13, fig.height=8}
+```{r results-simulation-null-trees, fig.width=1.5, fig.height=1.5}
+#| label: fig-results-simulation-null-trees
+#| fig-cap: "Null simulation concentration-index trees by criterion."
+#| fig-subcap:
+#|   - "CI"
+#|   - "CIg"
+#|   - "CIc"
+#|   - "L"
+#| layout-ncol: 2
+
+null_plot_types <- c("CI", "CIg", "CIc", "L")
+if (
+  "Null simulation" %in% names(simulation_tree_plots) &&
+    all(null_plot_types %in% names(simulation_tree_plots[["Null simulation"]]))
+) {
+  for (type in null_plot_types) {
+    grid::grid.newpage()
+    grid::grid.draw(simulation_tree_plots[["Null simulation"]][[type]])
+  }
+}
+```
+
+```{r results-simulation-tree, fig.width=9, fig.height=6}
 #| label: fig-results-simulation-tree
-#| fig-cap: "Tree recovered from simulated data with a known subgroup-generating mechanism."
+#| fig-cap: "CIg concentration-index tree recovered from simulated data with a known subgroup-generating mechanism."
 
-plot_known_subgroup_tree(
-  fit = known_subgroup_fit,
-  data = known_subgroup_sim_dt,
-  type = selected_tree_type
-)
+if (
+  "Poor subgroup simulation" %in% names(simulation_tree_plots) &&
+    "CIg" %in% names(simulation_tree_plots[["Poor subgroup simulation"]])
+) {
+  grid::grid.newpage()
+  grid::grid.draw(simulation_tree_plots[["Poor subgroup simulation"]][["CIg"]])
+}
 ```
 
 # Appendix
 
 ## Results
+
 
 ### Appendix R1: Exploratory Data Outputs
 
@@ -773,32 +810,9 @@ if (isTRUE(params$render_appendix_tree_plots) && "CIc" %in% names(tree_models_by
 }
 ```
 
-#### Lecturer rpart comparison trees
+### Appendix R4: Rpart Comparison Tree Details
 
-The lecturer-style `rpart` fits are converted to partykit trees before plotting,
-so the figures use the same terminal-node summaries as the concentration-index
-tree plots.
 
-```{r appendix-lecturer-rpart-summary}
-#| label: tbl-appendix-lecturer-rpart-summary
-#| tbl-cap: "Terminal-node summaries for the lecturer rpart comparison trees."
-
-lecturer_rpart_summary_out <- copy(lecturer_rpart_summary)
-if ("is_terminal" %in% names(lecturer_rpart_summary_out)) {
-  lecturer_rpart_summary_out <- lecturer_rpart_summary_out[is_terminal == TRUE]
-}
-if (!nrow(lecturer_rpart_summary_out)) {
-  lecturer_rpart_summary_out <- data.table(
-    note = "Run Generate_DRC_Results_Objects.qmd after installing rpart."
-  )
-}
-
-# report_compact_table(
-#   lecturer_rpart_summary_out,
-#   digits = 4,
-#   caption = "Terminal-node summaries for the lecturer rpart comparison trees"
-# )
-```
 
 ```{r appendix-lecturer-rpart-simple, fig.width=9, fig.height=8}
 #| label: fig-appendix-lecturer-rpart-simple
@@ -820,7 +834,7 @@ if (isTRUE(params$render_appendix_tree_plots) && "robust_abs" %in% names(lecture
 }
 ```
 
-### Appendix R4: Concentration-Index Forest Details
+### Appendix 5: Concentration-Index Forest Details
 
 #### Forest tuning and selection details
 
@@ -961,7 +975,7 @@ plot_importance_by_criterion(
 )
 ```
 
-#### Non-Selected Forest Surrogate Trees
+#### Forest Surrogate Trees plots
 
 The selected forest surrogate appears in the results section. The remaining
 criterion-specific forest surrogates are retained here for comparison.
@@ -1006,15 +1020,52 @@ if (!identical(selected_tree_type, "L")) {
 }
 ```
 
-### Appendix R5: Implementation Status
 
-Implemented in the report: selected concentration-index tree and selected
-forest/surrogate-tree variable-importance plots in the results section; tree
-and concentration-index forest best-control tables, selected-setting validation
-summaries, selection metrics, validation and complexity plots, and
-variable-importance plots by criterion in the appendix; ranger cross-validation
-and SHAP summary outputs in the appendix.
 
-To implement for the final analysis run: rerun the generator with `RUN_CV=true`
-and `RUN_FOREST_CV=true` when the full cross-validation objects should be
-recomputed from scratch rather than read from previously generated results.
+### Appendix S: Simulation Sensitivity Plots
+
+The CIg tree is shown in the main results section. The remaining
+positive-control simulation trees are shown here to check whether the recovered
+subgroup pattern is stable across concentration-index criteria.
+
+```{r appendix-simulation-positive-control-ci, fig.width=9, fig.height=6}
+#| label: fig-appendix-simulation-positive-control-ci
+#| fig-cap: "Positive-control simulation tree fitted with the CI criterion."
+#| fig-pos: "H"
+
+if (
+  "Poor subgroup simulation" %in% names(simulation_tree_plots) &&
+    "CI" %in% names(simulation_tree_plots[["Poor subgroup simulation"]])
+) {
+  grid::grid.newpage()
+  grid::grid.draw(simulation_tree_plots[["Poor subgroup simulation"]][["CI"]])
+}
+```
+
+```{r appendix-simulation-positive-control-cic, fig.width=9, fig.height=6}
+#| label: fig-appendix-simulation-positive-control-cic
+#| fig-cap: "Positive-control simulation tree fitted with the CIc criterion."
+#| fig-pos: "H"
+
+if (
+  "Poor subgroup simulation" %in% names(simulation_tree_plots) &&
+    "CIc" %in% names(simulation_tree_plots[["Poor subgroup simulation"]])
+) {
+  grid::grid.newpage()
+  grid::grid.draw(simulation_tree_plots[["Poor subgroup simulation"]][["CIc"]])
+}
+```
+
+```{r appendix-simulation-positive-control-l, fig.width=9, fig.height=6}
+#| label: fig-appendix-simulation-positive-control-l
+#| fig-cap: "Positive-control simulation tree fitted with the L criterion."
+#| fig-pos: "H"
+
+if (
+  "Poor subgroup simulation" %in% names(simulation_tree_plots) &&
+    "L" %in% names(simulation_tree_plots[["Poor subgroup simulation"]])
+) {
+  grid::grid.newpage()
+  grid::grid.draw(simulation_tree_plots[["Poor subgroup simulation"]][["L"]])
+}
+```

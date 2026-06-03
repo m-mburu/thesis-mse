@@ -1734,32 +1734,6 @@ report_compact_table(
 )
 ```
 
-# Build Positive-Control Simulation Objects
-
-The generator ends with a simulation-based sanity check that the fitted tree
-procedure can recover a planted subgroup signal.
-
-```{r build-simulation-objects}
-known_subgroup_sim_dt <- make_known_subgroup_data(n = 5000L, seed = 20260528)
-known_subgroup_fit <- fit_known_subgroup_ci_tree(known_subgroup_sim_dt, type = selected_tree_type)
-known_subgroup_validation <- validate_known_subgroup_recovery(known_subgroup_fit, known_subgroup_sim_dt)
-known_subgroup_summary <- summarise_known_subgroup_tree(known_subgroup_fit, known_subgroup_sim_dt)
-```
-
-```{r simulation-preview, purl=FALSE}
-report_compact_table(
-  known_subgroup_validation,
-  caption = "Positive-control validation of subgroup recovery"
-)
-```
-
-```{r simulation-tree-preview, purl=FALSE, fig.width=12, fig.height=8}
-plot_known_subgroup_tree(
-  fit = known_subgroup_fit,
-  data = known_subgroup_sim_dt,
-  type = selected_tree_type
-)
-```
 
 # Save Results Objects
 
@@ -1825,11 +1799,7 @@ drc_results_objects <- list(
   shap_diagnostics = selected_shap_diagnostics,
   shap_summary_long = shap_summary_long,
   method_comparison = method_comparison_table,
-  importance_wide = importance_wide,
-  known_subgroup_sim_dt = known_subgroup_sim_dt,
-  known_subgroup_fit = known_subgroup_fit,
-  simulation_validation = known_subgroup_validation,
-  simulation_summary = known_subgroup_summary
+  importance_wide = importance_wide
 )
 
 save(drc_results_objects, file = results_object_file)
