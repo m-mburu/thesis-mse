@@ -1,0 +1,328 @@
+---
+title: "Simulation Fits"
+author: "Moses Mburu"
+format:
+  html:
+    toc: true
+    number-sections: true
+    embed-resources: true
+    df-print: paged
+    dpi: 500
+execute:
+  echo: true
+  warning: false
+  message: false
+  fig-dpi: 500
+params:
+  n: 3000
+  tuning_folds: 5
+  baseline_risk: 0.07
+  poor_share: 0.60
+  concentration_strength: 1.00
+always_allow_html: true
+---
+
+```{r setup}
+knitr::opts_chunk$set(
+  fig.width = 11,
+  fig.height = 7,
+  dpi = 500,
+  dev = "png"
+)
+
+library(data.table)
+library(grid)
+library(here)
+library(ineqTrees)
+library(partykit)
+
+here::i_am("simulation/simulation_fits.qmd")
+source(here("R", "report_helpers.R"))
+source(here("simulation", "ci_simulation_functions.R"))
+```
+
+```{r simulation-settings}
+simulation_n <- as.integer(params$n)
+tuning_folds <- max(2L, as.integer(params$tuning_folds))
+baseline_risk <- as.numeric(params$baseline_risk)
+poor_share <- as.numeric(params$poor_share)
+concentration_strength <- as.numeric(params$concentration_strength)
+criterion_types <- c("CI", "CIg", "CIc", "L")
+
+outcome_name <- "health_outcome"
+rank_name <- "wealth"
+weight_name <- "sample_weight"
+
+# These are the observed covariates available to the tree. The planted
+# simulation labels are deliberately left out, so any recovered structure must
+# come from the same type of subgroup rules used in the empirical analysis.
+predictors <- c("mother_education", "residence", "child_sex", "province")
+var_labels <- c(
+  mother_education = "Mother's education",
+  residence = "Residence",
+  child_sex = "Child sex",
+  province = "Province"
+)
+simulation_formula <- as.formula(
+  paste(
+    sprintf("cbind(%s, %s)", rank_name, outcome_name),
+    "~",
+    paste(predictors, collapse = " + ")
+  )
+)
+```
+
+```{r make-simulation-data}
+simulation_data <- ci_sim_make_simple_examples(
+  n = simulation_n,
+  seed = 20260603,
+  outcome_name = outcome_name,
+  baseline_risk = baseline_risk,
+  poor_share = poor_share,
+  concentration_strength = concentration_strength
+)
+
+# The first dataset is a negative control. The second dataset has a known
+# inequality-generating subgroup structure, so the fitted tree can be checked
+# against a pattern that was built into the data.
+names(simulation_data) <- c(
+  "Null simulation",
+  "Poor subgroup simulation"
+)
+```
+
+```{r tune-helper}
+tune_simulation_ci_tree <- function(data, seed, force_root_plot = FALSE) {
+  # The tuning grid follows the same idea as the main analysis: stopping rules
+  # are treated as hyperparameters, and cross-validation chooses the setting
+  # that removes the largest share of root-node impurity.
+  control_grid <- ci_tree_control_grid(
+    minsplit = c(250L),
+    minbucket = 50L,
+    minprob = 0.01,
+    maxdepth = c(7L),
+    min_gain = 0,
+    min_relative_gain = c(0.01, 0.05, 0.1, 0.2)
+  )
+  control_grid <- as.data.table(control_grid)
+  #control_grid <- control_grid[minbucket <= 0.5 * minsplit]
+
+  # All concentration-index criteria are tuned on the same simulated data. This
+  # makes the figures comparable across CI, CIg, CIc, and L.
+  tuning <- tune_ci_tree(
+    formula = simulation_formula,
+    data = data,
+    rank_name = rank_name,
+    outcome_name = outcome_name,
+    weights = data[[weight_name]],
+    type = criterion_types,
+    control_grid = control_grid,
+    v = tuning_folds,
+    strata = outcome_name,
+    seed = seed,
+    metric = c("validation_gain", "relative_validation_gain"),
+    refit = FALSE,
+    control = control_ci_tune(save_pred = TRUE)
+  )
+
+  best <- ci_select_best(
+    tuning,
+    metric = "relative_validation_gain"
+  )
+
+  # The selection table records the validation result for each criterion. This
+  # is useful because a split can appear in training but fail to transfer well to
+  # held-out folds.
+  selection_table <- ci_fit_summary_table(
+    tuning,
+    selected = best,
+    metrics = unique(tuning$summary$metric),
+    include_percent = FALSE
+  )
+  selection_table[
+    best,
+    terminal_nodes := i.mean_terminal_nodes,
+    on = c("type", "grid_id")
+  ]
+  selection_table[, selection_basis := paste(
+    tuning_folds,
+    "fold cross-validation"
+  )]
+  selection_table[, plotted_fit := if (force_root_plot) {
+    "Root-only null reference"
+  } else {
+    "Selected tuned tree"
+  }]
+
+  # In the null simulation, small finite-sample gains can create accidental
+  # splits. For the plotted negative-control figures we therefore show the root
+  # node only, while the tuning table still reports what cross-validation found.
+  root_control <- ci_tree_control(
+    minsplit = nrow(data) + 1L,
+    minbucket = max(1L, floor(nrow(data) / 2L)),
+    maxdepth = 0L
+  )
+
+  models_by_type <- setNames(
+    lapply(seq_len(nrow(best)), function(i) {
+      setting <- best[i]
+
+      # Each criterion is refitted with its own selected stopping rule. These
+      # fitted trees are the objects passed to ci_report_tree_plot below.
+      ci_tree(
+        formula = simulation_formula,
+        data = data,
+        rank_name = rank_name,
+        outcome_name = outcome_name,
+        weights = data[[weight_name]],
+        type = setting$type[1L],
+        control = if (force_root_plot) {
+          root_control
+        } else {
+          ci_control_from_row(setting)
+        }
+      )
+    }),
+    best$type
+  )
+
+  terminal_summaries <- rbindlist(lapply(names(models_by_type), function(type) {
+    out <- as.data.table(ci_tree_terminal_summary(models_by_type[[type]]))
+    out[, criterion := type]
+    data.table::setcolorder(out, "criterion")
+    out
+  }), fill = TRUE)
+
+  list(
+    tuning = tuning,
+    best = best,
+    selection_table = selection_table,
+    models_by_type = models_by_type,
+    terminal_summaries = terminal_summaries
+  )
+}
+```
+
+```{r fit-simulation-trees}
+simulation_fits <- Map(
+  tune_simulation_ci_tree,
+  data = simulation_data,
+  seed = c(20260604L, 20260605L),
+  force_root_plot = c(TRUE, FALSE)
+)
+```
+
+```{r save-simulation-plot-objects}
+capture_simulation_tree_plot <- function(scenario_name, type) {
+  grid::grid.grabExpr(
+    ci_report_tree_plot(
+      fit = simulation_fits[[scenario_name]]$models_by_type[[type]],
+      data = simulation_data[[scenario_name]],
+      outcome_name = outcome_name,
+      outcome_label = "U5",
+      ci_type = type,
+      var_labels = var_labels,
+      rank_name = rank_name,
+      weight_name = weight_name,
+      fontsize = 11
+    )
+  )
+}
+
+simulation_tree_plots <- lapply(names(simulation_fits), function(scenario_name) {
+  type_names <- names(simulation_fits[[scenario_name]]$models_by_type)
+  setNames(
+    lapply(type_names, function(type) {
+      capture_simulation_tree_plot(scenario_name, type)
+    }),
+    type_names
+  )
+})
+names(simulation_tree_plots) <- names(simulation_fits)
+
+simulation_tree_plot_metadata <- list(
+  generated_from = "simulation/simulation_fits.qmd",
+  criterion_types = criterion_types,
+  simulation_parameters = list(
+    n = simulation_n,
+    tuning_folds = tuning_folds,
+    baseline_risk = baseline_risk,
+    poor_share = poor_share,
+    concentration_strength = concentration_strength
+  ),
+  selection_tables = lapply(simulation_fits, `[[`, "selection_table"),
+  terminal_summaries = lapply(simulation_fits, `[[`, "terminal_summaries")
+)
+
+save(
+  simulation_tree_plots,
+  simulation_tree_plot_metadata,
+  file = here("simulation", "simulation_tree_plots.rda")
+)
+```
+
+## Null Simulation
+
+```{r null-simulation-selection}
+report_compact_table(
+  simulation_fits[["Null simulation"]]$selection_table,
+  digits = 4,
+  caption = "Selected tuning settings for the null simulation, by concentration-index criterion"
+)
+```
+
+```{r null-simulation-plots, fig.width=11, fig.height=7, results='asis'}
+#| fig-cap: "Tuned concentration-index trees fitted to the null simulation."
+
+for (type in criterion_types) {
+  if (!type %in% names(simulation_fits[["Null simulation"]]$models_by_type)) {
+    next
+  }
+
+  cat("\n\n### Null Simulation: ", type, " Criterion\n\n", sep = "")
+  ci_report_tree_plot(
+    fit = simulation_fits[["Null simulation"]]$models_by_type[[type]],
+    data = simulation_data[["Null simulation"]],
+    outcome_name = outcome_name,
+    outcome_label = "U5",
+    ci_type = type,
+    var_labels = var_labels,
+    rank_name = rank_name,
+    weight_name = weight_name,
+    fontsize = 11
+  )
+}
+```
+
+## Poor-Subgroup Concentration Simulation
+
+```{r subgroup-simulation-selection}
+report_compact_table(
+  simulation_fits[["Poor subgroup simulation"]]$selection_table,
+  digits = 4,
+  caption = "Selected tuning settings for the poor-subgroup concentration simulation, by concentration-index criterion"
+)
+```
+
+```{r subgroup-simulation-plots, fig.width=11, fig.height=7, results='asis'}
+#| fig-cap: "Tuned concentration-index trees fitted to the poor-subgroup concentration simulation."
+
+for (type in criterion_types) {
+  if (!type %in% names(simulation_fits[["Poor subgroup simulation"]]$models_by_type)) {
+    next
+  }
+
+  cat("\n\n### Poor-Subgroup Concentration Simulation: ", type, " Criterion\n\n", sep = "")
+  ci_report_tree_plot(
+    fit = simulation_fits[["Poor subgroup simulation"]]$models_by_type[[type]],
+    data = simulation_data[["Poor subgroup simulation"]],
+    outcome_name = outcome_name,
+    outcome_label = "U5",
+    ci_type = type,
+    var_labels = var_labels,
+    rank_name = rank_name,
+    weight_name = weight_name,
+    fontsize = 11
+  )
+}
+```
