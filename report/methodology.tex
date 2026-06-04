@@ -343,7 +343,7 @@ index of the fitted tree-based predictions.
 
 \section{Methodology}\label{sec-methodology}
 
-\subsection{1. Data, Outcome, and
+\subsection{Data, Outcome, and
 Determinants}\label{sec-data-outcome-determinants}
 
 This thesis uses child-level data from the Democratic Republic of the
@@ -381,15 +381,14 @@ either parent belongs to a low-skill or non-working occupational group,
 and province. Categorical variables are recoded into interpretable
 groups before the tree is fitted.
 
-\subsection{2. Measuring Socioeconomic Inequality in
+\subsection{Measuring Socioeconomic Inequality in
 Health}\label{sec-measuring-socioeconomic-inequality}
 
 This methodology aims to develop a decomposition of health inequalities
 using tree methods. We will first introduce the concepts of health
 inequality decomposition, then move to tree-based methods.
 
-\subsubsection{2.1 The Concentration
-Index}\label{sec-concentration-index}
+\subsubsection{The Concentration Index}\label{sec-concentration-index}
 
 The concentration index measures socioeconomic-related inequality in a
 health variable. It uses the concentration curve, which plots the
@@ -444,7 +443,7 @@ curve using a simple hypothetical example.}
 
 \end{figure}%
 
-\subsubsection{2.2 Decomposing Socioeconomic Inequality in
+\subsubsection{Decomposing Socioeconomic Inequality in
 Health}\label{sec-decomposing-inequality}
 
 Inequality is measured in the observed health outcome \(y_i\), but
@@ -496,7 +495,7 @@ where \(x_{ki}\) is the value of determinant \(x_k\) for the individual
 \(i\), \(\bar{x}_k\) is the mean of determinant \(x_k\), and \(R_i\) is
 the fractional socioeconomic rank of individual \(i\).
 
-\subsubsection{2.3 Percentage
+\subsubsection{Percentage
 Contributions}\label{sec-percentage-contributions}
 
 In the concentration index results, the percentage contribution for each
@@ -521,7 +520,7 @@ that it offsets part of that inequality. A percentage can exceed 100 per
 cent when other determinants, or the residual term, contribute in the
 opposite direction.
 
-\subsubsection{2.4 Concentration Index Variants and a Level-Dependent
+\subsubsection{Concentration Index Variants and a Level-Dependent
 Alternative}\label{sec-ci-extensions}
 
 When the outcome is bounded, for instance, in our case, a binary
@@ -609,7 +608,7 @@ under \(CI\) may differ from one chosen under \(CIg\), \(CIc\), or
 \(L\), because each index defines inequality in a slightly different
 way.
 
-\subsubsection{2.5 Limits of the Linear
+\subsubsection{Limits of the Linear
 Framework}\label{sec-linear-framework-limits}
 
 The standard decomposition uses a generalised linear model,
@@ -632,10 +631,10 @@ after a threshold is crossed. This is why this thesis next turns to
 tree-based methods, which can represent thresholds and interactions more
 directly without specifying this before fitting a model.
 
-\subsection{3. Tree-Based Models for Inequality
+\subsection{Tree-Based Models for Inequality
 Analysis}\label{sec-tree-based-models}
 
-\subsubsection{3.1 Recursive Partitioning and Decision
+\subsubsection{Recursive Partitioning and Decision
 Trees}\label{sec-recursive-partitioning-decision-trees}
 
 A decision tree does not fit a single global equation to all
@@ -693,7 +692,7 @@ change from one part of the population to another. A decision tree thus
 becomes useful when the pattern depends on thresholds, interactions, or
 subgroup-specific effects.
 
-\subsubsection{3.2 Recursive Partitioning for Inequality
+\subsubsection{Recursive Partitioning for Inequality
 Analysis}\label{sec-recursive-partitioning-inequality}
 
 In a usual CART(Classification and Regression Trees), splits are chosen
@@ -710,7 +709,7 @@ reported, but it is not the quantity used to choose the split. A split
 is preferred when it reduces the within-node concentration index of
 under-five mortality.
 
-\subsubsection{3.3 Concentration-Index-Based Recursive
+\subsubsection{Concentration-Index-Based Recursive
 Partitioning}\label{sec-ci-recursive-partitioning}
 
 To implement recursive partitioning using concentration indices, we
@@ -736,7 +735,7 @@ However, it replaces the conditional-inference tree-growing engine with
 a custom recursive builder whose split rule directly maximises
 concentration-index gain over candidate variables and split points.
 
-\paragraph{3.3.1 Weighted Within-Node Rank
+\paragraph{Weighted Within-Node Rank
 Function}\label{sec-weighted-within-node-rank}
 
 The concentration index requires individuals to be ranked from poorest
@@ -768,7 +767,7 @@ the ordered list. The rank is then divided by the total node weight, so
 separately inside each node, the wealth rank used by the concentration
 index is local to the subgroup being split, not to the full DHS sample.
 
-\paragraph{3.3.2 Node Impurity Based on the Concentration
+\paragraph{Node Impurity Based on the Concentration
 Index}\label{sec-node-impurity-ci}
 
 After we define within-node rank, the tree needs a criterion for
@@ -817,7 +816,7 @@ or pro-rich, we use the absolute value as the impurity measure:
 I(t) = |CI_t|.
 \]
 
-\paragraph{3.3.3 Split Gain Function}\label{sec-split-gain}
+\paragraph{Split Gain Function}\label{sec-split-gain}
 
 At this stage, the tree needs an objective function: a rule for deciding
 which split is best. At each node, the objective searches for candidate
@@ -878,9 +877,8 @@ G_m(j, s, t).
 The selected split is the candidate pair \((j,s)\) with the largest
 admissible gain.
 
-\subsubsection{3.3.4 Split behaviour under alternative
-concentration-based impurity
-measures}\label{sec-split-behaviour-impurity}
+\subsubsection{Split behaviour under alternative concentration-based
+impurity measures}\label{sec-split-behaviour-impurity}
 
 The impurity measure is not separate from the gain function. It enters
 directly into the definition of the gain. Once an impurity measure has
@@ -954,7 +952,7 @@ In short, the impurity measure determines what the gain function
 measures and the scale, and the gain function determines which split is
 selected.
 
-\paragraph{3.3.5 Split Search for Numeric and Categorical
+\paragraph{Split Search for Numeric and Categorical
 Predictors}\label{sec-split-search}
 
 At each node, the algorithm searches across the candidate predictors and
@@ -1008,7 +1006,7 @@ up to
 The eligible splits are subject to the stopping rules discussed in the
 next section.
 
-\paragraph{3.3.6 Stopping Rules}\label{sec-stopping-rules}
+\paragraph{Stopping Rules}\label{sec-stopping-rules}
 
 A node is split only if it passes the node level checks, has at least
 one admissible candidate split, and the best candidate gives enough
@@ -1075,7 +1073,7 @@ appendix (Figure~\ref{fig-greedy-ci-tree-flow}), and the implementation
 is available in the ineqTrees package (\citeproc{ref-ineqTrees}{Mburu,
 2026}).
 
-\subsubsection{3.4 Extensions to Ensemble Methods: Random
+\subsubsection{Extensions to Ensemble Methods: Random
 Forests}\label{sec-random-forests}
 
 The main advantage of the concentration-index tree is that the subgroup
@@ -1135,8 +1133,8 @@ gives a readable summary of how the forest separates children into
 inequality-relevant groups, while keeping the random forest as the more
 flexible model.
 
-\subsubsection{3.5 Evaluation and Model Selection of Tree-Based Methods
-for Inequality Analysis}\label{sec-model-selection}
+\subsubsection{Evaluation and Model Selection of Tree-Based Methods for
+Inequality Analysis}\label{sec-model-selection}
 
 The purpose of the inequality tree is to split the sample into subgroups
 where under-five mortality is no longer strongly concentrated by
@@ -1213,17 +1211,19 @@ impurity measure. Training gain metrics are useful to judge overfitting.
 That is when there is a large gap between the metric chosen on the
 training set and that on the validation set.
 
-\subsection{4. Proposed Tree-Based Decomposition
+\subsection{SHAP based Decomposition
 Framework}\label{sec-tree-based-decomposition}
 
-\hyperref[sec-tree-based-models]{Section 3} showed that tree-based
-models, including random forests, can provide flexible predictions of
-health risk. However, they do not yield the additive terms required by
-the classical Wagstaff decomposition. To deal with this, this thesis
-uses SHAP values to rewrite the fitted predictions as a sum of
-feature-specific contributions.
+Tree-based models, including random forests, can provide flexible
+predictions of health risk. This makes it hard to use them for
+decomposition, since the current decomposition methods rely on
+GLMs(\citeproc{ref-wagstaff2003decomposing}{{Wagstaff, van Doorslaer and
+Watanabe}, 2003}; \citeproc{ref-speybroeck2010decomposing}{Speybroeck
+\emph{et al.}, 2010}). To deal with this, this thesis uses SHAP values
+to rewrite the fitted predictions as a sum of feature-specific
+contributions.
 
-\subsubsection{4.1 General Notation and Setup}\label{sec-decomp-setup}
+\subsubsection{General Notation and Setup}\label{sec-decomp-setup}
 
 We start with a dataset containing \(n\) individuals, indexed by
 \(i = 1, \dots, n\). For each individual, we observe:
@@ -1262,24 +1262,17 @@ where \(C_{\hat{y}}\) is the concentration index of the fitted outcomes,
 rank of individual \(i\). To obtain a decomposition, we need to express
 \(\hat{y}_i\) as a sum of feature-specific components.
 
-\subsubsection{4.2 Tree-Based Predictions}\label{sec-tree-predictions}
+\subsubsection{Tree-Based Predictions}\label{sec-tree-predictions}
 
-In the Wagstaff decomposition, the fitted value from the regression
-model can be separated into terms linked to the individual determinants.
-This makes the decomposition step relatively direct. The tree models
-used in this thesis do not have that form. A child's fitted mortality
-risk is determined by the path it follows through the tree and by the
-terminal node it reaches. In the forest, the fitted value is an average
-over many such paths. As defined in
-\hyperref[sec-random-forests]{Section 3.4}, these fitted values are
-inequality-structured mortality scores rather than calibrated mortality
-probabilities. This allows the model to reflect thresholds and
-interactions in the DRC DHS data, but it also means that the prediction
-is not written as one contribution for education, another for residence,
-another for province, and so on. We use SHAP values to address this.
+In the regression based decomposition, the fitted value from the
+regression model can be separated into terms linked to the individual
+determinants. This makes the decomposition step relatively direct. The
+tree models do not have that form. A child's fitted mortality risk is
+determined by the path it follows through the tree and by the terminal
+node it reaches. In the random forest, the fitted value is an average
+over many such paths.
 
-\subsubsection{4.3 SHAP as the Additive
-Link}\label{sec-shap-additive-link}
+\subsubsection{SHAP as the Additive Link}\label{sec-shap-additive-link}
 
 The tree and forest give fitted mortality rates, but those values are
 not estimated using determinant-level coefficients. We use SHAP values
@@ -1287,11 +1280,7 @@ for this step. SHAP rewrites a model prediction as a baseline value plus
 feature contributions (\citeproc{ref-lundberg2017unified}{Lundberg and
 Lee, 2017}; \citeproc{ref-lundberg2018tree}{Lundberg, Erion and Lee,
 2018}). For tree ensembles, TreeSHAP provides an efficient way to
-compute these contributions. Because several DHS predictors are related
-to one another, such as education, occupation, residence, and wealth,
-the attribution also depends on how the background distribution is
-defined for missing features (\citeproc{ref-aas2021dependent}{Aas,
-Jullum and Løland, 2021}).
+compute these contributions.
 
 For child \(i\), we write the fitted value as:
 
@@ -1307,16 +1296,14 @@ step: the tree-based fitted value can be inserted into the
 concentration-index decomposition through determinant-level SHAP
 contributions.
 
-\subsubsection{4.4 A Tree-Based Definition of
+\subsubsection{A SHAP-Based Definition of
 Decomposition}\label{sec-shap-decomposition-definition}
 
 Since we have now expressed the predictions using SHAP, we can
 substitute this representation into the concentration index formula for
-the predicted outcome.
-
-We start with the fractional rank \(R_i\) and the mean prediction
-\(\mu_{\hat{y}} = \frac{1}{n}\sum_{i=1}^n \hat{y}_i\), the sample
-concentration index of the predictions is given by:
+the predicted outcome. We start with the fractional rank \(R_i\) and the
+mean prediction \(\mu_{\hat{y}} = \frac{1}{n}\sum_{i=1}^n \hat{y}_i\),
+the sample concentration index of the predictions is given by:
 
 \[
 C_{\hat{y}} = \frac{2}{n\mu_{\hat{y}}}\sum_{i=1}^n \hat{y}_i R_i - 1.
@@ -1386,7 +1373,7 @@ contributes a large share to overall inequality when its SHAP values are
 large in magnitude and systematically concentrated among richer or
 poorer individuals.
 
-\subsubsection{4.5 Percentage
+\subsubsection{Percentage
 Contributions}\label{sec-shap-percentage-contributions}
 
 As in \hyperref[sec-percentage-contributions]{Section 2.3}, I express
@@ -1406,7 +1393,7 @@ negative percentage means that it offsets part of that inequality. If
 the SHAP additivity gap is small and \(C_{\hat{y}} \neq 0\), the
 percentages should add up to about 100 per cent.
 
-\subsubsection{4.6 Comparison with the Linear Decomposition
+\subsubsection{Comparison with the Linear Decomposition
 Logic}\label{sec-linear-decomposition-comparison}
 
 The SHAP-based decomposition plays the same role as the Wagstaff
@@ -1471,7 +1458,7 @@ where \(C_y\) is the concentration index of the observed outcome,
 \(e_i = y_i - \hat{y}_i\). The second term is the residual inequality
 not captured by the fitted tree-based model.
 
-\subsubsection{4.7 Equivalence under
+\subsubsection{Equivalence under
 Linearity}\label{sec-equivalence-linearity}
 
 Next we test whether SHAP decomposition extension safely reduces to the
@@ -1528,7 +1515,7 @@ SHAP-based decomposition mathematically generalises the standard
 approach, retaining equivalence under linearity while safely expanding
 to accommodate tree ensembles.
 
-\subsection{Simulation}\label{simulation}
+\subsection{Simulation}\label{sec-simulation-study}
 
 We ran a small simulation study to check whether the algorithm behaved
 as expected. In the null scenario, covariates, wealth and under-five
@@ -1537,7 +1524,7 @@ predefined groups based on rural residence, no maternal education and
 selected provinces were assigned lower wealth and higher mortality risk,
 with the strongest increase among poorer children in these groups.
 
-\subsection{Analysis}\label{analysis}
+\subsection{Analysis}\label{sec-analysis-methods}
 
 We divided the analysis into direct and indirect decomposition methods.
 The direct methods use concentration-index trees and forests, developed
@@ -1575,12 +1562,6 @@ implementation.
 
 \protect\phantomsection\label{refs}
 \begin{CSLReferences}{0}{1}
-\bibitem[\citeproctext]{ref-aas2021dependent}
-Aas, K., Jullum, M. and Løland, A. (2021) {`Explaining individual
-predictions when features are dependent: More accurate approximations to
-shapley values'}, \emph{Artificial Intelligence}, 298, p. 103502.
-Available at: \url{https://doi.org/10.1016/j.artint.2021.103502}.
-
 \bibitem[\citeproctext]{ref-banerjee2012representative_trees}
 Banerjee, M., Ding, Y. and Noone, A.-M. (2012) {`Identifying
 representative trees from ensembles'}, \emph{Statistics in Medicine},

@@ -203,8 +203,7 @@ method_comparison_table <- report_compact_table(
     method_comparison_report,
     digits = 3,
     align = c("l", rep("r", 7L)),
-    caption = "Regression and predictive-forest SHAP percentage contributions by criterion",
-    column_widths = c("3.4cm", rep("1.35cm", 7L))
+    column_widths = c("4.4cm", rep("1.35cm", 7L))
 )
 
 
@@ -225,11 +224,11 @@ method_comparison_table
 #### The Corrected Concentration-Index Tree $CIc$
 
 
-We start with a tree based on the corrected concentration index, appropriate for bounded outcomes[@erreygers2009correcting]. In this method, the tree shows that inequality in under-five mortality is structured primarily by maternal education, father’s agricultural occupation, household wealth, skilled birth attendance, and residence in Katanga [@fig-appendix-ci-tree-cic]. The lowest-mortality terminal group consists of children whose mothers had some education and whose fathers were not in agriculture, with an under-five mortality rate of about 6.5 per cent. At the opposite end, children whose mothers had no education, who lived in low-wealth households, and who resided in Katanga had the highest mortality rate, about 17.8 per cent. Thus, the corrected rank-dependent tree identifies a clear socioeconomic gradient, but one that is expressed through combinations of education, occupation, household wealth, delivery care, and region rather than through wealth alone.
+We start with a tree based on the corrected concentration index, appropriate for bounded outcomes[@erreygers2009correcting]. In this method, the tree shows that inequality in under-five mortality is structured primarily by maternal education, father’s agricultural occupation, household wealth, skilled birth attendance, and residence in Katanga [@fig-appendix-ci-tree-cic]. The lowest-mortality terminal group consists of children whose mothers had some education and whose fathers were not in agriculture, with an under-five mortality rate of about 6.5%. At the opposite end, children whose mothers had no education, who lived in low-wealth households, and who resided in Katanga had the highest mortality rate, about 17.8%. Thus, the corrected rank-dependent tree identifies a clear socioeconomic gradient, but one that is expressed through combinations of education, occupation, household wealth, delivery care, and region rather than through wealth alone.
 
 
 
-```{r fig.width=9, fig.height=5.0}
+```{r fig.width=9, fig.height=4}
 #| label: fig-appendix-ci-tree-cic
 #| fig-cap: "Concentration-index tree fitted with the CIc criterion."
 #| fig-pos: "H"
@@ -250,15 +249,18 @@ We start with a tree based on the corrected concentration index, appropriate for
 #### Generalised and standard concentration-index trees $CIg$ and $CI$
 
 
-The appendix also shows the trees fitted using the generalised and standard concentration indices. The generalised concentration-index tree is almost identical to the corrected concentration-index tree [@fig-appendix-ci-tree-cig]. It again separates children first by maternal education and father’s agricultural occupation, then by skilled birth attendance, household wealth, and residence in Katanga. The mortality pattern is therefore substantively unchanged: the lowest-risk group consists of children whose mothers had some education and whose fathers were not in agriculture, while the highest-risk group consists of children whose mothers had no education, who lived in low-wealth households, and who resided in Katanga, with mortality around 17.8 per cent [@fig-appendix-ci-tree-cig]. The standard concentration-index tree gives a similar structure. However, it adds an extra distinction among children whose mothers had some education and whose fathers were not in agriculture, splitting them by short preceding birth interval [@fig-appendix-ci-tree-ci]. Children in this otherwise advantaged group without a short birth interval have the lowest mortality, about 6.0 per cent. In contrast, those with a short birth interval have higher mortality, about 11.7 per cent [@fig-appendix-ci-tree-ci]. Apart from this additional demographic split, the standard CI tree points to the same main sources of inequality as the corrected and generalised trees: maternal education, father’s agricultural occupation, delivery care, household wealth, and residence in Katanga.
+The appendix also shows the trees fitted using the generalised and standard concentration indices. The generalised concentration-index tree is almost identical to the corrected concentration-index tree [@fig-appendix-ci-tree-cig]. It again separates children first by maternal education and father’s agricultural occupation, then by skilled birth attendance, household wealth, and residence in Katanga. The mortality pattern is therefore substantively unchanged: the lowest-risk group consists of children whose mothers had some education and whose fathers were not in agriculture, while the highest-risk group consists of children whose mothers had no education, who lived in low-wealth households, and who resided in Katanga, with mortality around 17.8% [@fig-appendix-ci-tree-cig]. The standard concentration-index tree gives a similar structure. However, it adds an extra distinction among children whose mothers had some education and whose fathers were not in agriculture, splitting them by short preceding birth interval [@fig-appendix-ci-tree-ci]. Children in this otherwise advantaged group without a short birth interval have the lowest mortality, about 6.0%. In contrast, those with a short birth interval have higher mortality, about 11.7% [@fig-appendix-ci-tree-ci]. Apart from this additional demographic split, the standard CI tree points to the same main sources of inequality as the corrected and generalised trees: maternal education, father’s agricultural occupation, delivery care, household wealth, and residence in Katanga.
 
 
 
 ### Level dependent Concentration-Index Tree $L$
 
-```{r results-selected-tree, fig.width=9, fig.height=5, out.width="100%"}
+We then fit a tree based on the level-dependent concentration index [@erreygers2017socioeconomic] criterion, $L$. In this method, the selected tree shows that inequality in under-five mortality is structured primarily by rural residence, father’s agricultural occupation, household wealth, and province, especially Kinshasa, Equateur, and Katanga [@fig-results-selected-ci-tree]. The lowest-mortality terminal group consists of urban children in Kinshasa whose fathers were not in agriculture, with an under-five mortality rate of about 5.1%. The highest-mortality terminal group consists of rural children living in low-wealth households in Katanga, with an under-five mortality rate of about 18.5%. Thus, the level-dependent tree tells a more spatial story of inequality: mortality risk is first organised by the rural-urban divide, then by occupation, wealth, and region. This shows that the level-dependent method found a different structure compared to the rank-dependent methods
+
+
+```{r results-selected-tree, fig.width=9, fig.height=4.5, out.width="100%"}
 #| label: fig-results-selected-ci-tree
-#| fig-cap: "Selected concentration-index tree for under-five mortality in the DRC."
+#| fig-cap: "Level dependent concentration-index tree for under-five mortality in the DRC."
 #| fig-pos: "H"
 
 ci_report_tree_plot(
@@ -274,6 +276,9 @@ ci_report_tree_plot(
 
 
 #### Tree validation plots
+
+The rank-dependent trees performed well on the training data but poorly on the validation data. The CI, CIc, and CIg trees removed approximately 87 to 88% of root-node inequality during training, but had negative validation gains at the selected settings: -75.5% for CI and -73.1% for both CIc and CIg [@fig-appendix-tree-validation-path; @tbl-appendix-tree-selected-setting-summary]. In this criterion, a negative validation gain means that the sum of the terminal-node concentration-index values in the validation fold exceeded the concentration-index value at the root node. Thus, although these trees identified substantial rank-based structure in the fitted sample, the same partitions did not reduce inequality when applied to held-out folds.
+Tree complexity decreased as the minimum relative split gain increased, since larger thresholds allowed only splits that removed a larger share of parent-node impurity [@fig-appendix-tree-complexity-path]. The selected trees remained small, with an average of 7.5 terminal nodes for CI, 7.3 for CIc and CIg, and 6.8 for L [@tbl-appendix-tree-selection; @fig-appendix-tree-complexity-path]. Unlike rank-dependent trees, the level-dependent tree maintained a positive validation gain throughout the tuning path. At the selected setting, it removed 70.5% of root-node inequality in held-out folds while retaining an average of 6.8 terminal nodes [@fig-appendix-tree-validation-path; @tbl-appendix-tree-selected-setting-summary]. The rural-urban, occupational, wealth, and regional partition identified by the L tree was therefore more stable under the validation criterion used in this thesis.
 
 ```{r appendix-tree-validation-path-plots, fig.width= 6.3, fig.height=3.8}
 #| label: fig-appendix-tree-validation-path
