@@ -42,6 +42,12 @@ execute:
   fig-dpi: 700
 params:
   render_appendix_tree_plots: true
+bibliography: ref/thesis_ref.bib
+csl: ref/harvard.csl
+citeproc: true
+cite-method: citeproc
+link-citations: true
+reference-location: block
 ---
 
 ```{r setup, include=FALSE}
@@ -96,17 +102,7 @@ if (file.exists(simulation_plot_file)) {
 
 ## Exploratory Data Analysis
 
-From the exploratory analysis, we see a high under-five mortality rate of
-10.32% (@fig-results-wealth-distribution). This was not evenly distributed
-among subgroups. Among children who died before age five, 51.3% were from
-low-wealth households, compared with 42.8% among children alive at age five;
-65.6% had no skilled birth attendance, compared with 56.8% among those alive;
-69.3% were from rural areas, compared with 60.7% among those alive; and 67.5%
-had mothers with no education, compared with 55.2% among those alive
-(@tbl-appendix-weighted-baseline). The province distribution also shows that
-mortality was not evenly distributed across the DRC provinces, with the highest
-under-five mortality rate observed in Katanga (14.2%) and the lowest in
-Kinshasa (6.2%) (@fig-appendix-province-mortality-distribution).
+In the DRC Data Set[@dhs_drc_2007_dataset], 10.32% of children died before reaching age five (@fig-results-wealth-distribution). Deaths were more commonly observed among children from disadvantaged or rural backgrounds. The children who died differed descriptively from those who survived. Low-wealth households accounted for a larger share of deaths than of survivors (51.3% versus 42.8%). The same pattern was present for rural residence (69.3% versus 60.7%), no skilled attendance at birth (65.6% versus 56.8%), and mothers with no education (67.5% versus 55.2%) (@tbl-appendix-weighted-baseline). Mortality also differed across provinces, ranging from 6.2% in Kinshasa to 14.2% in Katanga (@fig-appendix-province-mortality-distribution).  Next we use the direct and indirect methods for decomposition.
 
 ```{r results-outcome-distribution, fig.width=6.5, fig.height=3}
 #| label: fig-results-outcome-distribution
@@ -222,48 +218,43 @@ method_comparison_table <- kableExtra::add_header_above(
 method_comparison_table
 ```
 
-### Root-Node Inequality
+## Direct methods (concentration-index trees and forests)
 
-```{r results-root-ci}
-#| label: tbl-results-root-ci
-#| tbl-cap: "Root-node inequality in under-five mortality by concentration-index criterion."
+### Rank Dependent Concentration-Index Tree 
 
-root_ci_report <- copy(drc_results_objects$root_ci)
-root_ci_report[, root_node := "Full sample"]
-root_ci_report <- dcast(
-  root_ci_report,
-  root_node ~ criterion,
-  value.var = "estimate"
-)
-setcolorder(root_ci_report, intersect(c("root_node", "CI", "CIg", "CIc", "L"), names(root_ci_report)))
-setnames(root_ci_report, "root_node", "Root node")
+#### The Corrected Concentration-Index Tree $CIc$
 
-report_compact_table(
-  root_ci_report,
-  digits = 4,
-  align = c("l", rep("r", ncol(root_ci_report) - 1L)),
-  caption = "Root-node inequality in under-five mortality by concentration-index criterion",
-  column_widths = c("3.2cm", rep("2cm", ncol(root_ci_report) - 1L))
-)
-```
 
-#### Tree validation plots
+We start with a tree based on the corrected concentration index, appropriate for bounded outcomes[@erreygers2009correcting]. In this method, the tree shows that inequality in under-five mortality is structured primarily by maternal education, father’s agricultural occupation, household wealth, skilled birth attendance, and residence in Katanga [@fig-appendix-ci-tree-cic]. The lowest-mortality terminal group consists of children whose mothers had some education and whose fathers were not in agriculture, with an under-five mortality rate of about 6.5 per cent. At the opposite end, children whose mothers had no education, who lived in low-wealth households, and who resided in Katanga had the highest mortality rate, about 17.8 per cent. Thus, the corrected rank-dependent tree identifies a clear socioeconomic gradient, but one that is expressed through combinations of education, occupation, household wealth, delivery care, and region rather than through wealth alone.
 
-```{r appendix-tree-validation-path-plots, fig.width= 6.3, fig.height=3.8}
-#| label: fig-appendix-tree-validation-path
-#| fig-cap: "Tree validation gain and complexity by minimum relative split gain."
+
+
+```{r fig.width=9, fig.height=5.0}
+#| label: fig-appendix-ci-tree-cic
+#| fig-cap: "Concentration-index tree fitted with the CIc criterion."
 #| fig-pos: "H"
-tree_path_plot_dt <- copy(drc_results_objects$tree_min_relative_gain_path %||% data.table())
 
-plot_validation_percent_gain_path(
-    tree_path_plot_dt,
-    title = "Tree Validation Gain (% Root)"
-)
+
+  ci_report_tree_plot(
+    fit = tree_models_by_type[["CIc"]],
+    data = congo_model_dt,
+    outcome_name = "deadu5_num",
+    outcome_label = "U5",
+    ci_type = "CIc",
+    var_labels = congo_var_labels,
+    fontsize = 11
+  )
+
 ```
 
+#### Generalised and standard concentration-index trees $CIg$ and $CI$
 
 
-### Selected Concentration-Index Tree
+The appendix also shows the trees fitted using the generalised and standard concentration indices. The generalised concentration-index tree is almost identical to the corrected concentration-index tree [@fig-appendix-ci-tree-cig]. It again separates children first by maternal education and father’s agricultural occupation, then by skilled birth attendance, household wealth, and residence in Katanga. The mortality pattern is therefore substantively unchanged: the lowest-risk group consists of children whose mothers had some education and whose fathers were not in agriculture, while the highest-risk group consists of children whose mothers had no education, who lived in low-wealth households, and who resided in Katanga, with mortality around 17.8 per cent [@fig-appendix-ci-tree-cig]. The standard concentration-index tree gives a similar structure. However, it adds an extra distinction among children whose mothers had some education and whose fathers were not in agriculture, splitting them by short preceding birth interval [@fig-appendix-ci-tree-ci]. Children in this otherwise advantaged group without a short birth interval have the lowest mortality, about 6.0 per cent. In contrast, those with a short birth interval have higher mortality, about 11.7 per cent [@fig-appendix-ci-tree-ci]. Apart from this additional demographic split, the standard CI tree points to the same main sources of inequality as the corrected and generalised trees: maternal education, father’s agricultural occupation, delivery care, household wealth, and residence in Katanga.
+
+
+
+### Level dependent Concentration-Index Tree $L$
 
 ```{r results-selected-tree, fig.width=9, fig.height=5, out.width="100%"}
 #| label: fig-results-selected-ci-tree
@@ -282,24 +273,21 @@ ci_report_tree_plot(
 
 
 
+#### Tree validation plots
 
-```{r appendix-ci-tree-ci, fig.width=9, fig.height=5.0}
-#| label: fig-appendix-ci-tree-ci
-#| fig-cap: "Concentration-index tree fitted with the CI criterion."
+```{r appendix-tree-validation-path-plots, fig.width= 6.3, fig.height=3.8}
+#| label: fig-appendix-tree-validation-path
+#| fig-cap: "Tree validation gain and complexity by minimum relative split gain."
 #| fig-pos: "H"
+tree_path_plot_dt <- copy(drc_results_objects$tree_min_relative_gain_path %||% data.table())
 
-
-  ci_report_tree_plot(
-    fit = tree_models_by_type[["CI"]],
-    data = congo_model_dt,
-    outcome_name = "deadu5_num",
-    outcome_label = "U5",
-    ci_type = "CI",
-    var_labels = congo_var_labels,
-    fontsize = 11
-  )
-
+plot_validation_percent_gain_path(
+    tree_path_plot_dt,
+    title = "Tree Validation Gain (% Root)"
+)
 ```
+
+
 
 
 ### Surrogate Tree Comparison
@@ -773,6 +761,7 @@ plot_terminal_nodes_path(
 )
 ```
 
+### Additional Concentration-Index Tree Plots
 
 ```{r appendix-ci-tree-cig, fig.width=9, fig.height=5.0}
 #| label: fig-appendix-ci-tree-cig
@@ -792,18 +781,18 @@ if (isTRUE(params$render_appendix_tree_plots) && "CIg" %in% names(tree_models_by
 }
 ```
 
-```{r appendix-ci-tree-cic, fig.width=9, fig.height=5.0}
-#| label: fig-appendix-ci-tree-cic
-#| fig-cap: "Concentration-index tree fitted with the CIc criterion."
+```{r appendix-ci-tree-ci, fig.width=9, fig.height=5.0}
+#| label: fig-appendix-ci-tree-ci
+#| fig-cap: "Concentration-index tree fitted with the CI criterion."
 #| fig-pos: "H"
 
-if (isTRUE(params$render_appendix_tree_plots) && "CIc" %in% names(tree_models_by_type)) {
+if (isTRUE(params$render_appendix_tree_plots) && "CI" %in% names(tree_models_by_type)) {
   ci_report_tree_plot(
-    fit = tree_models_by_type[["CIc"]],
+    fit = tree_models_by_type[["CI"]],
     data = congo_model_dt,
     outcome_name = "deadu5_num",
-    outcome_label = "U5 death",
-    ci_type = "CIc",
+    outcome_label = "U5",
+    ci_type = "CI",
     var_labels = congo_var_labels,
     fontsize = 11
   )
