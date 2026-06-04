@@ -47,7 +47,6 @@ library(ineqTrees)
 library(partykit)
 library(here)
 source(here("R", "report_helpers.R"))
-source(here("R", "ci_known_subgroup_demo.R"))
 source(here("R", "ci_rpart_comparison_methods.R"))
 
 kableExtra::use_latex_packages()
@@ -330,7 +329,7 @@ congo_var_labels[intersect(kept_predictors, names(raw_congo_var_labels))] <-
     raw_congo_var_labels[intersect(kept_predictors, names(raw_congo_var_labels))]
 congo_var_labels[indicator_level_map$variable] <- indicator_level_map$variable_label
 
-congo_ci_formula <- stats::as.formula(
+congo_ci_formula <- as.formula(
     paste("cbind(wealth, deadu5_num) ~", paste(congo_predictors, collapse = " + "))
 )
 ```
@@ -495,7 +494,7 @@ decomposition method is built in its own chunk before being displayed.
 ```{r fit-classical-model}
 library(survey)
 library(rineq)
-linear_decomp_formula <- stats::as.formula(
+linear_decomp_formula <- as.formula(
   paste("deadu5_num ~", paste(raw_congo_predictors, collapse = " + "))
 )
 linear_decomp_design <- survey::svydesign(
@@ -506,7 +505,7 @@ linear_decomp_design <- survey::svydesign(
 linear_decomp_fit <- survey::svyglm(
   linear_decomp_formula,
   design = linear_decomp_design,
-  family = stats::quasibinomial()
+  family = quasibinomial()
 )
 ```
 
@@ -515,8 +514,8 @@ print(summary(linear_decomp_fit))
 ```
 
 ```{r extract-classical-model-components}
-linear_x <- stats::model.matrix(linear_decomp_formula, data = raw_congo_model_dt)
-linear_beta <- stats::coef(linear_decomp_fit)
+linear_x <- model.matrix(linear_decomp_formula, data = raw_congo_model_dt)
+linear_beta <- coef(linear_decomp_fit)
 linear_terms <- setdiff(colnames(linear_x), "(Intercept)")
 
 linear_term_info <- data.table(
@@ -543,7 +542,7 @@ regression_model_summary[, term_label := fifelse(
   "Intercept",
   format_variable_label(variable)
 )]
-data.table::setcolorder(
+setcolorder(
   regression_model_summary,
   c("term", "term_label", "variable", setdiff(names(regression_model_summary), c("term", "term_label", "variable")))
 )
@@ -593,7 +592,7 @@ summarise_rineq_decomposition <- function(object, method_name) {
     NA_real_
   )]
 
-  data.table::setcolorder(
+  setcolorder(
     out,
     c(
       "variable",
@@ -741,7 +740,7 @@ rineq_summary_by_type <- list(
 rineq_summary <- rbindlist(lapply(names(rineq_summary_by_type), function(type) {
   out <- copy(rineq_summary_by_type[[type]])
   out[, criterion := type]
-  data.table::setcolorder(out, c("criterion", setdiff(names(out), "criterion")))
+  setcolorder(out, c("criterion", setdiff(names(out), "criterion")))
   out
 }), fill = TRUE)
 
@@ -962,7 +961,7 @@ selected_tree_summary <- as.data.table(ci_tree_terminal_summary(selected_tree_fi
 all_tree_terminal_summaries <- rbindlist(lapply(names(tree_models_by_type), function(type) {
     out <- as.data.table(ci_tree_terminal_summary(tree_models_by_type[[type]]))
     out[, criterion := type]
-    data.table::setcolorder(out, "criterion")
+    setcolorder(out, "criterion")
     out
 }), fill = TRUE)
 ```
@@ -1324,7 +1323,7 @@ ranger_workflow <- workflows::workflow() |>
 ```{r build-ranger-grid}
 ranger_parameter_set <- hardhat::extract_parameter_set_dials(ranger_workflow) |>
   update(
-    mtry = dials::mtry(range = c(1L, length(ranger_predictor_terms))),
+    mtry = dials::mtry(range = c(10L, length(ranger_predictor_terms))),
     min_n = dials::min_n(range = c(200L, 2000L))
   )
 ranger_grid <- dials::grid_regular(
@@ -1381,7 +1380,7 @@ predict_ranger_risk <- function(object, newdata) {
 ```
 
 ```{r prepare-shap-data}
-shap_rows <- sort(sample.int(nrow(ranger_fit_df), min(shap_n, nrow(ranger_fit_df))))
+shap_rows <- sort(sample.int(nrow(ranger_fit_df), max(shap_n, nrow(ranger_fit_df))))
 shap_x_background <- ranger_fit_df[, ranger_predictor_terms, drop = FALSE]
 shap_x_eval <- ranger_fit_df[shap_rows, ranger_predictor_terms, drop = FALSE]
 shap_prediction <- as.numeric(predict_ranger_risk(predictive_forest_fit, shap_x_eval))
@@ -1453,7 +1452,7 @@ shap_summary_long[
   mean_abs_shap := mean(abs(shap_value), na.rm = TRUE),
   by = feature
 ]
-data.table::setcolorder(
+setcolorder(
   shap_summary_long,
   c(
     "feature",
@@ -1600,7 +1599,7 @@ selected_shap_contributions <- rbindlist(list(
   as.data.table(shap_l_decomp$contributions)[, criterion := "L"]
 ), fill = TRUE)
 selected_shap_contributions[, feature := canonicalize_model_terms(feature, congo_predictors)]
-data.table::setcolorder(selected_shap_contributions, c("criterion", setdiff(names(selected_shap_contributions), "criterion")))
+setcolorder(selected_shap_contributions, c("criterion", setdiff(names(selected_shap_contributions), "criterion")))
 
 selected_shap_diagnostics <- rbindlist(list(
   as.data.table(shap_ci_decomp$diagnostics)[, criterion := "CI"],
@@ -1608,7 +1607,7 @@ selected_shap_diagnostics <- rbindlist(list(
   as.data.table(shap_cic_decomp$diagnostics)[, criterion := "CIc"],
   as.data.table(shap_l_decomp$diagnostics)[, criterion := "L"]
 ), fill = TRUE)
-data.table::setcolorder(selected_shap_diagnostics, c("criterion", setdiff(names(selected_shap_diagnostics), "criterion")))
+setcolorder(selected_shap_diagnostics, c("criterion", setdiff(names(selected_shap_diagnostics), "criterion")))
 ```
 
 ```{r forest-preview, purl=FALSE}
@@ -1652,7 +1651,7 @@ selected_variables <- classical_decomposition_table[
   criterion == "CI"
 ][
   order(-abs(regression_pct_contribution))
-]$variable[seq_len(min(15L, classical_decomposition_table[criterion == "CI", .N]))]
+]$variable[seq_len(max(15L, classical_decomposition_table[criterion == "CI", .N]))]
 selected_variables <- selected_variables[!is.na(selected_variables) & nzchar(selected_variables)]
 
 method_comparison_table <- data.table(variable = selected_variables)
