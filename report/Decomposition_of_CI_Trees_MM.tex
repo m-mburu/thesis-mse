@@ -262,8 +262,8 @@ distribution and DHS wealth index in the DRC analysis data.}
 
 \end{figure}%
 
-\subsection{Decomposition of
-Concentration-Index}\label{decomposition-of-concentration-index}
+\subsection{Decomposition of determinants of under-five
+mortality}\label{decomposition-of-determinants-of-under-five-mortality}
 
 \subsubsection{Indirect methods comparison (regression and
 predictive-forest
@@ -570,6 +570,11 @@ gain and complexity by minimum relative split gain.}
 \paragraph{Surrogate trees from Forest
 Predictions}\label{surrogate-trees-from-forest-predictions}
 
+To interpret the selected forest, we fitted a surrogate tree to
+summarise its predictions (Figure~\ref{fig-results-surrogate-tree}). The
+surrogate tree retained the main structure seen in the level-dependent
+tree.
+
 \begin{figure}[H]
 
 \centering{
@@ -583,6 +588,32 @@ the selected concentration-index forest predictions.}
 
 \end{figure}%
 
+The first split was type of residence, separating urban and rural
+children. Among urban children, the main divisions were father's
+agricultural occupation and household wealth. Among rural children, the
+main divisions were household wealth, maternal education, and residence
+in Katanga. The lowest terminal-node mortality was observed among urban
+children in the high-wealth branch, while the highest terminal-node
+mortality was observed among rural, low-wealth children in Katanga.
+Compared with the single L tree, the surrogate gives a smoother version
+of the same rural-urban, socioeconomic, and regional pattern, with less
+extreme terminal-node mortality differences. The criterion-specific
+forest surrogate trees are shown in the appendix for comparison
+(Figure~\ref{fig-appendix-forest-surrogate-cig};
+Figure~\ref{fig-appendix-forest-surrogate-cic};
+Figure~\ref{fig-appendix-forest-surrogate-ci}).
+
+\subsubsection{Variable importance}\label{variable-importance}
+
+The variable-importance plots support the interpretation of the selected
+level-dependent models. In both the \(L\) tree and \(L\) forest, the
+type of residence gives the largest reduction in concentration-index
+impurity Figure~\ref{fig-results-selected-model-variable-importance}. In
+the single tree, residence is followed by father's agricultural
+occupation, Kinshasa, household wealth, Equateur, and Katanga,
+reflecting a structure organised around the rural-urban divide,
+occupational position, household wealth, and regional differences.
+
 \begin{figure}[H]
 
 \centering{
@@ -595,6 +626,14 @@ the selected concentration-index forest predictions.}
 importance for the selected concentration-index tree and forest.}
 
 \end{figure}%
+
+The \(L\) forest gives a less concentrated ranking than the single tree.
+Residence is still the first variable, but the forest also gives weight
+to mother's agricultural occupation, maternal education, household
+wealth, father's agricultural occupation, and regional indicators. In
+the appendix plots, the same groups of variables appear again under the
+other criteria: residence, region, occupation, education, and wealth
+Figure~\ref{fig-appendix-tree-variable-importance}, Figure~\ref{fig-appendix-forest-variable-importance}.
 
 \subsection{Simulation Study}\label{simulation-study}
 
@@ -695,6 +734,80 @@ impurity
 measures(Figure~\ref{fig-appendix-simulation-positive-control-ci};
 Figure~\ref{fig-appendix-simulation-positive-control-cic};
 Figure~\ref{fig-appendix-simulation-positive-control-l}).
+
+\section{Discussion}\label{discussion}
+
+\subsection{Main findings}\label{main-findings}
+
+This thesis developed and applied a tree-based model for analysing
+socioeconomic inequality in under-five mortality using the concentration
+index impurity. The main finding is that inequality in the DRC data
+could not be explained by household wealth alone. Under-five mortality
+was also related to residence, maternal education, skilled birth
+attendance, parental occupation, and province. Overall, 10.32\% of
+children died before age five. The children who died were more often
+from low-wealth households, rural households, mothers with no education,
+births without skilled attendance, and some provinces, especially
+Katanga. This is in line with earlier DRC work on geographic variation
+in under-five mortality, and with decomposition studies showing that
+wealth, education, residence, and occupation contribute to mortality
+inequalities in African settings
+(\citeproc{ref-vanmalderen2013under5}{Van Malderen, Van Oyen and
+Speybroeck, 2013}; \citeproc{ref-kandala2014drc}{Kandala \emph{et al.},
+2014}; \citeproc{ref-vanmalderen2019socioeconomic}{Van Malderen \emph{et
+al.}, 2019}).
+
+The indirect methods provided a variable view of this inequality. In the
+regression decomposition, mother's education made the largest
+contribution, accounting for 23.1\% under \(CI\) and 28.7\% under
+\(CIg\) and \(CIc\). Father's agricultural occupation was the
+second-largest contributor, accounting for 17.9\% under \(CI\) and
+19.9\% under \(CIg\) and \(CIc\). These results are consistent with
+earlier decomposition work, which found that household wealth, parental
+education, occupation, and residence were important contributors to
+under-five mortality inequality
+(\citeproc{ref-vanmalderen2013under5}{Van Malderen, Van Oyen and
+Speybroeck, 2013}; \citeproc{ref-vanmalderen2019socioeconomic}{Van
+Malderen \emph{et al.}, 2019}). The SHAP analysis (from the fitted
+random forest) gave a less concentrated picture: residence and household
+wealth each contributed about 12\%, followed by mother's occupation,
+father's occupation, mother's education, and skilled birth attendance.
+Shap-based decomposition provides an addition to the regression methods
+by allowing the use of more flexible models such as Random Forests or
+XGBoost.
+
+The direct concentration-index trees added the subgroup interpretation
+that is less visible in the regression-based decomposition. While the
+indirect methods ranked variables by their contribution to inequality,
+the trees showed how these variables combined within the data to define
+groups with different inequality patterns. The rank-dependent trees
+based on \(CI\), \(CIg\), and \(CIc\) identified a structure involving
+maternal education, father's agricultural occupation, skilled birth
+attendance, household wealth, and Katanga. Mortality was lower among
+children whose mothers had some education and whose fathers were not in
+agriculture, and higher among children whose mothers had no education,
+who lived in low-wealth households, and who resided in Katanga. However,
+these partitions did not validate well. Although the rank-based methods
+removed about 87\% to 88\% of root-node inequality in training, their
+validation gains were negative, suggesting that the strong training
+structure did not transfer well to held-out folds.
+
+\subsection{Rank-dependent and level-dependent views of
+inequality}\label{rank-dependent-and-level-dependent-views-of-inequality}
+
+\subsection{Stability, validation, and overfitting Forests and
+surrogate-tree
+interpretation}\label{stability-validation-and-overfitting-forests-and-surrogate-tree-interpretation}
+
+\subsection{Methodological and data
+limitations}\label{methodological-and-data-limitations}
+
+\subsection{Ethical, societal, and stakeholder
+relevance}\label{ethical-societal-and-stakeholder-relevance}
+
+\section{Future research}\label{future-research}
+
+\section{Conclusion}\label{conclusion}
 
 \section{Appendix}\label{appendix}
 
@@ -1373,10 +1486,30 @@ A new approach to the measurement of bivariate inequality'},
 Health}, 14(7), p. 673. Available at:
 \url{https://doi.org/10.3390/ijerph14070673}.
 
+\bibitem[\citeproctext]{ref-kandala2014drc}
+Kandala, N.-B. \emph{et al.} (2014) {`Child mortality in the democratic
+republic of congo: Cross-sectional evidence of the effect of geographic
+location and prolonged conflict from a national household survey'},
+\emph{BMC Public Health}, 14(1), p. 266. Available at:
+\url{https://doi.org/10.1186/1471-2458-14-266}.
+
 \bibitem[\citeproctext]{ref-dhs_drc_2007_dataset}
 The DRC Program Program (2007) {`{Congo Democratic Republic: Standard
 DHS, 2007}'}. Survey dataset page. Available at:
 \url{https://dhsprogram.com/methodology/survey/survey-display-239.cfm}.
+
+\bibitem[\citeproctext]{ref-vanmalderen2019socioeconomic}
+Van Malderen, C. \emph{et al.} (2019) {`Socioeconomic factors
+contributing to under-five mortality in sub-saharan africa: A
+decomposition analysis'}, \emph{BMC Public Health}, 19(1), p. 760.
+Available at: \url{https://doi.org/10.1186/s12889-019-7111-8}.
+
+\bibitem[\citeproctext]{ref-vanmalderen2013under5}
+Van Malderen, C., Van Oyen, H. and Speybroeck, N. (2013) {`Contributing
+determinants of overall and wealth-related inequality in under-5
+mortality in 13 african countries'}, \emph{Journal of Epidemiology and
+Community Health}, 67(8), pp. 667--676. Available at:
+\url{https://doi.org/10.1136/jech-2012-202195}.
 
 \end{CSLReferences}
 
