@@ -322,11 +322,11 @@ provides contributions at the level of the determinants.
 
 For the analysis, we use child-level data from the Democratic Republic
 of the Congo DHS phase V survey (\citeproc{ref-dhs_drc_2007_dataset}{The
-DHS Program, 2007a}). Under-five mortality is treated as the outcome,
-and the DHS household wealth index serves as the socioeconomic ranking
-variable. This is appropriate for the DRC setting, where DHS-based
-research has shown that poverty and education are associated with access
-to health insurance
+DRC Program Program, 2007}). Under-five mortality is treated as the
+outcome, and the DHS household wealth index serves as the socioeconomic
+ranking variable. This is appropriate for the DRC setting, where
+DHS-based research has shown that poverty and education are associated
+with access to health insurance
 (\citeproc{ref-tsala_dimbuene2022_drc_health_insurance}{Tsala Dimbuene,
 Muanza Nzuzi and Nzita Kikhela, 2022}). The splitting variables cover
 characteristics of the child, the mother, the household, occupation,
@@ -347,8 +347,8 @@ index of the fitted tree-based predictions.
 Determinants}\label{sec-data-outcome-determinants}
 
 This thesis uses child-level data from the Democratic Republic of the
-Congo DHS Phase V survey (\citeproc{ref-dhs_drc_2007_dataset}{The DHS
-Program, 2007a}). The analysis includes children with complete
+Congo DHS Phase V survey (\citeproc{ref-dhs_drc_2007_dataset}{The DRC
+Program Program, 2007}). The analysis includes children with complete
 information on the outcome, household wealth score, survey weight, and
 covariates used in the tree models. DHS sampling weights are rescaled
 and used as non-negative case weights in the inequality-tree fitting
@@ -596,7 +596,7 @@ consumption, or expenditure, but a PCA-derived composite measure of
 household living standard based on asset ownership, housing materials,
 water access, sanitation facilities, and related household amenities
 (\citeproc{ref-dhsprogram_wealth_index_construction}{The DHS Program,
-2007b}). For the \(L\) index
+2007}). For the \(L\) index
 (\citeproc{ref-erreygers2017socioeconomic}{Erreygers and Kessels,
 2017}), state that the level-dependent construction is acceptable only
 when the socioeconomic variable has ratio-scale properties; since the
@@ -1510,19 +1510,29 @@ term:
 D_k^{\text{SHAP}} = \hat{\beta}_k \left( \frac{\bar{x}_k}{\mu_{\hat{y}}} \right) C_k.
 \]
 
-This is identical to the Wagstaff contribution formula. This means the
-SHAP-based decomposition mathematically generalises the standard
-approach, retaining equivalence under linearity while safely expanding
-to accommodate tree ensembles.
+This is identical to the Wagstaff contribution
+formula(\citeproc{ref-wagstaff2003decomposing}{{Wagstaff, van Doorslaer
+and Watanabe}, 2003};
+\citeproc{ref-speybroeck2010decomposing}{Speybroeck \emph{et al.},
+2010}). This means the SHAP-based decomposition generalises the standard
+approach, retaining equivalence under linearity while expanding to
+accommodate tree ensembles.
 
 \subsection{Simulation}\label{sec-simulation-study}
 
 We ran a small simulation study to check whether the algorithm behaved
-as expected. In the null scenario, covariates, wealth and under-five
-mortality were generated randomly. In the positive-control scenario,
-predefined groups based on rural residence, no maternal education and
-selected provinces were assigned lower wealth and higher mortality risk,
-with the strongest increase among poorer children in these groups.
+as expected. We first generated covariates: residence, maternal
+education, and province. Then, we produced two datasets. The null data
+set and the positive control. This was determined by wealth and under-5
+mortality distribution. In the null case, wealth and mortality were
+generated randomly. In the positive case, the planted structure
+comprised three variables: residence, maternal education, and province.
+Rural children formed the main at-risk group. Within this group,
+children in Kasai and Nord-Kivu formed a higher-risk subgroup compared
+with those in Kinshasa and Kongo Central. Children with no maternal
+education formed the highest-risk subgroup. These planted groups were
+assigned lower wealth and higher under-five mortality risk, with the
+strongest increase among poorer children in the highest-risk subgroup.
 
 \subsection{Analysis}\label{sec-analysis-methods}
 
@@ -1550,13 +1560,21 @@ applying the concentration-index decomposition
 (\citeproc{ref-wright2017ranger}{Wright and Ziegler, 2017};
 \citeproc{ref-tidymodels2020}{Kuhn and Wickham, 2020}).
 
-We also included a supplementary comparison to check the same splitting
-idea in an established CART implementation using
-(\citeproc{ref-rpart2026}{Therneau and Atkinson, 2026}). In this
-comparison, we replace the prediction deviance with weighted
-concentration-index loss as before. These results are included in the
-appendix as a comparison with the main concentration-index tree
-implementation.
+We also fitted a comparison concentration-index tree using the rpart R
+package (\citeproc{ref-rpart2026}{Therneau and Atkinson, 2026}) with a
+custom concentration-index splitting method. The comparison used the
+same outcome, socioeconomic ranking variable, and analysis weights as
+the main concentration-index tree. Node impurity was also defined using
+the absolute concentration index. The main difference was in the
+tree-growing tools. In the main implementation, we used custom and
+Partykit controls (\citeproc{ref-hothorn2015partykit}{Hothorn and
+Zeileis, 2015}). A split was accepted only if it satisfied the
+concentration-index tree controls: minimum parent-node size, minimum
+child-node size, minimum child-node proportion, maximum depth, minimum
+absolute gain, and minimum relative gain (introduced for this thesis).
+In the rpart comparison, split search and stopping were controlled via
+rpart controls, primarily minsplit, minbucket, and the complexity
+parameter cp.~
 
 \section{References}\label{sec-references}
 
@@ -1634,15 +1652,15 @@ Speybroeck, N. \emph{et al.} (2010) {`Decomposing socioeconomic health
 inequalities'}, \emph{International Journal of Public Health}, 55, pp.
 347--351. Available at: \url{https://doi.org/10.1007/s00038-009-0105-z}.
 
-\bibitem[\citeproctext]{ref-dhs_drc_2007_dataset}
-The DHS Program (2007a) {`{Congo Democratic Republic: Standard DHS,
-2007}'}. Survey dataset page. Available at:
-\url{https://dhsprogram.com/methodology/survey/survey-display-239.cfm}.
-
 \bibitem[\citeproctext]{ref-dhsprogram_wealth_index_construction}
-The DHS Program (2007b) {`Wealth index construction'}. The DHS Program.
+The DHS Program (2007) {`Wealth index construction'}. The DHS Program.
 Available at:
 \url{https://dhsprogram.com/topics/wealth-index/Wealth-Index-Construction.cfm}.
+
+\bibitem[\citeproctext]{ref-dhs_drc_2007_dataset}
+The DRC Program Program (2007) {`{Congo Democratic Republic: Standard
+DHS, 2007}'}. Survey dataset page. Available at:
+\url{https://dhsprogram.com/methodology/survey/survey-display-239.cfm}.
 
 \bibitem[\citeproctext]{ref-rpart2026}
 Therneau, T. and Atkinson, B. (2026) \emph{Rpart: Recursive partitioning

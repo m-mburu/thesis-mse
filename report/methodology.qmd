@@ -962,11 +962,11 @@ $$
 D_k^{\text{SHAP}} = \hat{\beta}_k \left( \frac{\bar{x}_k}{\mu_{\hat{y}}} \right) C_k.
 $$
 
-This is identical to the Wagstaff contribution formula. This means the SHAP-based decomposition mathematically generalises the standard approach, retaining equivalence under linearity while safely expanding to accommodate tree ensembles.
+This is identical to the Wagstaff contribution formula[@wagstaff2003decomposing; @speybroeck2010decomposing]. This means the SHAP-based decomposition generalises the standard approach, retaining equivalence under linearity while expanding to accommodate tree ensembles.
 
 ## Simulation {#sec-simulation-study}
 
-We ran a small simulation study to check whether the algorithm behaved as expected. In the null scenario, covariates, wealth and under-five mortality were generated randomly. In the positive-control scenario, predefined groups based on rural residence, no maternal education and selected provinces were assigned lower wealth and higher mortality risk, with the strongest increase among poorer children in these groups.
+We ran a small simulation study to check whether the algorithm behaved as expected. We first generated covariates: residence, maternal education, and province. Then, we produced two datasets. The null data set and the positive control. This was determined by wealth and under-5 mortality distribution. In the null case, wealth and mortality were generated randomly. In the positive case, the planted structure comprised three variables: residence, maternal education, and province. Rural children formed the main at-risk group. Within this group, children in Kasai and Nord-Kivu formed a higher-risk subgroup compared with those in Kinshasa and Kongo Central. Children with no maternal education formed the highest-risk subgroup. These planted groups were assigned lower wealth and higher under-five mortality risk, with the strongest increase among poorer children in the highest-risk subgroup.
 
 
 ## Analysis {#sec-analysis-methods}
@@ -974,7 +974,8 @@ We ran a small simulation study to check whether the algorithm behaved as expect
 
 We divided the analysis into direct and indirect decomposition methods. The direct methods use concentration-index trees and forests, developed here, in which the model is built to reduce socioeconomic inequality in under-five mortality at each split. In these methods, the subgroup structure is part of the decomposition because the tree is fitted using the concentration index criterion. The indirect methods first fit a model for under-five mortality and then decompose the fitted mortality pattern across the socioeconomic ranking. For the indirect methods, we use a regression-based decomposition in which we fitted a survey-weighted logistic regression with a quasibinomial family using svyglm from the survey package, and the fitted equation separates the contribution of each determinant through its coefficient [@wagstaff2003decomposing; @speybroeck2010decomposing; @survey2026]. The second indirect method is the SHAP-based decomposition described in [shap section](#sec-shap-decomposition-definition). For this method, a predictive random forest is fitted using the tidymodels package with the ranger engine, and the fitted predictions are then decomposed into SHAP contributions at the determinant level before applying the concentration-index decomposition [@tidymodels2020; @wright2017ranger].
 
-We also included a supplementary comparison to check the same splitting idea in an established CART implementation using [@rpart2026]. In this comparison, we replace the prediction deviance with weighted concentration-index loss as before. These results are included in the appendix as a comparison with the main concentration-index tree implementation.
+We also fitted a comparison concentration-index tree using the rpart R package [@rpart2026] with a custom concentration-index splitting method. The comparison used the same outcome, socioeconomic ranking variable, and analysis weights as the main concentration-index tree. Node impurity was also defined using the absolute concentration index. The main difference was in the tree-growing tools. In the main implementation, we used custom and Partykit controls [@hothorn2015partykit]. A split was accepted only if it satisfied the concentration-index tree controls: minimum parent-node size, minimum child-node size, minimum child-node proportion, maximum depth, minimum absolute gain, and minimum relative gain (introduced for this thesis). In the rpart comparison, split search and stopping were controlled via rpart controls, primarily minsplit, minbucket, and the complexity parameter cp. 
+
 
 # References {#sec-references}
 
