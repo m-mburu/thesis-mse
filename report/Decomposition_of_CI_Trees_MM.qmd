@@ -152,7 +152,7 @@ grid.arrange(outcome_gg, wealth_distr, ncol = 2)
 
 
 
-## Decomposition of Concentration-Index
+## Decomposition of determinants of under-five mortality
 
 ### Indirect methods comparison (regression and predictive-forest SHAP)
 
@@ -275,12 +275,11 @@ ci_report_tree_plot(
 
 
 
-#### Tree validation plots
+### Tree validation plots
 
-The rank-dependent trees performed well on the training data but poorly on the validation data. The CI, CIc, and CIg trees removed approximately 87 to 88% of root-node inequality during training, but had negative validation gains at the selected settings: -75.5% for CI and -73.1% for both CIc and CIg [@fig-appendix-tree-validation-path; @tbl-appendix-tree-selected-setting-summary]. In this criterion, a negative validation gain means that the sum of the terminal-node concentration-index values in the validation fold exceeded the concentration-index value at the root node. Thus, although these trees identified substantial rank-based structure in the fitted sample, the same partitions did not reduce inequality when applied to held-out folds.
-Tree complexity decreased as the minimum relative split gain increased, since larger thresholds allowed only splits that removed a larger share of parent-node impurity [@fig-appendix-tree-complexity-path]. The selected trees remained small, with an average of 7.5 terminal nodes for CI, 7.3 for CIc and CIg, and 6.8 for L [@tbl-appendix-tree-selection; @fig-appendix-tree-complexity-path]. Unlike rank-dependent trees, the level-dependent tree maintained a positive validation gain throughout the tuning path. At the selected setting, it removed 70.5% of root-node inequality in held-out folds while retaining an average of 6.8 terminal nodes [@fig-appendix-tree-validation-path; @tbl-appendix-tree-selected-setting-summary]. The rural-urban, occupational, wealth, and regional partition identified by the L tree was therefore more stable under the validation criterion used in this thesis.
+The rank-dependent trees performed well on the training data but poorly on the validation data. The CI, CIc, and CIg trees removed approximately 87 to 88% of root-node inequality during training, but had negative validation gains at the selected settings: -75.5% for CI and -73.1% for both CIc and CIg [@fig-appendix-tree-validation-path; @tbl-appendix-tree-selected-setting-summary]. In this criterion, a negative validation gain means that the sum of the terminal-node concentration-index values in the validation fold exceeded the concentration-index value at the root node. Thus, although these trees identified substantial rank-based structure in the fitted sample, the same partitions did not reduce inequality when applied to held-out folds. Unlike rank-dependent trees, the level-dependent tree maintained a positive validation gain throughout the tuning path. At the selected setting, it removed 70.5% of root-node inequality in held-out folds while retaining an average of 6.8 terminal nodes [@fig-appendix-tree-validation-path; @tbl-appendix-tree-selected-setting-summary]. The rural-urban, occupational, wealth, and regional partition identified by the L tree was therefore more stable under the validation criterion used in this thesis.
 
-```{r appendix-tree-validation-path-plots, fig.width= 6.3, fig.height=3.8}
+```{r appendix-tree-validation-path-plots, fig.width= 6.3, fig.height=3}
 #| label: fig-appendix-tree-validation-path
 #| fig-cap: "Tree validation gain and complexity by minimum relative split gain."
 #| fig-pos: "H"
@@ -293,11 +292,74 @@ plot_validation_percent_gain_path(
 ```
 
 
+#### Tree complexity plots
+
+Tree complexity decreased as the minimum relative split gain increased, since larger thresholds allowed only splits that removed a larger share of parent-node impurity [@fig-appendix-tree-complexity-path]. The selected trees remained small, with an average of 7.5 terminal nodes for CI, 7.3 for CIc and CIg, and 6.8 for L [@tbl-appendix-tree-selection; @fig-appendix-tree-complexity-path].
 
 
-### Surrogate Tree Comparison
+```{r}
+#| label: fig-appendix-tree-complexity-path
+#| fig-cap: "Tree complexity by number of terminal nodes."
+#| fig-pos: "H"
+#| fig-width: 6.3
+#| fig-height: 3
+#| 
+plot_terminal_nodes_path(
+    tree_path_plot_dt,
+    title = "Tree Complexity"
+)
+```
 
-```{r results-surrogate-tree, fig.width=11.5, fig.height=7, out.width="100%"}
+#### Rpart comparison
+
+The rpart comparison tree recovered the same upper-level structure as the main CI tree (@fig-appendix-ci-tree-ci; @fig-appendix-lecturer-rpart-robust). Both trees first split on maternal education, then separated children by father’s agricultural occupation among those whose mothers had some education, and by household wealth among those whose mothers had no education. The high-mortality branch was also similar, identifying children whose mothers had no education, who lived in low-wealth households, and who resided in Katanga. The main difference was in the lower branches: the rpart comparison introduced a split by long preceding birth interval, while the main CI tree used a short preceding birth-interval split. This suggests that the main rank-dependent structure was not driven only by the custom implementation, although some lower-level refinements depended on the tree-growing and stopping rules.
+
+```{r appendix-lecturer-rpart-robust, fig.width=9, fig.height=5}
+#| label: fig-appendix-lecturer-rpart-robust
+#| fig-cap: "Rpart comparison tree using CI impurity."
+#| fig-pos: "H"
+if (isTRUE(params$render_appendix_tree_plots) &&
+    "robust_abs" %in% names(lecturer_rpart_models)) {
+    plot_lecturer_rpart("robust_abs",
+        fontsize = 11,
+        outcome_label = "U5",
+        var_labels = var_labels
+    )
+}
+```
+
+
+
+### Concentration index forest and surrogate tree
+
+#### Forest validation plots
+
+We evaluated concentration-index forests using the same validation criterion as the single trees. For the forests, the minimum relative split gain was tuned to 0.35, since larger values produced near-root-only forests with mean terminal-node counts close to 1. At that point, further validation failed to reveal a meaningful structure.
+For the rank-dependent criteria, the forests reduced overfitting but did not stabilise the partitions. The CI, CIc, and CIg forests removed 29.6%, 38.5%, and 38.7% of root-node inequality in training, compared with about 87 to 88% for the corresponding single trees [@tbl-appendix-forest-selected-setting-summary; @tbl-appendix-tree-selected-setting-summary]. Their validation gains remained negative: -25.0% for CI, -28.1% for CIc, and -34.7% for CIg [@fig-appendix-forest-validation-path; @tbl-appendix-forest-selected-setting-summary]. Thus, averaging across trees reduced the validation loss, but did not produce a reproducible rank-dependent subgroup structure.
+The tuning path shows the trade-off. Validation gain improved as the minimum relative split gain increased, but the component trees also became shallower [@fig-appendix-forest-validation-path; @fig-appendix-forest-complexity-path]. At the selected setting, the mean terminal-node counts were 2.4 for CI, 2.9 for CIc, and 2.9 for CIg [@tbl-appendix-forest-selection]. 
+The level-dependent forest remained more stable. It removed 95.1% of root-node inequality in training and 69.7% in validation [@tbl-appendix-forest-selected-setting-summary]. The selected L forest had an average of 4.1 terminal nodes per tree, compared with 6.8 for the selected L tree [@tbl-appendix-forest-selection; @tbl-appendix-tree-selection]. 
+
+```{r appendix-forest-validation-path-plots, fig.width=6.3, fig.height=3.8}
+#| label: fig-appendix-forest-validation-path
+#| fig-cap: "Forest validation gain and complexity by minimum relative split gain."
+#| fig-pos: "H"
+
+forest_path_plot_dt <- copy(drc_results_objects$forest_min_relative_gain_path)
+
+plot_validation_percent_gain_path(
+  forest_path_plot_dt,
+  title = "Forest Validation Gain (% Root)"
+)
+```
+
+
+####  Surrogate trees from Forest Predictions
+
+
+To interpret the selected forest, we fitted a surrogate tree to summarise its predictions (@fig-results-surrogate-tree). The surrogate tree retained the main structure seen in the level-dependent tree. 
+
+
+```{r  fig.width=9, fig.height=5, out.width="100%"}
 #| label: fig-results-surrogate-tree
 #| fig-cap: "Surrogate tree summarising the selected concentration-index forest predictions."
 #| fig-pos: "H"
@@ -313,11 +375,17 @@ ci_report_tree_plot(
     var_labels = var_labels,
     fontsize = 11
 )
+
+
 ```
 
+The first split was type of residence, separating urban and rural children. Among urban children, the main divisions were father’s agricultural occupation and household wealth. Among rural children, the main divisions were household wealth, maternal education, and residence in Katanga. The lowest terminal-node mortality was observed among urban children in the high-wealth branch, while the highest terminal-node mortality was observed among rural, low-wealth children in Katanga. Compared with the single L tree, the surrogate gives a smoother version of the same rural-urban, socioeconomic, and regional pattern, with less extreme terminal-node mortality differences. The criterion-specific forest surrogate trees are shown in the appendix for comparison (@fig-appendix-forest-surrogate-cig; @fig-appendix-forest-surrogate-cic; @fig-appendix-forest-surrogate-ci).
 
+### Variable importance
 
-```{r results-selected-model-variable-importance, fig.width=9, fig.height=4.4}
+The variable-importance plots support the interpretation of the selected level-dependent models. In both the $L$ tree and $L$ forest, the type of residence gives the largest reduction in concentration-index impurity [@fig-results-selected-model-variable-importance]. In the single tree, residence is followed by father’s agricultural occupation, Kinshasa, household wealth, Equateur, and Katanga, reflecting a structure organised around the rural-urban divide, occupational position, household wealth, and regional differences.
+
+```{r results-selected-model-variable-importance, fig.width=8, fig.height=4}
 #| label: fig-results-selected-model-variable-importance
 #| fig-cap: "Variable importance for the selected concentration-index tree and forest."
 #| fig-pos: "H"
@@ -345,18 +413,15 @@ gridExtra::grid.arrange(tree_importance_plot,
 )
 ```
 
+The $L$ forest gives a less concentrated ranking than the single tree. Residence is still the first variable, but the forest also gives weight to mother’s agricultural occupation, maternal education, household wealth, father’s agricultural occupation, and regional indicators. In the appendix plots, the same groups of variables appear again under the other criteria: residence, region, occupation, education, and wealth [@fig-appendix-tree-variable-importance; @fig-appendix-forest-variable-importance].
+
 
 ## Simulation Study
 
-### Recovery of the Simulated Subgroup Structure
+### Null case
 
-The simulation study is used as a direct check on the tree-growing rule. In the
-null simulation, wealth, the binary outcome, and the candidate subgroup
-variables are generated independently. In the positive-control simulation, the
-outcome is concentrated among poorer observations in a planted subgroup defined
-by residence, maternal education, and province. The null trees should therefore
-remain at the root node, while the positive-control tree should recover a
-readable subgroup structure.
+From (@fig-results-simulation-null-trees) we see that the algorithm developed here did not find a meaningful structure and behaved as expected. This shows that the tree-growing rule does not create subgroup structure when the outcome and socioeconomic ranking are independent, since the tree uses concentraion index as an impurity measure, which measures how sociaeconomic ranking and outcome covary. 
+
 
 ```{r results-simulation-null-trees, fig.width=1.5, fig.height=1.5}
 #| label: fig-results-simulation-null-trees
@@ -380,18 +445,51 @@ if (
 }
 ```
 
-```{r results-simulation-tree, fig.width=9, fig.height=6}
+### Poor subgroup case
+
+
+In the positive-control simulation, the method(the concentration index tree with $CIc$ as an impurity measure) recovered the planted subgroup structure. The tree first separated urban from rural observations, then split the rural group by province and maternal education (@fig-results-simulation-tree). This structure matched the way the simulated outcome was generated: poorer observations in the planted rural, low-education, selected-province subgroup had higher outcome prevalence. The terminal nodes also followed the expected gradient, with the highest prevalence among observations in the most disadvantaged planted subgroup.
+
+
+```{r results-simulation-tree, fig.width=9, fig.height=4}
 #| label: fig-results-simulation-tree
-#| fig-cap: "CIg concentration-index tree recovered from simulated data with a known subgroup-generating mechanism."
+#| fig-cap: "CIc concentration-index tree recovered from simulated data with a known subgroup-generating mechanism."
 
 if (
   "Poor subgroup simulation" %in% names(simulation_tree_plots) &&
-    "CIg" %in% names(simulation_tree_plots[["Poor subgroup simulation"]])
+    "CIc" %in% names(simulation_tree_plots[["Poor subgroup simulation"]])
 ) {
   grid::grid.newpage()
-  grid::grid.draw(simulation_tree_plots[["Poor subgroup simulation"]][["CIg"]])
+  grid::grid.draw(simulation_tree_plots[["Poor subgroup simulation"]][["CIc"]])
 }
 ```
+
+We see the same pattern across the sensitivity plots in the appendix the trees developed using $CI$, $CIg$, and $CIc$, and $L$ as impurity measures(@fig-appendix-simulation-positive-control-ci; @fig-appendix-simulation-positive-control-cic; @fig-appendix-simulation-positive-control-l).
+
+
+# Discussion
+
+## Main findings
+
+This thesis developed and applied a tree-based model for analysing socioeconomic inequality in under-five mortality using the concentration index impurity. The main finding is that inequality in the DRC data could not be explained by household wealth alone. Under-five mortality was also related to residence, maternal education, skilled birth attendance, parental occupation, and province. Overall, 10.32% of children died before age five. The children who died were more often from low-wealth households, rural households, mothers with no education, births without skilled attendance, and some provinces, especially Katanga. This is in line with earlier DRC work on geographic variation in under-five mortality, and with decomposition studies showing that wealth, education, residence, and occupation contribute to mortality inequalities in African settings [@kandala2014drc; @vanmalderen2013under5; @vanmalderen2019socioeconomic].
+
+The indirect methods provided a variable view of this inequality. In the regression decomposition, mother’s education made the largest contribution, accounting for 23.1% under $CI$ and 28.7% under $CIg$ and $CIc$. Father’s agricultural occupation was the second-largest contributor, accounting for 17.9% under $CI$ and 19.9% under $CIg$ and $CIc$. These results are consistent with earlier decomposition work, which found that household wealth, parental education, occupation, and residence were important contributors to under-five mortality inequality [@vanmalderen2013under5; @vanmalderen2019socioeconomic]. The SHAP analysis (from the fitted random forest) gave a less concentrated picture: residence and household wealth each contributed about 12%, followed by mother’s occupation, father’s occupation, mother’s education, and skilled birth attendance. Shap-based decomposition provides an addition to the regression methods by allowing the use of more flexible models such as Random Forests or XGBoost. 
+
+The direct concentration-index trees added the subgroup interpretation that is less visible in the regression-based decomposition. While the indirect methods ranked variables by their contribution to inequality, the trees showed how these variables combined within the data to define groups with different inequality patterns. The rank-dependent trees based on $CI$, $CIg$, and $CIc$ identified a structure involving maternal education, father’s agricultural occupation, skilled birth attendance, household wealth, and Katanga. Mortality was lower among children whose mothers had some education and whose fathers were not in agriculture, and higher among children whose mothers had no education, who lived in low-wealth households, and who resided in Katanga. However, these partitions did not validate well. Although the rank-based methods removed about 87% to 88% of root-node inequality in training, their validation gains were negative, suggesting that the strong training structure did not transfer well to held-out folds.
+
+
+## Rank-dependent and level-dependent views of inequality
+
+## Stability, validation, and overfitting Forests and surrogate-tree interpretation
+
+## Methodological and data limitations
+
+## Ethical, societal, and stakeholder relevance
+
+# Future research
+how to improve rank depedent methods in validation set or see different ways of calculating concetration index on top of level depednet methods.
+# Conclusion
+
 
 # Appendix
 
@@ -566,21 +664,12 @@ report_compact_table(
 ```
 
 #### Predictive ranger SHAP summary plot
-```{r appendix-shap-summary-plot, fig.width=6.2, fig.height=5.8}
+```{r appendix-shap-summary-plot, fig.width=6.2, fig.height=5}
 #| label: fig-appendix-shap-summary
 #| fig-cap: "SHAP summary plot for the predictive ranger model."
 
 shap_plot_dt <- copy(as.data.table(drc_results_objects$shap_summary_long))
-if (!nrow(shap_plot_dt)) {
-  ggplot() +
-    annotate(
-      "text",
-      x = 0,
-      y = 0,
-      label = "Run Generate_DRC_Results_Objects.qmd with run_shap: true to compute SHAP values."
-    ) +
-    theme_void(base_size = 11)
-} else {
+
   top_shap_features <- shap_plot_dt[
     ,
     .(mean_abs_shap = mean(abs(shap_value), na.rm = TRUE)),
@@ -642,7 +731,7 @@ if (!nrow(shap_plot_dt)) {
       legend.title = element_text(size = 11),
       legend.text = element_text(size = 11)
     )
-}
+
 ```
 
 ### Appendix R3: Concentration-Index Tree Details
@@ -738,7 +827,7 @@ report_compact_table(
 ```
 
 
-```{r appendix-tree-variable-importance-plot, fig.width=10, fig.height=7}
+```{r appendix-tree-variable-importance-plot, fig.width=8, fig.height=6}
 #| label: fig-appendix-tree-variable-importance
 #| fig-cap: "Top tree variables by concentration-index criterion."
 #| fig-pos: "H"
@@ -751,20 +840,6 @@ plot_importance_by_criterion(
 ```
 
 
-
-#### Tree complexity plots
-
-```{r}
-#| label: fig-appendix-tree-complexity-path
-#| fig-cap: "Tree complexity by number of terminal nodes."
-#| fig-pos: "H"
-#| fig-width: 6.3
-#| fig-height: 3.8
-plot_terminal_nodes_path(
-    tree_path_plot_dt,
-    title = "Tree Complexity"
-)
-```
 
 ### Additional Concentration-Index Tree Plots
 
@@ -808,7 +883,7 @@ if (isTRUE(params$render_appendix_tree_plots) && "CI" %in% names(tree_models_by_
 
 
 
-```{r appendix-lecturer-rpart-simple, fig.width=9, fig.height=8}
+```{r appendix-lecturer-rpart-simple, fig.width=14, fig.height=8}
 #| label: fig-appendix-lecturer-rpart-simple
 #| fig-cap: "Lecturer rpart comparison tree using absolute CI impurity."
 #| fig-pos: "H"
@@ -818,15 +893,6 @@ if (isTRUE(params$render_appendix_tree_plots) && "simple_abs" %in% names(lecture
 }
 ```
 
-```{r appendix-lecturer-rpart-robust, fig.width=9, fig.height=8}
-#| label: fig-appendix-lecturer-rpart-robust
-#| fig-cap: "Lecturer rpart comparison tree using robust absolute CI impurity."
-#| fig-pos: "H"
-
-if (isTRUE(params$render_appendix_tree_plots) && "robust_abs" %in% names(lecturer_rpart_models)) {
-  plot_lecturer_rpart("robust_abs", fontsize = 11)
-}
-```
 
 ### Appendix 5: Concentration-Index Forest Details
 
@@ -855,20 +921,19 @@ report_compact_table(
 ```{r appendix-forest-selected-setting-summary}
 #| label: tbl-appendix-forest-selected-setting-summary
 #| tbl-cap: "Forest summary for the selected settings."
-
 forest_selection_for_summary <- copy(drc_results_objects$forest_selection %||% data.table())
 if (!nrow(forest_selection_for_summary)) {
-  forest_fit_table_out <- data.table(
-    note = "Run Generate_DRC_Results_Objects.qmd with RUN_FOREST=true"
-  )
+    forest_fit_table_out <- data.table(
+        note = "Run Generate_DRC_Results_Objects.qmd with RUN_FOREST=true"
+    )
 } else {
-  forest_fit_table_out <- fit_summary_long(forest_selection_for_summary)
+    forest_fit_table_out <- fit_summary_long(forest_selection_for_summary)
 }
 
 report_compact_table(
-  forest_fit_table_out,
-  digits = 4,
-  caption = "Forest summary for the selected settings"
+    forest_fit_table_out,
+    digits = 4,
+    caption = "Forest summary for the selected settings"
 )
 ```
 
@@ -877,70 +942,55 @@ report_compact_table(
 ```{r appendix-forest-selection}
 #| label: tbl-appendix-forest-selection
 #| tbl-cap: "Selection metrics for fitted concentration-index forests."
-
 forest_selection_out <- copy(drc_results_objects$forest_selection %||% data.table())
 if (!nrow(forest_selection_out)) {
-  forest_selection_out <- data.table(
-    note = "Run Generate_DRC_Results_Objects.qmd with RUN_FOREST=true"
-  )
+    forest_selection_out <- data.table(
+        note = "Run Generate_DRC_Results_Objects.qmd with RUN_FOREST=true"
+    )
 } else {
-  forest_selection_out <- forest_selection_out[
-    ,
-    .(
-      criterion = type,
-      root_objective = mean_root_objective,
-      train_gain = mean_train_gain,
-      train_relative_gain = mean_train_relative_gain,
-      validation_gain = mean_validation_gain,
-      validation_relative_gain = mean_validation_relative_gain,
-      mean_terminal_nodes
+    forest_selection_out <- forest_selection_out[
+        ,
+        .(
+            criterion = type,
+            root_objective = mean_root_objective,
+            train_gain = mean_train_gain,
+            train_relative_gain = mean_train_relative_gain,
+            validation_gain = mean_validation_gain,
+            validation_relative_gain = mean_validation_relative_gain,
+            mean_terminal_nodes
+        )
+    ]
+    setnames(
+        forest_selection_out,
+        c(
+            "criterion",
+            "root_objective",
+            "train_gain",
+            "train_relative_gain",
+            "validation_gain",
+            "validation_relative_gain",
+            "mean_terminal_nodes"
+        ),
+        c(
+            "Criterion",
+            "Root objective",
+            "Train gain",
+            "Train gain/root",
+            "Validation gain",
+            "Validation gain/root",
+            "Mean terminal nodes"
+        )
     )
-  ]
-  setnames(
-    forest_selection_out,
-    c(
-      "criterion",
-      "root_objective",
-      "train_gain",
-      "train_relative_gain",
-      "validation_gain",
-      "validation_relative_gain",
-      "mean_terminal_nodes"
-    ),
-    c(
-      "Criterion",
-      "Root objective",
-      "Train gain",
-      "Train gain/root",
-      "Validation gain",
-      "Validation gain/root",
-      "Mean terminal nodes"
-    )
-  )
 }
 
 report_compact_table(
-  forest_selection_out,
-  digits = 4,
-  caption = "Selection metrics for fitted concentration-index forests",
-  column_widths = c("1.4cm", rep("1.8cm", 6L))
+    forest_selection_out,
+    digits = 4,
+    caption = "Selection metrics for fitted concentration-index forests",
+    column_widths = c("1.4cm", rep("1.8cm", 6L))
 )
 ```
 
-#### Forest validation plots
-
-```{r appendix-forest-validation-path-plots, fig.width=6.3, fig.height=3.8}
-#| label: fig-appendix-forest-validation-path
-#| fig-cap: "Forest validation gain and complexity by minimum relative split gain."
-#| fig-pos: "H"
-
-forest_path_plot_dt <- copy(drc_results_objects$forest_min_relative_gain_path %||% data.table())
-
-plot_validation_percent_gain_path(
-  forest_path_plot_dt,
-  title = "Forest Validation Gain (% Root)"
-)
-```
 
 #### Forest complexity plots
 
@@ -974,43 +1024,86 @@ plot_importance_by_criterion(
 The selected forest surrogate appears in the results section. The remaining
 criterion-specific forest surrogates are retained here for comparison.
 
-```{r appendix-forest-surrogate-ci, fig.width=12, fig.height=7}
+```{r appendix-forest-surrogate-objects, include=FALSE}
+forest_surrogates <- drc_results_objects$forest_surrogates_by_type %||% list()
+```
+
+```{r appendix-forest-surrogate-ci, fig.width=9, fig.height=5}
 #| label: fig-appendix-forest-surrogate-ci
 #| fig-cap: "Surrogate tree for the CI concentration-index forest."
 #| fig-pos: "H"
 
-if (!identical(selected_tree_type, "CI")) {
-  plot_forest_surrogate("CI")
+if ("CI" %in% names(forest_surrogates)) {
+  forest_surrogate_ci <- forest_surrogates[["CI"]]
+  ci_report_tree_plot(
+    fit = forest_surrogate_ci$fit,
+    data = forest_surrogate_ci$data,
+    outcome_name = forest_surrogate_ci$prediction_name,
+    outcome_label = "U5",
+    ci_type = "CI",
+    var_labels = var_labels,
+    fontsize = 11
+  )
 }
 ```
 
-```{r appendix-forest-surrogate-cig, fig.width=12, fig.height=7}
+```{r appendix-forest-surrogate-cig, fig.width=9, fig.height=5}
 #| label: fig-appendix-forest-surrogate-cig
 #| fig-cap: "Surrogate tree for the CIg concentration-index forest."
 #| fig-pos: "H"
 
-if (!identical(selected_tree_type, "CIg")) {
-  plot_forest_surrogate("CIg")
+if ("CIg" %in% names(forest_surrogates)) {
+  forest_surrogate_cig <- forest_surrogates[["CIg"]]
+  ci_report_tree_plot(
+    fit = forest_surrogate_cig$fit,
+    data = forest_surrogate_cig$data,
+    outcome_name = forest_surrogate_cig$prediction_name,
+    outcome_label = "U5",
+    ci_type = "CIg",
+    var_labels = var_labels,
+    fontsize = 11
+  )
 }
+
+
+
 ```
 
-```{r appendix-forest-surrogate-cic, fig.width=12, fig.height=7}
+```{r appendix-forest-surrogate-cic, fig.width=9, fig.height=5}
 #| label: fig-appendix-forest-surrogate-cic
 #| fig-cap: "Surrogate tree for the CIc concentration-index forest."
 #| fig-pos: "H"
 
-if (!identical(selected_tree_type, "CIc")) {
-  plot_forest_surrogate("CIc")
+if ("CIc" %in% names(forest_surrogates)) {
+  forest_surrogate_cic <- forest_surrogates[["CIc"]]
+  ci_report_tree_plot(
+    fit = forest_surrogate_cic$fit,
+    data = forest_surrogate_cic$data,
+    outcome_name = forest_surrogate_cic$prediction_name,
+    outcome_label = "U5",
+    ci_type = "CIc",
+    var_labels = var_labels,
+    fontsize = 11
+  )
 }
 ```
 
-```{r appendix-forest-surrogate-l, fig.width=12, fig.height=7}
+```{r appendix-forest-surrogate-l, fig.width=9, fig.height=5}
 #| label: fig-appendix-forest-surrogate-l
 #| fig-cap: "Surrogate tree for the L concentration-index forest."
 #| fig-pos: "H"
 
-if (!identical(selected_tree_type, "L")) {
-  plot_forest_surrogate("L")
+if ("L" %in% names(forest_surrogates)) {
+  forest_surrogate_l <- forest_surrogates[["L"]]
+  ci_report_tree_plot(
+    fit = forest_surrogate_l$fit,
+    data = forest_surrogate_l$data,
+    outcome_name = forest_surrogate_l$prediction_name,
+    outcome_label = "U5",
+    ci_type = "L",
+    var_labels = var_labels,
+    fontsize = 11
+  )
 }
 ```
 

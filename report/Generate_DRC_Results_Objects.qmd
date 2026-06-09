@@ -76,7 +76,7 @@ env_num_or_null <- function(name, default = NULL) {
 default_params <- list(
   analysis_rows = 1L,
   tuning_folds = 10L,
-  undersample = 0.41
+  undersample = 0.4
 )
 
 runtime_params <- utils::modifyList(default_params, as.list(params))
@@ -174,12 +174,7 @@ are fixed below so the workflow stays readable. Set `analysis_rows` to `1` to
 use the full data set.
 
 ```{r load-2007-drc-data}
-required_source_packages <- c("haven")
-missing_source_packages <- required_source_packages[
-  !vapply(required_source_packages, requireNamespace, logical(1L), quietly = TRUE)
-]
-stopifnot(length(missing_source_packages) == 0L)
-
+library(haven)
 drc_2007_dt <- as.data.table(haven::read_dta(source_data_file))
 ```
 
@@ -878,6 +873,8 @@ tree_grid <- ci_tree_control_grid(
     min_relative_gain = c(0.15,  0.20, 0.25,  0.30)
 )
 
+
+
 # filter where minbucket is at least 50% of minsplit to avoid invalid settings
 tree_grid <- tree_grid[minbucket <= 0.5 * minsplit]
 ```
@@ -892,21 +889,23 @@ ci_tuning_metrics <- c(
     "roc_auc"
 )
 
-tree_tuning <- tune_ci_tree(
-    formula = congo_ci_formula,
-    data = congo_model_dt,
-    rank_name = "wealth",
-    outcome_name = "deadu5_num",
-    weights = congo_model_dt$sample_weight,
-    type = criterion_types,
-    control_grid = tree_grid,
-    v = runtime_params$tuning_folds,
-    strata = "deadu5_num",
-    seed = 20260508,
-    metric = ci_tuning_metrics,
-    refit = FALSE,
-    control = control_ci_tune(save_pred = TRUE)
-)
+# tree_tuning <- tune_ci_tree(
+#     formula = congo_ci_formula,
+#     data = congo_model_dt,
+#     rank_name = "wealth",
+#     outcome_name = "deadu5_num",
+#     weights = congo_model_dt$sample_weight,
+#     type = criterion_types,
+#     control_grid = tree_grid,
+#     v = runtime_params$tuning_folds,
+#     strata = "deadu5_num",
+#     seed = 20260508,
+#     metric = ci_tuning_metrics,
+#     refit = FALSE,
+#     control = control_ci_tune(save_pred = TRUE)
+# )
+# save(tree_tuning, file = here("data", "tree_tuning.rda"))
+load(here("data", "tree_tuning.rda"))
 ```
 
 ```{r select-ci-tree-settings}
@@ -1004,45 +1003,45 @@ report_compact_table(
 
 ```{r selected-tree-preview, purl=FALSE, fig.width=12, fig.height=8}
 ci_report_tree_plot(
-  fit = selected_tree_fit,
-  data = congo_model_dt,
-  outcome_name = "deadu5_num",
-  outcome_label = "U5 death",
-  ci_type = "L",
-  var_labels = congo_var_labels
+    fit = selected_tree_fit,
+    data = congo_model_dt,
+    outcome_name = "deadu5_num",
+    outcome_label = "U5 death",
+    ci_type = "L",
+    var_labels = congo_var_labels
 )
 ```
 
 ```{r ci-tree-preview, purl=FALSE, fig.width=12, fig.height=8}
 ci_report_tree_plot(
-  fit = tree_models_by_type[["CI"]],
-  data = congo_model_dt,
-  outcome_name = "deadu5_num",
-  outcome_label = "U5 death",
-  ci_type = "CI",
-  var_labels = congo_var_labels
+    fit = tree_models_by_type[["CI"]],
+    data = congo_model_dt,
+    outcome_name = "deadu5_num",
+    outcome_label = "U5 death",
+    ci_type = "CI",
+    var_labels = congo_var_labels
 )
 ```
 
 ```{r cig-tree-preview, purl=FALSE, fig.width=12, fig.height=8}
 ci_report_tree_plot(
-  fit = tree_models_by_type[["CIg"]],
-  data = congo_model_dt,
-  outcome_name = "deadu5_num",
-  outcome_label = "U5 death",
-  ci_type = "CIg",
-  var_labels = congo_var_labels
+    fit = tree_models_by_type[["CIg"]],
+    data = congo_model_dt,
+    outcome_name = "deadu5_num",
+    outcome_label = "U5 death",
+    ci_type = "CIg",
+    var_labels = congo_var_labels
 )
 ```
 
 ```{r cic-tree-preview, purl=FALSE, fig.width=12, fig.height=8}
 ci_report_tree_plot(
-  fit = tree_models_by_type[["CIc"]],
-  data = congo_model_dt,
-  outcome_name = "deadu5_num",
-  outcome_label = "U5 death",
-  ci_type = "CIc",
-  var_labels = congo_var_labels
+    fit = tree_models_by_type[["CIc"]],
+    data = congo_model_dt,
+    outcome_name = "deadu5_num",
+    outcome_label = "U5 death",
+    ci_type = "CIc",
+    var_labels = congo_var_labels
 )
 ```
 
@@ -1095,47 +1094,51 @@ for (method_name in names(lecturer_rpart_models)) {
 
 # Forest and SHAP Objects
 
-These objects are the most expensive part of the generator, so their runtime is
-kept understandable by using the same row count and fold count set above.
-`rineq` does not expose a SHAP decomposition API, so the SHAP section uses a
-cross-validated `ranger` model and `shap_conc_decomp` for the four
-reported inequality criteria.
+
 
 ```{r forest-control-grid}
+# min_relative_gain =       c( 0.25, 0.30, 0.35, 0.40)
+#minisplit = 500 #minibucket 
 p <- length(congo_predictors)
 forest_grid <- ci_tree_control_grid(
-    minsplit = 500L,
-    minbucket = 100L,
+    minsplit = 500L, # 1000
+    minbucket = 100L, # 300
     minprob = 0.01,
     maxdepth = 15L,
     min_gain = 0.00001,
-    min_relative_gain = c( 0.25, 0.30, 0.35, 0.40),
-    mtry = c(10),
-    ntree = 50L
+    min_relative_gain = c( 0.25, 0.30, 0.35), #0.3,0.35,
+    mtry = c(15),
+    ntree = c(50L, 100L)
 )
 ```
 
 ```{r tune-ci-forests}
-forest_tuning <- run_forest_tuning_batches(
-  formula = congo_ci_formula,
-  data = congo_model_dt,
-  forest_grid = forest_grid,
-  criterion_types = criterion_types,
-  tuning_metrics = ci_tuning_metrics,
-  tuning_selection_metric = "relative_validation_gain",
-  rank_name = "wealth",
-  outcome_name = "deadu5_num",
-  weights = congo_model_dt$sample_weight,
-  folds = runtime_params$tuning_folds,
-  workers = 4L,
-  progress_steps = min(20L, nrow(forest_grid)),
-  log_file = here("logs", "forest_tuning.log"),
-  seed = 20260508,
-  perturb = list(replace = FALSE, fraction = 0.7)
-)
+# forest_tuning <- run_forest_tuning_batches(
+#   formula = congo_ci_formula,
+#   data = congo_model_dt,
+#   forest_grid = forest_grid,
+#   criterion_types = criterion_types,
+#   tuning_metrics = ci_tuning_metrics,
+#   tuning_selection_metric = "relative_validation_gain",
+#   rank_name = "wealth",
+#   outcome_name = "deadu5_num",
+#   weights = congo_model_dt$sample_weight,
+#   folds = runtime_params$tuning_folds,
+#   workers = 4L,
+#   progress_steps = min(20L, nrow(forest_grid)),
+#   log_file = here("logs", "forest_tuning.log"),
+#   seed = 20260508,
+#   perturb = list(replace = FALSE, fraction = 0.7)
+# )
+
+# library(here)
+# save(forest_tuning, file = here("data", "forest_tuning.rdata"))
+load(here("data", "forest_tuning.rdata"))
 ```
 
 ```{r select-ci-forest-settings}
+#roc_auc
+#relative_validation_gain
 forest_best_by_type <- ci_select_best(
   forest_tuning,
   metric = "relative_validation_gain"
@@ -1144,24 +1147,28 @@ forest_best_by_type <- ci_select_best(
 
 ```{r fit-selected-ci-forests}
 set.seed(20260509)
-forest_models_by_type <- setNames(
-  lapply(seq_len(nrow(forest_best_by_type)), function(i) {
-    setting <- forest_best_by_type[i]
-    ci_forest(
-      formula = congo_ci_formula,
-      data = congo_model_dt,
-      rank_name = "wealth",
-      outcome_name = "deadu5_num",
-      weights = congo_model_dt$sample_weight,
-      type = setting$type[1L],
-      control = ci_control_from_row(setting, include_mtry = FALSE),
-      ntree = as.integer(setting$ntree[1L]),
-      mtry = as.integer(setting$mtry[1L]),
-      perturb = list(replace = FALSE, fraction = 0.632)
-    )
-  }),
-  forest_best_by_type$type
-)
+# forest_models_by_type <- setNames(
+#   lapply(seq_len(nrow(forest_best_by_type)), function(i) {
+#     setting <- forest_best_by_type[i]
+#     ci_forest(
+#       formula = congo_ci_formula,
+#       data = congo_model_dt,
+#       rank_name = "wealth",
+#       outcome_name = "deadu5_num",
+#       weights = congo_model_dt$sample_weight,
+#       type = setting$type[1L],
+#       control = ci_control_from_row(setting, include_mtry = FALSE),
+#       ntree = as.integer(setting$ntree[1L]),
+#       mtry = as.integer(setting$mtry[1L]),
+#       perturb = list(replace = FALSE, fraction = 0.632)
+#     )
+#   }),
+#   forest_best_by_type$type
+# )
+
+# save(forest_models_by_type, file = here("data", "forest_models_by_type.rdata"))
+load(here("data", "forest_models_by_type.rdata"))
+
 selected_forest_fit <- forest_models_by_type[[selected_tree_type]]
 forest_variable_importance <- collect_variable_importance(forest_models_by_type)
 ```
@@ -1222,11 +1229,31 @@ forest_best_controls <- forest_best_by_type[
 ```{r fit-ci-forest-surrogates}
 forest_surrogates_by_type <- setNames(
   lapply(seq_len(nrow(forest_best_by_type)), function(i) {
-    setting <- copy(forest_best_by_type[i])
-    setting$min_relative_gain <- 0.30
-    setting$minsplit <- 1500L
-    setting$minbucket <- 100L
-    setting$maxdepth <- 5L
+    #setting <- copy(forest_best_by_type[i])
+    # use same tree settings
+    setting <- copy(tree_best_by_type[type == forest_best_by_type$type[i]])
+    type = setting$type[1L]
+
+    if (type == "CIc"){
+      setting$min_relative_gain <- 0.25
+      #setting$minsplit <- 500L
+      setting$minbucket <- 200L
+    }else if (type == "L"){
+      setting$min_relative_gain <- 0.3
+      # setting$minsplit <- 1000L
+      #setting$minbucket <- 200L
+      setting$maxdepth <- 3L
+    } else {
+      setting$min_relative_gain <- 0.5
+      setting$maxdepth <- 4L
+      #setting$minsplit <- 1000L
+      #setting$minbucket <- 200L
+      #setting$min_gain <- 0.001
+    }
+
+    # # setting$minsplit <- 500L
+    # # setting$minbucket <- 300L
+    # # setting$maxdepth <- 6L
     ci_forest_surrogate(
       forest_fit = forest_models_by_type[[setting$type[1L]]],
       data = congo_model_dt,
@@ -1251,7 +1278,7 @@ ci_report_tree_plot(
   fit = forest_surrogates_by_type[["CI"]]$fit,
   data = forest_surrogates_by_type[["CI"]]$data,
   outcome_name = forest_surrogates_by_type[["CI"]]$prediction_name,
-  outcome_label = "Forest predicted U5 death",
+  outcome_label = "U5",
   ci_type = "CI",
   var_labels = congo_var_labels
 )
@@ -1262,7 +1289,7 @@ ci_report_tree_plot(
   fit = forest_surrogates_by_type[["CIg"]]$fit,
   data = forest_surrogates_by_type[["CIg"]]$data,
   outcome_name = forest_surrogates_by_type[["CIg"]]$prediction_name,
-  outcome_label = "Forest predicted U5 death",
+  outcome_label = "U5",
   ci_type = "CIg",
   var_labels = congo_var_labels
 )
@@ -1273,8 +1300,20 @@ ci_report_tree_plot(
   fit = forest_surrogates_by_type[["CIc"]]$fit,
   data = forest_surrogates_by_type[["CIc"]]$data,
   outcome_name = forest_surrogates_by_type[["CIc"]]$prediction_name,
-  outcome_label = "Forest predicted U5 death",
+  outcome_label = "U5",
   ci_type = "CIc",
+  var_labels = congo_var_labels
+)
+```
+
+
+```{r l-forest-surrogate-preview, purl=FALSE, fig.width=12, fig.height=8}
+ci_report_tree_plot(
+  fit = forest_surrogates_by_type[["L"]]$fit,
+  data = forest_surrogates_by_type[["L"]]$data,
+  outcome_name = forest_surrogates_by_type[["L"]]$prediction_name,
+  outcome_label = "U5",
+  ci_type = "L",
   var_labels = congo_var_labels
 )
 ```
@@ -1292,21 +1331,21 @@ list2env(ranger_analysis, envir = environment())
 ```
 
 ```{r build-ranger-recipe}
-ranger_recipe <- recipes::recipe(deadu5_factor ~ ., data = ranger_fit_df)
+ranger_recipe <- recipe(deadu5_factor ~ ., data = ranger_fit_df)
 ```
 
 ```{r build-ranger-model-spec}
-ranger_model_spec <- parsnip::rand_forest(
-  mtry = tune::tune(),
-  min_n = tune::tune(),
+ranger_model_spec <- rand_forest(
+  mtry = tune(),
+  min_n = tune(),
   trees = 500L
 ) |>
-  parsnip::set_mode("classification") |>
-  parsnip::set_engine("ranger", probability = TRUE, importance = "impurity")
+  set_mode("classification") |>
+  set_engine("ranger", probability = TRUE, importance = "impurity")
 ```
 
 ```{r build-ranger-resamples}
-ranger_resamples <- rsample::vfold_cv(
+ranger_resamples <- vfold_cv(
   ranger_fit_df,
   v = runtime_params$tuning_folds,
   strata = deadu5_factor
@@ -1314,17 +1353,17 @@ ranger_resamples <- rsample::vfold_cv(
 ```
 
 ```{r build-ranger-workflow}
-ranger_workflow <- workflows::workflow() |>
-  workflows::add_model(ranger_model_spec) |>
-  workflows::add_recipe(ranger_recipe) |>
-  workflows::add_case_weights(sample_weight_case)
+ranger_workflow <- workflow() |>
+  add_model(ranger_model_spec) |>
+  add_recipe(ranger_recipe) |>
+  add_case_weights(sample_weight_case)
 ```
 
 ```{r build-ranger-grid}
 ranger_parameter_set <- hardhat::extract_parameter_set_dials(ranger_workflow) |>
   update(
     mtry = dials::mtry(range = c(10L, length(ranger_predictor_terms))),
-    min_n = dials::min_n(range = c(200L, 2000L))
+    min_n = dials::min_n(range = c(200L, 800L))
   )
 ranger_grid <- dials::grid_regular(
   ranger_parameter_set,
@@ -1336,16 +1375,62 @@ ranger_grid <- dials::grid_regular(
 ranger_metric_set <- yardstick::metric_set(
   yardstick::roc_auc,
   yardstick::accuracy,
-  yardstick::sens
+  yardstick::sens,
+  yardstick::spec,
+  yardstick::f_meas
 )
-ranger_tune_results <- tune::tune_grid(
+ranger_tune_results <- tune_grid(
   ranger_workflow,
   resamples = ranger_resamples,
   grid = ranger_grid,
   metrics = ranger_metric_set,
-  control = tune::control_grid(save_pred = TRUE)
+  control = control_grid(save_pred = TRUE)
 )
-ranger_tuning <- as.data.table(tune::collect_metrics(ranger_tune_results))
+ranger_tuning <- as.data.table(collect_metrics(ranger_tune_results))
+ranger_cv_predictions <- as.data.table(collect_predictions(ranger_tune_results))
+```
+
+```{r tune-ranger-probability-threshold}
+ranger_threshold_grid <- seq(0.05, 0.95, by = 0.01)
+
+ranger_threshold_performance <- rbindlist(lapply(ranger_threshold_grid, function(cutoff) {
+  threshold_dt <- copy(ranger_cv_predictions)
+
+  threshold_dt[, pred_threshold := factor(
+    fifelse(.pred_Died >= cutoff, "Died", "Survived"),
+    levels = levels(deadu5_factor)
+  )]
+
+  threshold_dt[
+    ,
+    .(
+      threshold = cutoff,
+      accuracy = mean(pred_threshold == deadu5_factor),
+      sensitivity = yardstick::sens_vec(
+        truth = deadu5_factor,
+        estimate = pred_threshold,
+        event_level = "first"
+      ),
+      specificity = yardstick::spec_vec(
+        truth = deadu5_factor,
+        estimate = pred_threshold,
+        event_level = "first"
+      ),
+      f_meas = yardstick::f_meas_vec(
+        truth = deadu5_factor,
+        estimate = pred_threshold,
+        event_level = "first"
+      ),
+      predicted_died = mean(pred_threshold == "Died"),
+      observed_died = mean(deadu5_factor == "Died")
+    ),
+    by = .config
+  ]
+}))
+# knitr::kable(
+#   ranger_threshold_performance,
+#   caption = "Performance metrics across probability thresholds for the cross-validated ranger models"
+# )
 ```
 
 ```{r ranger-cv-preview, purl=FALSE}
@@ -1357,7 +1442,13 @@ report_compact_table(
 ```
 
 ```{r select-best-ranger-model}
-selected_ranger_setting <- tune::select_best(ranger_tune_results, metric = "roc_auc")
+selected_ranger_setting <- select_best(ranger_tune_results, metric = "f_meas")
+
+selected_ranger_threshold <- ranger_threshold_performance[
+  .config == selected_ranger_setting$.config
+][
+  order(-f_meas, -sensitivity, -specificity, threshold)
+][1L]
 ```
 
 ```{r selected-ranger-preview, purl=FALSE}
@@ -1368,14 +1459,69 @@ report_compact_table(
 )
 ```
 
+```{r}
+plot_threshold_dt <- ranger_threshold_performance[
+  .config == selected_ranger_setting$.config,
+  .(threshold, F1 = specificity, Sensitivity = sensitivity)
+]
+
+plot_threshold_long <- melt(
+  plot_threshold_dt,
+  id.vars = "threshold",
+  variable.name = "Metric",
+  value.name = "value"
+)
+
+ggplot(plot_threshold_long, aes(x = threshold, y = value, colour = Metric)) +
+  geom_line(linewidth = 0.8) +
+  geom_point(size = 1.4) +
+  geom_vline(
+    xintercept = selected_ranger_threshold$threshold,
+    linetype = "dashed",
+    colour = "grey40"
+  ) +
+  scale_x_continuous(
+    breaks = seq(0.05, 0.95, by = 0.10),
+    labels = scales::percent_format(accuracy = 1)
+  ) +
+  scale_y_continuous(limits = c(0, 1)) +
+  labs(
+    title = "F1 and Sensitivity vs Probability Threshold",
+    x = "Probability threshold for predicting death",
+    y = "Metric value",
+    colour = "Metric"
+  ) +
+  theme_minimal()
+```
+
+
+```{r selected-ranger-threshold-preview, purl=FALSE}
+report_compact_table(
+  selected_ranger_threshold,
+  digits = 4,
+  caption = "Selected predictive ranger probability threshold"
+)
+```
+
 ```{r fit-selected-ranger-model}
-final_ranger_workflow <- tune::finalize_workflow(ranger_workflow, selected_ranger_setting)
+final_ranger_workflow <- finalize_workflow(ranger_workflow, selected_ranger_setting)
 predictive_forest_fit <- workflows::fit(final_ranger_workflow, data = ranger_fit_df)
 ```
 
 ```{r predict-ranger-risk-helper}
 predict_ranger_risk <- function(object, newdata) {
   predict(object, new_data = as.data.frame(newdata), type = "prob")$.pred_Died
+}
+
+predict_ranger_class <- function(
+  object,
+  newdata,
+  threshold = selected_ranger_threshold$threshold
+) {
+  factor(
+    ifelse(predict_ranger_risk(object, newdata) >= threshold, "Died", "Survived"),
+    levels = c("Died", "Survived")
+  )
 }
 ```
 
@@ -1791,6 +1937,9 @@ drc_results_objects <- list(
   forest_selection = forest_selection_table,
   forest_variable_importance = forest_variable_importance,
   predictive_forest_tuning = ranger_tuning,
+  predictive_forest_cv_predictions = ranger_cv_predictions,
+  predictive_forest_threshold_performance = ranger_threshold_performance,
+  selected_predictive_forest_threshold = selected_ranger_threshold,
   predictive_forest_sampling = ranger_sampling_summary,
   predictive_forest_feature_lookup = ranger_feature_lookup,
   predictive_forest_fit = predictive_forest_fit,

@@ -614,7 +614,7 @@ extract_surrogate_importance <- function(surrogate_object) {
 #' Plot a criterion-specific forest surrogate tree from the DRC report objects.
 plot_forest_surrogate <- function(
   type,
-  fontsize = 6.2,
+  fontsize = 11,
   results_objects = drc_results_objects,
   var_labels = congo_var_labels
 ) {
@@ -635,7 +635,7 @@ plot_forest_surrogate <- function(
     fit = surrogate$fit,
     data = surrogate$data,
     outcome_name = surrogate$prediction_name,
-    outcome_label = "Forest predicted U5 death",
+    outcome_label = "U5",
     ci_type = type,
     var_labels = var_labels,
     fontsize = fontsize
@@ -648,6 +648,7 @@ plot_lecturer_rpart <- function(
   fontsize = 4.4,
   models = lecturer_rpart_models,
   data = congo_model_dt,
+  outcome_label = "U5",
   var_labels = congo_var_labels
 ) {
   fit <- models[[method_name]]
@@ -667,7 +668,7 @@ plot_lecturer_rpart <- function(
     fit = fit,
     data = data,
     outcome_name = "deadu5_num",
-    outcome_label = "U5 death",
+    outcome_label = outcome_label,
     ci_type = "CI",
     var_labels = var_labels,
     fontsize = fontsize
@@ -1104,14 +1105,29 @@ ci_tree_gg <- function(
   weight_name = "sample_weight",
   horizontal = FALSE,
   terminal_space = NULL,
-  inner_text_size = 3.4,
-  terminal_text_size = 3.0,
-  edge_text_size = 3.0,
-  label_padding = grid::unit(0.18, "lines"),
-  terminal_padding = grid::unit(0.20, "lines"),
+  inner_text_size = 11 / ggplot2::.pt,
+  terminal_text_size = 11 / ggplot2::.pt,
+  edge_text_size = 10 / ggplot2::.pt,
+  label_padding = NULL,
+  terminal_padding = NULL,
+  inner_label_r = grid::unit(0.06, "lines"),
+  terminal_label_r = grid::unit(0.01, "lines"),
+  terminal_layout = c("ggparty", "level"),
+  node_box_style = c("ci_report_tree", "rounded", "square"),
+  edge_label_style = c("text", "label", "none"),
+  split_label_width = 26L,
+  edge_label_width = 22L,
+  terminal_label_width = 18L,
+  use_repel = c("none", "terminal", "all"),
+  repel_seed = 20260608,
+  repel_force = 1,
+  repel_box_padding = 0.02,
+  repel_point_padding = 0.02,
   inner_fill = "white",
   terminal_fill = "#d9d9d9",
   edge_colour = "#303030",
+  edge_label_colour = "#111111",
+  plot_margin = ggplot2::margin(4, 4, 4, 4),
   base_size = 11
 ) {
   stopifnot(requireNamespace("data.table", quietly = TRUE))
@@ -1120,6 +1136,19 @@ ci_tree_gg <- function(
   stopifnot(requireNamespace("grid", quietly = TRUE))
   stopifnot(requireNamespace("ineqTrees", quietly = TRUE))
   stopifnot(requireNamespace("partykit", quietly = TRUE))
+  terminal_layout <- match.arg(terminal_layout)
+  node_box_style <- match.arg(node_box_style)
+  edge_label_style <- match.arg(edge_label_style)
+  use_repel <- match.arg(use_repel)
+  can_repel <- use_repel != "none" &&
+    requireNamespace("ggrepel", quietly = TRUE)
+  if (use_repel != "none" && !can_repel) {
+    warning(
+      "`ggrepel` is not installed; falling back to ggparty node labels.",
+      call. = FALSE
+    )
+    use_repel <- "none"
+  }
 
   if (inherits(fit, "rpart")) {
     fit <- partykit::as.party(fit)
@@ -1162,19 +1191,61 @@ ci_tree_gg <- function(
       ci
     )
   ]
+  terminal_stats[
+    ,
+    node_label := vapply(
+      strsplit(node_label, "\n", fixed = TRUE),
+      function(lines) {
+        paste(
+          unlist(lapply(lines, strwrap, width = terminal_label_width)),
+          collapse = "\n"
+        )
+      },
+      character(1L)
+    )
+  ]
   terminal_label_lookup <- stats::setNames(
     terminal_stats$node_label,
     terminal_stats$node_id
   )
+
+  wrap_label <- function(value, width) {
+    value <- gsub("\\s+", " ", trimws(as.character(value)))
+    if (!nzchar(value) || is.na(value)) {
+      return(NA_character_)
+    }
+    paste(strwrap(value, width = width), collapse = "\n")
+  }
+
+  compact_split_value <- function(value, width = edge_label_width, max_items = 3L) {
+    value <- gsub("\\s+", " ", trimws(as.character(value)))
+    if (!nzchar(value) || is.na(value)) {
+      return(NA_character_)
+    }
+    if (!grepl(",", value, fixed = TRUE)) {
+      return(wrap_label(value, width))
+    }
+
+    parts <- trimws(strsplit(value, ",", fixed = TRUE)[[1L]])
+    if (length(parts) <= max_items && nchar(value) <= width) {
+      return(wrap_label(value, width))
+    }
+
+    shown <- paste(parts[seq_len(min(max_items, length(parts)))], collapse = ", ")
+    wrap_label(
+      paste0(length(parts), " levels: ", shown, ", ..."),
+      width
+    )
+  }
 
   pretty_split <- function(value) {
     if (is.na(value) || !nzchar(value)) {
       return(NA_character_)
     }
     if (!is.null(var_labels) && value %in% names(var_labels)) {
-      return(unname(var_labels[value]))
+      return(wrap_label(unname(var_labels[value]), split_label_width))
     }
-    gsub("_", " ", value)
+    wrap_label(gsub("_", " ", value), split_label_width)
   }
 
   add_vars <- list(
@@ -1196,36 +1267,196 @@ ci_tree_gg <- function(
     gg_args$terminal_space <- terminal_space
   }
 
-  do.call(ggparty::ggparty, gg_args) +
-    ggparty::geom_edge(colour = edge_colour, linewidth = 0.35) +
-    ggparty::geom_edge_label(
-      ggplot2::aes(label = breaks_label),
-      size = edge_text_size,
-      fill = "white",
-      max_length = 24,
-      parse = FALSE
-    ) +
-    ggparty::geom_node_label(
-      ggplot2::aes(label = splitvar_label),
-      ids = "inner",
-      size = inner_text_size,
-      label.padding = label_padding,
-      label.r = grid::unit(0.10, "lines"),
-      label.size = 0.25,
-      label.fill = inner_fill
-    ) +
-    ggparty::geom_node_label(
-      ggplot2::aes(label = node_label),
-      ids = "terminal",
-      size = terminal_text_size,
-      label.padding = terminal_padding,
-      label.r = grid::unit(0.08, "lines"),
-      label.size = 0.25,
-      label.fill = terminal_fill
-    ) +
+  if (identical(node_box_style, "ci_report_tree")) {
+    inner_label_r <- grid::unit(0.08, "lines")
+    terminal_label_r <- grid::unit(0, "lines")
+    if (is.null(label_padding)) {
+      label_padding <- grid::unit(0.34, "lines")
+    }
+    if (is.null(terminal_padding)) {
+      terminal_padding <- grid::unit(0.26, "lines")
+    }
+  } else if (identical(node_box_style, "square")) {
+    inner_label_r <- grid::unit(0, "lines")
+    terminal_label_r <- grid::unit(0, "lines")
+  }
+  label_padding <- label_padding %||% grid::unit(0.20, "lines")
+  terminal_padding <- terminal_padding %||% grid::unit(0.18, "lines")
+
+  p <- do.call(ggparty::ggparty, gg_args)
+  if (identical(terminal_layout, "level") &&
+    all(c("id", "parent") %in% names(p$data))) {
+    collect_true_levels <- function(node, level = 0L) {
+      row <- data.table::data.table(
+        id = partykit::id_node(node),
+        true_level = level,
+        true_terminal = partykit::is.terminal(node)
+      )
+      kids <- partykit::kids_node(node)
+      if (is.null(kids) || !length(kids)) {
+        return(row)
+      }
+      data.table::rbindlist(
+        c(
+          list(row),
+          lapply(kids, collect_true_levels, level = level + 1L)
+        ),
+        use.names = TRUE
+      )
+    }
+    true_levels <- collect_true_levels(partykit::node_party(fit))
+    p$data <- merge(
+      p$data,
+      true_levels,
+      by = "id",
+      all.x = TRUE,
+      sort = FALSE
+    )
+    max_level <- max(p$data$true_level, na.rm = TRUE)
+    if (is.finite(max_level) && max_level > 0) {
+      if (isTRUE(horizontal)) {
+        p$data$x <- p$data$true_level / (max_level + 1)
+        p$data$x_parent <- p$data$x[match(p$data$parent, p$data$id)]
+      } else {
+        p$data$y <- 1 - p$data$true_level / (max_level + 1)
+        p$data$y_parent <- p$data$y[match(p$data$parent, p$data$id)]
+      }
+    }
+  }
+  p$data$node_label <- vapply(
+    p$data$id,
+    function(id) {
+      label <- terminal_label_lookup[as.character(id)]
+      if (is.na(label)) "" else unname(label)
+    },
+    character(1L)
+  )
+  p$data$splitvar_label <- vapply(
+    p$data$splitvar,
+    pretty_split,
+    character(1L)
+  )
+  p$data$breaks_label_compact <- vapply(
+    p$data$breaks_label,
+    compact_split_value,
+    character(1L)
+  )
+
+  inner_dt <- p$data[p$data$kids > 0L, , drop = FALSE]
+  terminal_dt <- p$data[p$data$kids == 0L, , drop = FALSE]
+  edge_dt <- p$data[
+    !is.na(p$data$parent) &
+      !is.na(p$data$x_parent) &
+      !is.na(p$data$y_parent) &
+      !is.na(p$data$breaks_label_compact) &
+      nzchar(p$data$breaks_label_compact),
+    ,
+    drop = FALSE
+  ]
+  if (nrow(edge_dt)) {
+    edge_dt$edge_label_x <- (edge_dt$x + edge_dt$x_parent) / 2
+    edge_dt$edge_label_y <- (edge_dt$y + edge_dt$y_parent) / 2
+  }
+
+  out <- p +
+    ggparty::geom_edge(colour = edge_colour, linewidth = 0.35)
+
+  if (edge_label_style == "label") {
+    edge_label_layer <- suppressWarnings(
+      ggparty::geom_edge_label(
+        ggplot2::aes(label = breaks_label_compact),
+        size = edge_text_size,
+        fill = "white",
+        max_length = edge_label_width,
+        parse = FALSE
+      )
+    )
+    out <- out + edge_label_layer
+  } else if (edge_label_style == "text" && nrow(edge_dt)) {
+    out <- out +
+      ggplot2::geom_text(
+        data = edge_dt,
+        ggplot2::aes(
+          x = edge_label_x,
+          y = edge_label_y,
+          label = breaks_label_compact
+        ),
+        inherit.aes = FALSE,
+        size = edge_text_size,
+        color = edge_label_colour,
+        lineheight = 0.9,
+        check_overlap = TRUE
+      )
+  }
+
+  if (use_repel == "all") {
+    out <- out +
+      ggrepel::geom_label_repel(
+        data = inner_dt,
+        ggplot2::aes(x = x, y = y, label = splitvar_label),
+        inherit.aes = FALSE,
+        size = inner_text_size,
+        label.padding = label_padding,
+        label.r = inner_label_r,
+        label.size = 0.25,
+        fill = inner_fill,
+        seed = repel_seed,
+        force = repel_force,
+        box.padding = repel_box_padding,
+        point.padding = repel_point_padding,
+        min.segment.length = 0,
+        max.overlaps = Inf
+      )
+  } else {
+    out <- out +
+      ggparty::geom_node_label(
+        ggplot2::aes(label = splitvar_label),
+        ids = "inner",
+        size = inner_text_size,
+        label.padding = label_padding,
+        label.r = inner_label_r,
+        label.size = 0.25,
+        label.col = "black",
+        label.fill = inner_fill
+      )
+  }
+
+  if (use_repel %in% c("terminal", "all")) {
+    out <- out +
+      ggrepel::geom_label_repel(
+        data = terminal_dt,
+        ggplot2::aes(x = x, y = y, label = node_label),
+        inherit.aes = FALSE,
+        size = terminal_text_size,
+        label.padding = terminal_padding,
+        label.r = terminal_label_r,
+        label.size = 0.25,
+        fill = terminal_fill,
+        seed = repel_seed,
+        force = repel_force,
+        box.padding = repel_box_padding,
+        point.padding = repel_point_padding,
+        min.segment.length = 0,
+        max.overlaps = Inf
+      )
+  } else {
+    out <- out +
+      ggparty::geom_node_label(
+        ggplot2::aes(label = node_label),
+        ids = "terminal",
+        size = terminal_text_size,
+        label.padding = terminal_padding,
+        label.r = terminal_label_r,
+        label.size = 0.25,
+        label.fill = terminal_fill
+      )
+  }
+
+  out +
+    ggplot2::coord_cartesian(clip = "off") +
     ggplot2::theme_void(base_size = base_size) +
     ggplot2::theme(
-      plot.margin = ggplot2::margin(12, 16, 12, 16),
+      plot.margin = plot_margin,
       plot.background = ggplot2::element_rect(fill = "white", colour = NA)
     )
 }
