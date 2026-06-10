@@ -805,8 +805,9 @@ a child's contribution depends on the child's position in the current
 node's socioeconomic ranking. After each split, the children in the new
 subgroup are ranked again, so the same child can receive a different
 rank because the comparison group has changed. In the level-dependent
-criterion, \(L\), the child's observed socioeconomic level is carried
-into the subgroup, so a child's rank also reflects their wealth level.
+criterion, re-ranking is still done but in \(L\), the child's observed
+socioeconomic level is carried into the subgroup, so a child's rank also
+reflects their wealth level.
 
 The differences also showed up in cross-validation; the level-dependent
 method outperformed the rank-dependent methods. The rank-dependent trees
@@ -874,43 +875,42 @@ inequality trees.
 \subsection{Ethical, societal, and stakeholder
 relevance}\label{ethical-societal-and-stakeholder-relevance}
 
-The main ethical issue in this thesis is not the tree algorithm itself,
-but the governance of the DHS data used to fit it. The analysis uses
-secondary survey data, so the first ethical check is how the data were
-collected, whether participants gave informed consent, whether
-confidentiality protections were applied, and whether the data are used
-in line with the conditions under which access was granted. The DHS
-Program states that ``participation is voluntary'' and that the
-respondent's ``identity and information will be kept strictly
-confidential'' (\citeproc{ref-dhs_privacy_respondents}{The DHS Program,
-2026}). The analysis should therefore be reported as a secondary
-analysis of protected survey data, with no attempt to identify
-individuals, households, or small local groups.
+This thesis uses child-level data from the Democratic Republic of the
+Congo DHS phase V survey (\citeproc{ref-dhs_drc_2007_dataset}{The DRC
+Program Program, 2007}). These data contain sensitive information,
+including child survival status, birth histories, household wealth,
+residence, province, maternal education, occupation, and skilled birth
+attendance. Even without names, the data describe mothers, children,
+households, and family deaths. The DHS Program states that participation
+is voluntary and that respondents' identities and information are kept
+confidential (\citeproc{ref-dhs_privacy_respondents}{The DHS Program,
+2026}). In this thesis, we used secondary survey data and should remain
+within the conditions under which we were granted access to the DHS
+files.
 
-The second ethical issue is data protection. Even when DHS files are
-distributed for research in de-identified form, the analysis still uses
-sensitive health, household, and socioeconomic information. Data
-handling should therefore be checked against the data-access agreement
-and, where relevant, GDPR principles of lawful processing, data
-minimisation, purpose limitation, secure storage, and avoidance of
-re-identification (\citeproc{ref-europeanparliament2016gdpr}{European
-Parliament and Council of the European Union, 2016}). The subgroup rules
-should also be used carefully. They can help public-health planners see
-where socioeconomic inequality in under-five mortality is concentrated,
-but they should not be used to stigmatise provinces, rural households,
-or families with particular socioeconomic characteristics.
+The concentration index trees developed here can identify subgroups with
+higher mortality and greater socioeconomic disadvantage. For example,
+the fitted trees point to rural children from low-wealth households in
+Katanga, or children whose mothers had no education and who lived in
+low-wealth households. These subgroups are useful for public health
+analysis and planning, but the results should be used carefully. Groups
+we identified through concentration index trees should not be described
+as if the children, mothers, or provinces are the problem. The tree is
+showing where mortality and disadvantage are concentrated in the data.
+The interpretation should therefore focus on unequal conditions, access
+to services, and policy response, not labelling groups.
 
-The stakeholder value of the tree approach is that the results can be
-explained without requiring advanced statistical knowledge. A tree
-diagram works like a flow chart: the reader begins at the first branch,
-follows the observed characteristics, and arrives at a high-risk or
-low-risk subgroup. This is useful for Ministry of Health officials and
-programme teams because the first branch immediately shows the main
-split in the population, while later branches show how risk differs
-within those groups. Regression coefficients and SHAP contributions are
-useful for technical comparison, but the tree and surrogate outputs
-translate the same inequality pattern into readable decision rules that
-can be discussed with non-specialist stakeholders.
+Compared with other statistical methods used in decomposition, such as
+generalised linear models and tree-based models, tree-based models are
+easier to interpret. The variable percentage contribution from
+regression or Shap-based decomposition can show which variables
+contribute more. However, it cannot show how disadvantage is organised
+across residence, household wealth, occupation, maternal background, and
+province. A tree is easier to discuss because it works like a flow
+chart. As shown in this thesis, the tree partitions the data graphically
+into high- and low-risk groups. Concentration index trees make it easier
+to follow the path to these high- and low-risk groups and identify them
+for public health planning.
 
 \section{Future research}\label{future-research}
 
@@ -1622,12 +1622,6 @@ A new approach to the measurement of bivariate inequality'},
 \emph{International Journal of Environmental Research and Public
 Health}, 14(7), p. 673. Available at:
 \url{https://doi.org/10.3390/ijerph14070673}.
-
-\bibitem[\citeproctext]{ref-europeanparliament2016gdpr}
-European Parliament and Council of the European Union (2016)
-{`Regulation (EU) 2016/679 of the european parliament and of the
-council'}. Official Journal of the European Union, L 119, 4 May 2016.
-Available at: \url{https://eur-lex.europa.eu/eli/reg/2016/679/oj}.
 
 \bibitem[\citeproctext]{ref-kandala2014drc}
 Kandala, N.-B. \emph{et al.} (2014) {`Child mortality in the democratic
