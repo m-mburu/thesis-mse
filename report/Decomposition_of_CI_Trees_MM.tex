@@ -795,19 +795,150 @@ structure did not transfer well to held-out folds.
 \subsection{Rank-dependent and level-dependent views of
 inequality}\label{rank-dependent-and-level-dependent-views-of-inequality}
 
-\subsection{Stability, validation, and overfitting Forests and
-surrogate-tree
-interpretation}\label{stability-validation-and-overfitting-forests-and-surrogate-tree-interpretation}
+From these analyses, we see differences in the results
+(Figure~\ref{fig-appendix-ci-tree-ci};
+Figure~\ref{fig-appendix-ci-tree-cig};
+Figure~\ref{fig-appendix-ci-tree-cic}) in subgroups formed by the two
+ways of defining the impurity measure when developing the concentration
+index tree. In the rank-dependent criteria \(CI\), \(CIg\), and \(CIc\),
+a child's contribution depends on the child's position in the current
+node's socioeconomic ranking. After each split, the children in the new
+subgroup are ranked again, so the same child can receive a different
+rank because the comparison group has changed. In the level-dependent
+criterion, \(L\), the child's observed socioeconomic level is carried
+into the subgroup, so a child's rank also reflects their wealth level.
+
+The differences also showed up in cross-validation; the level-dependent
+method outperformed the rank-dependent methods. The rank-dependent trees
+had strong training performance but negative validation gains, while the
+level-dependent tree kept a positive validation gain
+(Figure~\ref{fig-appendix-tree-validation-path};
+Table~\ref{tbl-appendix-tree-selected-setting-summary}). The same
+pattern was seen in the forests: averaging trees reduced the validation
+loss for the rank-dependent criteria, but their validation gains
+remained below zero, whereas the \(L\) forest retained a positive
+validation gain (Figure~\ref{fig-appendix-forest-validation-path};
+Table~\ref{tbl-appendix-forest-selected-setting-summary}). The
+validation results show that \(CI\), \(CIg\), and \(CIc\) identified
+detailed in-sample subgroup rules, whereas \(L\) produced a more
+reproducible subgroup structure in this application.
+
+These results are also mirrored by the subgroup-decomposability argument
+in (\citeproc{ref-erreygers2017subgroup}{Erreygers \emph{et al.},
+2017}). In their comparison of rank-dependent and level-dependent
+measures, they show that the level-dependent index \(L\) is
+subgroup-decomposable and rank-dependent measures are more difficult to
+decompose cleanly across population groups. Decomposability of the
+level-dependent concentration index shown by
+(\citeproc{ref-erreygers2017subgroup}{Erreygers \emph{et al.}, 2017})
+can also explain why \(L\) performed better as a tree impurity criterion
+in this application: children inherit their socioeconomic level within
+each subgroup, rather than being re-weighted only by a new within-node
+rank. Although the DHS wealth index is an asset-based
+score(\citeproc{ref-dhsprogram_wealth_index_construction}{The DHS
+Program, 2007}) and (\citeproc{ref-erreygers2017socioeconomic}{Erreygers
+and Kessels, 2017}) recommends using Level depedent concentration
+index(\(L\)) with a wealth-ranking variable that has ratio properties.
+The cross-validation results show that the \(L\) concentration index
+impurity measure yielded a structure transferable to held-out samples
+using the DHS wealth score.
 
 \subsection{Methodological and data
 limitations}\label{methodological-and-data-limitations}
 
+The analysis is descriptive and should not be interpreted as a causal
+design. The DHS data are cross-sectional, and the fitted trees identify
+subgroup patterns rather than intervention effects. A terminal node with
+high mortality does not show that the splitting variables caused the
+outcome; it shows that the observed covariates define a group with a
+different mortality and inequality profile.
+
+The choice of socioeconomic ranking variable is also a limitation. The
+DHS wealth index is appropriate for ordering households from poorer to
+richer, but it is not equivalent to measured income, consumption, or
+expenditure. This matters especially for the level-dependent index,
+because level-dependent weights are easier to justify when socioeconomic
+levels have a clear ratio-scale interpretation. The validation results
+favour the \(L\) criterion in this application, but that empirical
+stability should be read alongside this measurement caveat.
+
+The SHAP analysis is also approximate. It is based on a fitted
+predictive forest and a sampled SHAP calculation, so the reported
+percentages describe how the fitted model allocates prediction
+differences across variables. They do not provide causal effects, and
+they are not the same object as the concentration-index tree impurity.
+Their value in this thesis is comparative: they show whether a flexible
+predictive model points to the same determinant groups as the direct
+inequality trees.
+
 \subsection{Ethical, societal, and stakeholder
 relevance}\label{ethical-societal-and-stakeholder-relevance}
 
+The main ethical issue in this thesis is not the tree algorithm itself,
+but the governance of the DHS data used to fit it. The analysis uses
+secondary survey data, so the first ethical check is how the data were
+collected, whether participants gave informed consent, whether
+confidentiality protections were applied, and whether the data are used
+in line with the conditions under which access was granted. The DHS
+Program states that ``participation is voluntary'' and that the
+respondent's ``identity and information will be kept strictly
+confidential'' (\citeproc{ref-dhs_privacy_respondents}{The DHS Program,
+2026}). The analysis should therefore be reported as a secondary
+analysis of protected survey data, with no attempt to identify
+individuals, households, or small local groups.
+
+The second ethical issue is data protection. Even when DHS files are
+distributed for research in de-identified form, the analysis still uses
+sensitive health, household, and socioeconomic information. Data
+handling should therefore be checked against the data-access agreement
+and, where relevant, GDPR principles of lawful processing, data
+minimisation, purpose limitation, secure storage, and avoidance of
+re-identification (\citeproc{ref-europeanparliament2016gdpr}{European
+Parliament and Council of the European Union, 2016}). The subgroup rules
+should also be used carefully. They can help public-health planners see
+where socioeconomic inequality in under-five mortality is concentrated,
+but they should not be used to stigmatise provinces, rural households,
+or families with particular socioeconomic characteristics.
+
+The stakeholder value of the tree approach is that the results can be
+explained without requiring advanced statistical knowledge. A tree
+diagram works like a flow chart: the reader begins at the first branch,
+follows the observed characteristics, and arrives at a high-risk or
+low-risk subgroup. This is useful for Ministry of Health officials and
+programme teams because the first branch immediately shows the main
+split in the population, while later branches show how risk differs
+within those groups. Regression coefficients and SHAP contributions are
+useful for technical comparison, but the tree and surrogate outputs
+translate the same inequality pattern into readable decision rules that
+can be discussed with non-specialist stakeholders.
+
 \section{Future research}\label{future-research}
 
+Future research should examine why the rank-dependent criteria overfit
+in this application and whether alternative validation rules, bootstrap
+stability checks, or constraints on early splits improve their held-out
+performance. A second direction is to repeat the level-dependent
+analysis with socioeconomic variables that have clearer level meaning,
+such as consumption or income, where available. The method should also
+be applied to another DHS country sample, such as Kenya, to assess
+whether the same rural-urban, occupational, educational, and regional
+structure appears outside the DRC data.
+
 \section{Conclusion}\label{conclusion}
+
+The thesis shows that concentration-index trees can turn socioeconomic
+inequality in under-five mortality into interpretable subgroup rules. In
+the DRC application, the indirect regression decomposition highlighted
+mother's education and father's agricultural occupation, while the SHAP,
+tree, forest, and surrogate results repeatedly pointed to residence,
+household wealth, education, occupation, skilled birth attendance, and
+province. The rank-dependent trees recovered a clear in-sample
+socioeconomic gradient, but they did not validate well. The
+level-dependent tree and forest produced a more stable subgroup
+structure centred on rural-urban residence, occupation, wealth, and
+region. The method therefore adds a useful descriptive tool to classical
+decomposition: it does not only rank determinants, but shows how
+determinants combine to define inequality-relevant groups.
 
 \section{Appendix}\label{appendix}
 
@@ -1479,6 +1610,12 @@ Erreygers, G. (2009) {`Correcting the concentration index'},
 \emph{Journal of Health Economics}, 28(2), pp. 504--515. Available at:
 \url{https://doi.org/10.1016/j.jhealeco.2008.02.003}.
 
+\bibitem[\citeproctext]{ref-erreygers2017subgroup}
+Erreygers, G. \emph{et al.} (2017) {`Subgroup decomposability of
+income-related inequality of health, with an application to australia'},
+\emph{Economic Record} {[}Preprint{]}. Available at:
+\url{https://doi.org/10.1111/1475-4932.12373}.
+
 \bibitem[\citeproctext]{ref-erreygers2017socioeconomic}
 Erreygers, G. and Kessels, R. (2017) {`Socioeconomic status and health:
 A new approach to the measurement of bivariate inequality'},
@@ -1486,12 +1623,28 @@ A new approach to the measurement of bivariate inequality'},
 Health}, 14(7), p. 673. Available at:
 \url{https://doi.org/10.3390/ijerph14070673}.
 
+\bibitem[\citeproctext]{ref-europeanparliament2016gdpr}
+European Parliament and Council of the European Union (2016)
+{`Regulation (EU) 2016/679 of the european parliament and of the
+council'}. Official Journal of the European Union, L 119, 4 May 2016.
+Available at: \url{https://eur-lex.europa.eu/eli/reg/2016/679/oj}.
+
 \bibitem[\citeproctext]{ref-kandala2014drc}
 Kandala, N.-B. \emph{et al.} (2014) {`Child mortality in the democratic
 republic of congo: Cross-sectional evidence of the effect of geographic
 location and prolonged conflict from a national household survey'},
 \emph{BMC Public Health}, 14(1), p. 266. Available at:
 \url{https://doi.org/10.1186/1471-2458-14-266}.
+
+\bibitem[\citeproctext]{ref-dhsprogram_wealth_index_construction}
+The DHS Program (2007) {`Wealth index construction'}. The DHS Program.
+Available at:
+\url{https://dhsprogram.com/topics/wealth-index/Wealth-Index-Construction.cfm}.
+
+\bibitem[\citeproctext]{ref-dhs_privacy_respondents}
+The DHS Program (2026) {`Protecting the privacy of DHS survey
+respondents'}. Methodology webpage. Available at:
+\url{https://dhsprogram.com/methodology/protecting-the-privacy-of-dhs-survey-respondents.cfm}.
 
 \bibitem[\citeproctext]{ref-dhs_drc_2007_dataset}
 The DRC Program Program (2007) {`{Congo Democratic Republic: Standard
