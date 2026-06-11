@@ -70,7 +70,9 @@ library(ineqTrees)
 library(partykit)
 library(here)
 library(kableExtra)
-use_latex_packages()
+if (isTRUE(knitr::is_latex_output())) {
+  kableExtra::use_latex_packages()
+}
 source(here("R", "report_helpers.R"))
 source(here("R", "ci_rpart_comparison_methods.R"))
 
@@ -207,11 +209,13 @@ method_comparison_table <- report_compact_table(
 )
 
 
-method_comparison_table <- kableExtra::add_header_above(
-    method_comparison_table,
-    c(" " = 1, "Regression" = 3, "Predictive-forest SHAP" = 4),
-    bold = TRUE
-)
+if (report_use_kable_extra()) {
+    method_comparison_table <- kableExtra::add_header_above(
+        method_comparison_table,
+        c(" " = 1, "Regression" = 3, "Predictive-forest SHAP" = 4),
+        bold = TRUE
+    )
+}
 
 
 method_comparison_table
@@ -480,16 +484,49 @@ The direct concentration-index trees added the subgroup interpretation that is l
 
 ## Rank-dependent and level-dependent views of inequality
 
-## Stability, validation, and overfitting Forests and surrogate-tree interpretation
+
+From these analyses, we see differences in the results (@fig-appendix-ci-tree-ci; @fig-appendix-ci-tree-cig; @fig-appendix-ci-tree-cic) in subgroups formed by the two ways of defining the impurity measure when developing the concentration index tree. In the rank-dependent criteria $CI$, $CIg$, and $CIc$, a child's contribution depends on the child's position in the current node's socioeconomic ranking. After each split, the children in the new subgroup are ranked again, so the same child can receive a different rank because the comparison group has changed. In the level-dependent criterion, re-ranking is still done but in $L$, the child's observed socioeconomic level is carried into the subgroup, so a child's rank also reflects their wealth level.
+
+The differences also showed up in cross-validation; the level-dependent method outperformed the rank-dependent methods. The rank-dependent trees had strong training performance but negative validation gains, while the level-dependent tree kept a positive validation gain (@fig-appendix-tree-validation-path; @tbl-appendix-tree-selected-setting-summary). The same pattern was seen in the forests: averaging trees reduced the validation loss for the rank-dependent criteria, but their validation gains remained below zero, whereas the $L$ forest retained a positive validation gain (@fig-appendix-forest-validation-path; @tbl-appendix-forest-selected-setting-summary). The validation results show that $CI$, $CIg$, and $CIc$ identified detailed in-sample subgroup rules, whereas $L$ produced a more reproducible subgroup structure in this application.
+
+These results are also mirrored by the subgroup-decomposability argument in [@erreygers2017subgroup]. In their comparison of rank-dependent and level-dependent measures, they show that the level-dependent index $L$ is subgroup-decomposable and rank-dependent measures are more difficult to decompose cleanly across population groups. Decomposability of the level-dependent concentration index shown by [@erreygers2017subgroup] can also explain why $L$ performed better as a tree impurity criterion in this application: children inherit their socioeconomic level within each subgroup, rather than being re-weighted only by a new within-node rank. Although the DHS wealth index is an asset-based score[@dhsprogram_wealth_index_construction] and [@erreygers2017socioeconomic] recommends using Level depedent concentration index($L$) with a wealth-ranking variable that has ratio properties. The cross-validation results show that the $L$ concentration index impurity measure yielded a structure transferable to held-out samples using the DHS wealth score.
+
 
 ## Methodological and data limitations
 
+This thesis uses DHS survey data [@dhs_drc_2007_dataset]. On the DHS privacy page[@dhs_privacy_respondents], they state that this voluntary survey data is known to have some limitations, such as non-response bias and recall bias, because deaths were recorded after the fact. We also used an older data set because we wanted to compare the new method with a data set with known results. So the results might not reflect the current status in the Democratic Republic of Congo.
+
+The second limitation is the socioeconomic ranking variable, which is reconstructed using PCA [@dhsprogram_wealth_index_construction]. The DHS wealth index is useful for ordering households from poorest to richest. It is also a relative score within the survey. This imitation mainly affects the level-dependent concentration index. This specifically affects $L$, because the level-dependent index has been shown to perform best for wealth variables with rational properties [@erreygers2017socioeconomic].
+
+We also used decision trees, which are known to be unstable. Small changes in the data can produce different split variables, split points, and tree structures. This instability arises from the recursive, greedy nature of tree construction: once an early split changes, all subsequent splits are fit to different subsets of the data. Since this is a concentration index tree, we tried to address this by introducing a minimum relative gain, so that we can admit splits that remove a set amount of gain, chosen via cross-validation.
+
+
 ## Ethical, societal, and stakeholder relevance
 
+
+
+This thesis uses DHS survey data [@dhs_drc_2007_dataset]. On the DHS privacy page[@dhs_privacy_respondents], they state that this voluntary survey data has some limitations, such as non-response bias and recall bias, because deaths were recorded after the fact. We also used an older data set to compare the new method with one with known results. So the results might not reflect the current status in the Democratic Republic of Congo.
+
+The second limitation is the socioeconomic ranking variable, which is reconstructed using PCA [@dhsprogram_wealth_index_construction]. The DHS wealth index is useful for ordering households from poorest to richest. It is also a relative score within the survey. This imitation mainly affects the level-dependent concentration index. This specifically affects $L$, because the level-dependent index has been shown to perform best for wealth variables with rational properties [@erreygers2017socioeconomic].
+
+We also used decision trees, which are known to be unstable. Small changes in the data can produce different split variables, split points, and tree structures. This instability arises from the recursive, greedy nature of tree construction: once an early split changes, all subsequent splits are fit to different subsets of the data. Since this is a concentration index tree, we addressed this by introducing a minimum relative gain, so that we can admit splits that remove a set amount of gain, chosen via cross-validation.
+
+
 # Future research
-how to improve rank depedent methods in validation set or see different ways of calculating concetration index on top of level depednet methods.
+
+In this thesis, the level-dependent $L$ method yielded more stable validation results than the rank-dependent criteria. This suggests that the choice of concentration index, used here as the tree impurity measure, is an important part of the method. One useful direction for future work would be to investigate whether rank-dependent concentration-index trees can be modified so that a child node retains more information about the wealth position from which its observations came, rather than relying solely on the new within-node ranking after each split. This may help reduce some of the instability seen in the rank-dependent trees. Another direction is to study the hyperparameters more systematically. Controls such as minimum node size, minimum child-node proportion, maximum depth, minimum gain, and minimum relative gain can alter the final tree structure, depending on the study's purpose. Future work could therefore examine how these controls affect validation gain, terminal-node size, and the stability of the subgroups found by the model.
+
 # Conclusion
 
+This thesis developed and applied a tree-based method for analysing socioeconomic inequality in under-five mortality. The method used the concentration index as the impurity measure in a recursive partitioning method. Instead of ranking determinants by their percentage contribution to inequality, the fitted tree produced subgroups that could be interpreted as decision rules. This added a subgroup view to the usual regression-based decomposition. In the DRC DHS application, inequality in under-five mortality was not explained solely by household wealth. Residence, maternal education, skilled birth attendance, parental occupation, household wealth, and province all appeared in the analysis.
+
+The indirect methods gave the variable-level view, while the direct trees showed how these variables combined. The regression decomposition emphasised the mother's education and the father's agricultural occupation. The SHAP-based decomposition gave a broader pattern, with residence, household wealth, mother's education, skilled birth attendance, and parental occupation appearing across criteria.
+
+ The concentration-index trees acted as a direct method to decomposition, which showed directly with subgroups had higher under 5 deaths concentration. The rank-dependent trees found an education-occupation-wealth pattern, with higher mortality among children whose mothers had no education, who lived in low-wealth households, and who resided in Katanga. The $L$ method gave a more spatial structure, beginning with residence and then splitting by occupation, wealth, and province.
+
+In this thesis, the level-dependent $L$ method yielded more stable validation results than the rank-dependent criteria. This suggests that the choice of concentration index, used here as the tree impurity measure, is an important part of the method. The rank-dependent trees found detailed structures in the fitted data, but these structures did not validate well. The $L$ tree and forest retained positive validation gains, so the level-dependent result was the more stable descriptive partition in this application. 
+
+Since the level-dependent concentration index, as a measure of impurity, produced better results on held-out folds, future research should examine how to improve rank-dependent trees to retain more information from the original wealth ranking after each split. 
 
 # Appendix
 
