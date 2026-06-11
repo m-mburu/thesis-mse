@@ -48,6 +48,7 @@ citeproc: true
 cite-method: citeproc
 link-citations: true
 reference-location: block
+prefer-html: false
 ---
 
 ```{r setup, include=FALSE}
@@ -70,7 +71,9 @@ library(ineqTrees)
 library(partykit)
 library(here)
 library(kableExtra)
-use_latex_packages()
+if (isTRUE(knitr::is_latex_output())) {
+  kableExtra::use_latex_packages()
+}
 source(here("R", "report_helpers.R"))
 source(here("R", "ci_rpart_comparison_methods.R"))
 
@@ -137,7 +140,7 @@ $$
 
 The coding uses the child's survival status and age at death. Children who died before 60 months receive a value of one. Since the outcome is adverse, higher fitted values correspond to higher mortality risk.
 
-Socioeconomic position is measured using the DHS household wealth index. The continuous wealth score is used to rank children from poorer to richer households when computing the concentration index. Wealth defines the socioeconomic scale along which mortality inequality is measured.
+Socioeconomic position is measured using the DHS household wealth index[@dhsprogram_wealth_index_construction]. The wealth score is a PCA-derived composite measure of household living standard based on asset ownership, housing materials, water access, sanitation facilities, and related household amenities. The continuous wealth score is used to rank children from poorer to richer households when computing the concentration index. Wealth defines the socioeconomic scale along which mortality inequality is measured.
 
 The independent variables describe the child, mother, household, occupation, residence, and province. They include child sex, birth-order and birth-interval group, mother's age group, rural residence, mother's and partner's education, mother's and partner's occupation, whether either parent belongs to a low-skill or non-working occupational group, and province. Categorical variables are recoded into interpretable groups before the tree is fitted.
 
@@ -745,7 +748,7 @@ RG_m(j,s,t)
 \frac{G_m(j,s,t)}{|I_m(t)|}.
 $$
 
-This expresses the gain as a share of the impurity in the parent node. It helps avoid splits that have a positive raw gain but reduce only a very small part of the parent-node impurity. It also makes the stopping rule less dependent on the numerical scale of the chosen concentration-index impurity measure. Thus, a node becomes terminal when the node-level checks fail, when no split satisfies the child-size rules, or when the best admissible split fails the absolute or relative gain requirement. The number of predictors considered (mtry) only changes which predictors are searched at a node, especially in the forest setting. It is not a stopping rule. The full algorithm is shown in (pseudocode)[#app-greedy-ci-tree-flow] and flowchart form in the appendix (@fig-greedy-ci-tree-flow), and the implementation is available in the ineqTrees package [@ineqTrees].
+This expresses the gain as a share of the impurity in the parent node. It helps avoid splits that have a positive raw gain but reduce only a very small part of the parent-node impurity. It also makes the stopping rule less dependent on the numerical scale of the chosen concentration-index impurity measure. Thus, a node becomes terminal when the node-level checks fail, when no split satisfies the child-size rules, or when the best admissible split fails the absolute or relative gain requirement. The number of predictors considered (mtry) only changes which predictors are searched at a node, especially in the forest setting. It is not a stopping rule. The full algorithm is shown in [pseudocode](#app-greedy-ci-tree-flow) and flowchart form in the appendix (@fig-greedy-ci-tree-flow), and the implementation is available in the ineqTrees package [@ineqTrees].
 
 ### Extensions to Ensemble Methods: Random Forests {#sec-random-forests}
 
@@ -753,7 +756,7 @@ The main advantage of the concentration-index tree is that the subgroup structur
 
 A limitation of the single tree is that its structure can be unstable. The algorithm grows the tree greedily, so an early split determines which observations are available for later splits. A small change in the data or in the tuning controls can therefore change the upper part of the tree and lead to a different set of terminal nodes. Tree depth also matters. A shallow tree may miss important combinations of determinants, while a deeper tree may start to follow small weighted subgroups rather than a pattern that is likely to appear again in another sample.
 
-To reduce this dependence on one fitted tree, we extend the concentration-index split rule to a random forest. The forest fits many greedy CI trees to perturbed versions of the training data. Within each tree, node splitting follows the same direct maximisation of concentration-index gain over admissible variable-split pairs used by the single-[concentration-index tree](#sec-algorithmic-summary). Randomness enters through row perturbation and, optionally, through mtry, the number of candidate predictors searched at each node. The final prediction is obtained by aggregating predictions across trees.
+To reduce this dependence on one fitted tree, we extend the concentration-index split rule to a random forest. The forest fits many greedy CI trees to perturbed versions of the training data. Within each tree, node splitting follows the same direct maximisation of concentration-index gain over admissible variable-split pairs used by the [single-concentration-index tree](#sec-algorithmic-summary). Randomness enters through row perturbation and, optionally, through mtry, the number of candidate predictors searched at each node. The final prediction is obtained by aggregating predictions across trees.
 
 The forest contains $B$ trees, and $\hat{f}_b(x)$ is the prediction from tree $b$, the forest prediction is
 
@@ -919,7 +922,7 @@ This equation shows that the absolute contribution of feature $k$ to health ineq
 
 ### Percentage Contributions {#sec-shap-percentage-contributions}
 
-As in [Section 2.3](#sec-percentage-contributions), I express the SHAP-based contributions as percentages of the concentration index for the fitted mortality risks. For determinant $k$, this is
+As in [Percentage Contributions for decomposition based on Regression Models](#sec-percentage-contributions), I express the SHAP-based contributions as percentages of the concentration index for the fitted mortality risks. For determinant $k$, this is
 
 $$
 \text{PC}_k^{\text{SHAP}} = 100 \times \frac{D_k^{\text{SHAP}}}{C_{\hat{y}}}.
@@ -1016,7 +1019,7 @@ We ran a small simulation study to check whether the algorithm behaved as expect
 ## Analysis {#sec-analysis-methods}
 
 
-We divided the analysis into direct and indirect decomposition methods. The direct methods use concentration-index trees and forests, developed here, in which the model is built to reduce socioeconomic inequality in under-five mortality at each split. In these methods, the subgroup structure is part of the decomposition because the tree is fitted using the concentration index criterion. The indirect methods first fit a model for under-five mortality and then decompose the fitted mortality pattern across the socioeconomic ranking. For the indirect methods, we use a regression-based decomposition in which we fitted a survey-weighted logistic regression with a quasibinomial family using svyglm from the survey package, and the fitted equation separates the contribution of each determinant through its coefficient [@wagstaff2003decomposing; @speybroeck2010decomposing; @survey2026]. The second indirect method is the SHAP-based decomposition described in [shap section](#sec-shap-decomposition-definition). For this method, a predictive random forest is fitted using the tidymodels package with the ranger engine, and the fitted predictions are then decomposed into SHAP contributions at the determinant level before applying the concentration-index decomposition [@tidymodels2020; @wright2017ranger].
+We divided the analysis into direct and indirect decomposition methods. The direct methods use concentration-index trees and forests, developed here, in which the model is built to reduce socioeconomic inequality in under-five mortality at each split. In these methods, the subgroup structure is part of the decomposition because the tree is fitted using the concentration index criterion. The indirect methods first fit a model for under-five mortality and then decompose the fitted mortality pattern across the socioeconomic ranking. For the indirect methods, we use a regression-based decomposition in which we fitted a survey-weighted logistic regression with a quasibinomial family using svyglm from the survey package, and the fitted equation separates the contribution of each determinant through its coefficient [@wagstaff2003decomposing; @speybroeck2010decomposing; @survey2026]. We then used the Rineq R package[@rineq2025] for decomposition. The second indirect method is the SHAP-based decomposition described in [shap section](#sec-shap-decomposition-definition). For this method, a predictive random forest is fitted using the tidymodels package with the ranger package as backend, and the fitted predictions are then decomposed into SHAP contributions at the determinant level before applying the concentration-index decomposition [@tidymodels2020; @wright2017ranger].
 
 We also fitted a comparison concentration-index tree using the rpart R package [@rpart2026] with a custom concentration-index splitting method. The comparison used the same outcome, socioeconomic ranking variable, and analysis weights as the main concentration-index tree. Node impurity was also defined using the absolute concentration index. The main difference was in the tree-growing tools. In the main implementation, we used custom and Partykit controls [@hothorn2015partykit]. A split was accepted only if it satisfied the concentration-index tree controls: minimum parent-node size, minimum child-node size, minimum child-node proportion, maximum depth, minimum absolute gain, and minimum relative gain (introduced for this thesis). In the rpart comparison, split search and stopping were controlled via rpart controls, primarily minsplit, minbucket, and the complexity parameter cp. 
 
@@ -1129,11 +1132,13 @@ method_comparison_table <- report_compact_table(
 )
 
 
-method_comparison_table <- kableExtra::add_header_above(
-    method_comparison_table,
-    c(" " = 1, "Regression" = 3, "Predictive-forest SHAP" = 4),
-    bold = TRUE
-)
+if (report_use_kable_extra()) {
+    method_comparison_table <- kableExtra::add_header_above(
+        method_comparison_table,
+        c(" " = 1, "Regression" = 3, "Predictive-forest SHAP" = 4),
+        bold = TRUE
+    )
+}
 
 
 method_comparison_table
@@ -1414,10 +1419,12 @@ These results are also mirrored by the subgroup-decomposability argument in [@er
 
 This thesis uses DHS survey data from the Democratic Republic of the Congo [@dhs_drc_2007_dataset]. The DHS Program states that participation is voluntary and that respondents' identities and information are kept confidential [@dhs_privacy_respondents]. However, the data still have the usual limitations of retrospective household surveys. Under-five mortality is reconstructed from birth histories, so the estimates depend on correct reporting of births, dates, and child survival status. Non-response, recall error, and misreporting of dates may affect the mortality estimates. The survey is also from 2007. It was useful for comparing the new method with earlier work on the same setting. However, the results should not be read as describing the current situation in the Democratic Republic of the Congo.
 
-The second limitation is the socioeconomic ranking variable. The DHS wealth index is constructed from household assets and living-standard variables, typically using principal component analysis [@dhsprogram_wealth_index_construction]. It is useful for ordering households from poorer to richer, but it is not a measure of income, consumption, or expenditure. It is also a relative score within the survey. This limitation mainly affects the level-dependent concentration index. For $L$, the interpretation is clearer when the socioeconomic variable has ratio-scale properties [@erreygers2017socioeconomic]. The $L$ results should therefore be read as a sensitivity analysis using the available DHS wealth score, not as a direct welfare-level decomposition.
+The second limitation is the socioeconomic ranking variable. The DHS wealth index is constructed from household assets and living-standard variables, typically using principal component analysis [@dhsprogram_wealth_index_construction]. It is useful for ordering households from poorer to richer, but it is not a measure of income, consumption, or expenditure. It is also a relative score within the survey. This limitation mainly affects the level-dependent concentration index. For $L$, the interpretation is clearer when the socioeconomic variable has ratio-scale properties [@erreygers2017socioeconomic].
 
 
 Decision trees are known to be unstable: small changes in the data can produce different split variables, split points, and tree structures. This comes from the recursive and greedy nature of tree construction. Once an early split changes, all later splits are fitted to different subsets of the data. In this thesis, this was handled partly through cross-validation and through splitting controls such as minimum node size, minimum child-node proportion, maximum depth, minimum gain, and minimum relative gain. These controls helped restrict weak or very small splits, but they do not remove the instability problem completely.
+
+Another limitation is the use of a surrogate tree to summarise the forest. The forest was added to reduce dependence on a single greedy tree, but the resulting forest is harder to interpret than a single tree. To obtain an interpretable summary, a surrogate tree was fitted using the forest's risk estimates. The surrogate still chooses splits by maximising concentration-index gain, but the outcome used in that split rule is the forest-predicted risk rather than the observed mortality outcome. This approximation of the forest, therefore, depends on the correctness of the forest.
 
 
 ## Ethical, societal, and stakeholder relevance
@@ -1426,11 +1433,11 @@ This thesis uses child-level data from the Democratic Republic of the Congo DHS 
 
 The concentration index trees developed here can identify subgroups with higher mortality and greater socioeconomic disadvantage. For example, the fitted trees point to rural children from low-wealth households in Katanga, or children whose mothers had no education and who lived in low-wealth households. These subgroups are useful for public health analysis and planning, but the results should be used carefully. Groups we identified through concentration index trees should not be described as if the children, mothers, or provinces are the problem. The tree is showing where mortality and disadvantage are concentrated in the data. The interpretation should therefore focus on unequal conditions, access to services, and policy response, not labelling groups.
 
-Compared with other statistical methods used in decomposition, such as generalised linear models and tree-based models, tree-based models are easier to interpret. The variable percentage contribution from regression or Shap-based decomposition can show which variables contribute more. However, it cannot show how disadvantage is organised across residence, household wealth, occupation, maternal background, and province.   A tree is easier to discuss because it works like a flow chart. As shown in this thesis, the tree partitions the data graphically into high- and low-risk groups. Concentration index trees make it easier to follow the path to these high- and low-risk groups and identify them for public health planning. 
+Compared with GLM based decomposition, tree-based models are easier to interpret. The variable percentage contribution from regression or Shap-based decomposition can show which variables contribute more. However, it cannot show how disadvantage is organised across residence, household wealth, occupation, maternal background, and province.   A tree is easier to discuss because it works like a flow chart. As shown in this thesis, the tree partitions the data graphically into high- and low-risk groups. Concentration index trees make it easier to follow the path to these high- and low-risk groups and identify them for public health planning. This makes tree models useful in public health and policy contexts, where the goal is to identify groups for targeted interventions. They are also easy to interpret for non-technical groups.
 
 # Future research
 
-In this thesis, the level-dependent $L$ method yielded more stable validation results than the rank-dependent criteria. This suggests that the choice of concentration index, used here as the tree impurity measure, is an important part of the method. One useful direction for future work would be to investigate whether rank-dependent concentration-index trees can be modified so that a child node retains more information about the wealth position from which its observations came, rather than relying solely on the new within-node ranking after each split. This may help reduce some of the instability seen in the rank-dependent trees. Another direction is to study the hyperparameters more systematically. Controls such as minimum node size, minimum child-node proportion, maximum depth, minimum gain, and minimum relative gain can alter the final tree structure, depending on the study's purpose. Future work could therefore examine how these controls affect validation gain, terminal-node size, and the stability of the subgroups found by the model.
+In this thesis, the level-dependent $L$ method yielded more stable validation results than the rank-dependent criteria. This suggests that the choice of concentration index, used here as the tree impurity measure, is an important part of the method. One useful direction for future work would be to investigate whether rank-dependent concentration-index trees can be modified so that a child node retains more information about the wealth position from which its observations came, rather than relying solely on the new within-node ranking after each split. This may help reduce some of the instability seen in the rank-dependent trees.
 
 # Conclusion
 

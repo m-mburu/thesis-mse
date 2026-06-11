@@ -9,6 +9,26 @@ library(ineqTrees)
   if (is.null(x)) y else x
 }
 
+#' Choose a kable format that works for the active output target.
+report_table_format <- function(format = NULL) {
+  if (!is.null(format)) {
+    return(format)
+  }
+  if (isTRUE(knitr::is_latex_output())) {
+    return("latex")
+  }
+  if (isTRUE(knitr::is_html_output())) {
+    return("html")
+  }
+  "pipe"
+}
+
+#' Use kableExtra only for formats it can render directly.
+report_use_kable_extra <- function(format = NULL) {
+  format <- report_table_format(format)
+  format %in% c("latex", "html")
+}
+
 #' Draw a reproducible analysis sample unless the full data should be kept.
 sample_analysis_rows <- function(
   data,
@@ -836,7 +856,7 @@ weighted_baseline_table <- function(
     bold_header = FALSE
   )
 
-  if (requireNamespace("kableExtra", quietly = TRUE)) {
+  if (report_use_kable_extra()) {
     baseline_table_kable <- kableExtra::add_header_above(
       baseline_table_kable,
       c(" " = 1, "Under-five mortality" = 2, "Overall" = 1),
@@ -871,17 +891,19 @@ report_kable <- function(
   full_width = FALSE,
   ...
 ) {
+  format <- report_table_format(format)
+  latex_table <- identical(format, "latex")
   out <- knitr::kable(
     x,
     caption = caption,
     digits = digits,
     format = format,
     align = align,
-    booktabs = booktabs,
-    longtable = longtable,
+    booktabs = isTRUE(booktabs) && latex_table,
+    longtable = isTRUE(longtable) && latex_table,
     ...
   )
-  if (requireNamespace("kableExtra", quietly = TRUE)) {
+  if (report_use_kable_extra(format)) {
     latex_options <- c(
       if (isTRUE(hold_position)) "hold_position",
       if (isTRUE(scale_down)) "scale_down"

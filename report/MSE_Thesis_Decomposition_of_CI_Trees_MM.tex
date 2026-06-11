@@ -367,7 +367,11 @@ The coding uses the child's survival status and age at death. Children
 who died before 60 months receive a value of one. Since the outcome is
 adverse, higher fitted values correspond to higher mortality risk.
 
-Socioeconomic position is measured using the DHS household wealth index.
+Socioeconomic position is measured using the DHS household wealth
+index(\citeproc{ref-dhsprogram_wealth_index_construction}{The DHS
+Program, 2007}). The wealth score is a PCA-derived composite measure of
+household living standard based on asset ownership, housing materials,
+water access, sanitation facilities, and related household amenities.
 The continuous wealth score is used to rank children from poorer to
 richer households when computing the concentration index. Wealth defines
 the socioeconomic scale along which mortality inequality is measured.
@@ -1067,10 +1071,10 @@ rules, or when the best admissible split fails the absolute or relative
 gain requirement. The number of predictors considered (mtry) only
 changes which predictors are searched at a node, especially in the
 forest setting. It is not a stopping rule. The full algorithm is shown
-in (pseudocode){[}\#app-greedy-ci-tree-flow{]} and flowchart form in the
-appendix (Figure~\ref{fig-greedy-ci-tree-flow}), and the implementation
-is available in the ineqTrees package (\citeproc{ref-ineqTrees}{Mburu,
-2026}).
+in \hyperref[app-greedy-ci-tree-flow]{pseudocode} and flowchart form in
+the appendix (Figure~\ref{fig-greedy-ci-tree-flow}), and the
+implementation is available in the ineqTrees package
+(\citeproc{ref-ineqTrees}{Mburu, 2026}).
 
 \subsubsection{Extensions to Ensemble Methods: Random
 Forests}\label{sec-random-forests}
@@ -1094,7 +1098,7 @@ concentration-index split rule to a random forest. The forest fits many
 greedy CI trees to perturbed versions of the training data. Within each
 tree, node splitting follows the same direct maximisation of
 concentration-index gain over admissible variable-split pairs used by
-the single-\hyperref[sec-algorithmic-summary]{concentration-index tree}.
+the \hyperref[sec-algorithmic-summary]{single-concentration-index tree}.
 Randomness enters through row perturbation and, optionally, through
 mtry, the number of candidate predictors searched at each node. The
 final prediction is obtained by aggregating predictions across trees.
@@ -1375,9 +1379,10 @@ poorer individuals.
 \subsubsection{Percentage
 Contributions}\label{sec-shap-percentage-contributions}
 
-As in \hyperref[sec-percentage-contributions]{Section 2.3}, I express
-the SHAP-based contributions as percentages of the concentration index
-for the fitted mortality risks. For determinant \(k\), this is
+As in \hyperref[sec-percentage-contributions]{Percentage Contributions
+for decomposition based on Regression Models}, I express the SHAP-based
+contributions as percentages of the concentration index for the fitted
+mortality risks. For determinant \(k\), this is
 
 \[
 \text{PC}_k^{\text{SHAP}} = 100 \times \frac{D_k^{\text{SHAP}}}{C_{\hat{y}}}.
@@ -1549,13 +1554,15 @@ svyglm from the survey package, and the fitted equation separates the
 contribution of each determinant through its coefficient
 (\citeproc{ref-wagstaff2003decomposing}{{Wagstaff, van Doorslaer and
 Watanabe}, 2003}; \citeproc{ref-speybroeck2010decomposing}{Speybroeck
-\emph{et al.}, 2010}; \citeproc{ref-survey2026}{Lumley, 2026}). The
-second indirect method is the SHAP-based decomposition described in
+\emph{et al.}, 2010}; \citeproc{ref-survey2026}{Lumley, 2026}). We then
+used the Rineq R package(\citeproc{ref-rineq2025}{Devleesschauwer
+\emph{et al.}, 2025}) for decomposition. The second indirect method is
+the SHAP-based decomposition described in
 \hyperref[sec-shap-decomposition-definition]{shap section}. For this
 method, a predictive random forest is fitted using the tidymodels
-package with the ranger engine, and the fitted predictions are then
-decomposed into SHAP contributions at the determinant level before
-applying the concentration-index decomposition
+package with the ranger package as backend, and the fitted predictions
+are then decomposed into SHAP contributions at the determinant level
+before applying the concentration-index decomposition
 (\citeproc{ref-wright2017ranger}{Wright and Ziegler, 2017};
 \citeproc{ref-tidymodels2020}{Kuhn and Wickham, 2020}).
 
@@ -1630,7 +1637,7 @@ contributions are shown in Figure~\ref{fig-appendix-shap-summary}.
 
 \begingroup\fontsize{11}{13}\selectfont
 
-\begin{longtable}[t]{>{\raggedright\arraybackslash}p{4.4cm}>{\raggedleft\arraybackslash}p{1.35cm}>{\raggedleft\arraybackslash}p{1.35cm}>{\raggedleft\arraybackslash}p{1.35cm}>{\raggedleft\arraybackslash}p{1.35cm}>{\raggedleft\arraybackslash}p{1.35cm}>{\raggedleft\arraybackslash}p{1.35cm}>{\raggedleft\arraybackslash}p{1.35cm}}
+\begin{longtable}{>{\raggedright\arraybackslash}p{4.4cm}>{\raggedleft\arraybackslash}p{1.35cm}>{\raggedleft\arraybackslash}p{1.35cm}>{\raggedleft\arraybackslash}p{1.35cm}>{\raggedleft\arraybackslash}p{1.35cm}>{\raggedleft\arraybackslash}p{1.35cm}>{\raggedleft\arraybackslash}p{1.35cm}>{\raggedleft\arraybackslash}p{1.35cm}}
 
 \caption{\label{tbl-results-method-comparison}Regression and
 predictive-forest SHAP percentage contributions by criterion.}
@@ -2216,9 +2223,7 @@ relative score within the survey. This limitation mainly affects the
 level-dependent concentration index. For \(L\), the interpretation is
 clearer when the socioeconomic variable has ratio-scale properties
 (\citeproc{ref-erreygers2017socioeconomic}{Erreygers and Kessels,
-2017}). The \(L\) results should therefore be read as a sensitivity
-analysis using the available DHS wealth score, not as a direct
-welfare-level decomposition.
+2017}).
 
 Decision trees are known to be unstable: small changes in the data can
 produce different split variables, split points, and tree structures.
@@ -2229,6 +2234,16 @@ cross-validation and through splitting controls such as minimum node
 size, minimum child-node proportion, maximum depth, minimum gain, and
 minimum relative gain. These controls helped restrict weak or very small
 splits, but they do not remove the instability problem completely.
+
+Another limitation is the use of a surrogate tree to summarise the
+forest. The forest was added to reduce dependence on a single greedy
+tree, but the resulting forest is harder to interpret than a single
+tree. To obtain an interpretable summary, a surrogate tree was fitted
+using the forest's risk estimates. The surrogate still chooses splits by
+maximising concentration-index gain, but the outcome used in that split
+rule is the forest-predicted risk rather than the observed mortality
+outcome. This approximation of the forest, therefore, depends on the
+correctness of the forest.
 
 \subsection{Ethical, societal, and stakeholder
 relevance}\label{ethical-societal-and-stakeholder-relevance}
@@ -2258,17 +2273,18 @@ showing where mortality and disadvantage are concentrated in the data.
 The interpretation should therefore focus on unequal conditions, access
 to services, and policy response, not labelling groups.
 
-Compared with other statistical methods used in decomposition, such as
-generalised linear models and tree-based models, tree-based models are
-easier to interpret. The variable percentage contribution from
-regression or Shap-based decomposition can show which variables
-contribute more. However, it cannot show how disadvantage is organised
-across residence, household wealth, occupation, maternal background, and
-province. A tree is easier to discuss because it works like a flow
-chart. As shown in this thesis, the tree partitions the data graphically
-into high- and low-risk groups. Concentration index trees make it easier
-to follow the path to these high- and low-risk groups and identify them
-for public health planning.
+Compared with GLM based decomposition, tree-based models are easier to
+interpret. The variable percentage contribution from regression or
+Shap-based decomposition can show which variables contribute more.
+However, it cannot show how disadvantage is organised across residence,
+household wealth, occupation, maternal background, and province. A tree
+is easier to discuss because it works like a flow chart. As shown in
+this thesis, the tree partitions the data graphically into high- and
+low-risk groups. Concentration index trees make it easier to follow the
+path to these high- and low-risk groups and identify them for public
+health planning. This makes tree models useful in public health and
+policy contexts, where the goal is to identify groups for targeted
+interventions. They are also easy to interpret for non-technical groups.
 
 \section{Future research}\label{future-research}
 
@@ -2281,13 +2297,7 @@ concentration-index trees can be modified so that a child node retains
 more information about the wealth position from which its observations
 came, rather than relying solely on the new within-node ranking after
 each split. This may help reduce some of the instability seen in the
-rank-dependent trees. Another direction is to study the hyperparameters
-more systematically. Controls such as minimum node size, minimum
-child-node proportion, maximum depth, minimum gain, and minimum relative
-gain can alter the final tree structure, depending on the study's
-purpose. Future work could therefore examine how these controls affect
-validation gain, terminal-node size, and the stability of the subgroups
-found by the model.
+rank-dependent trees.
 
 \section{Conclusion}\label{conclusion}
 
@@ -2341,6 +2351,11 @@ Banerjee, M., Ding, Y. and Noone, A.-M. (2012) {`Identifying
 representative trees from ensembles'}, \emph{Statistics in Medicine},
 31(15), pp. 1601--1616. Available at:
 \url{https://doi.org/10.1002/sim.4492}.
+
+\bibitem[\citeproctext]{ref-rineq2025}
+Devleesschauwer, B. \emph{et al.} (2025) \emph{Rineq: Concentration
+index and decomposition for health inequalities}. Available at:
+\url{https://doi.org/10.32614/CRAN.package.rineq}.
 
 \bibitem[\citeproctext]{ref-erreygers2009correcting}
 Erreygers, G. (2009) {`Correcting the concentration index'},
@@ -2791,7 +2806,7 @@ Details}\label{appendix-r2-regression-and-predictive-forest-details}
 
 \begingroup\fontsize{11}{13}\selectfont
 
-\begin{longtable}[t]{>{\raggedleft\arraybackslash}p{4.5cm}rrrrrr}
+\begin{longtable}[t]{>{\raggedright\arraybackslash}p{4.5cm}rrrlrr}
 
 \caption{\label{tbl-appendix-regression-model-summary}Survey-weighted
 regression model summary}
@@ -2844,7 +2859,7 @@ results}\label{predictive-ranger-tuning-results}
 
 \begingroup\fontsize{11}{13}\selectfont
 
-\begin{longtable}[t]{rrrrr}
+\begin{longtable}[t]{llrrr}
 
 \caption{\label{tbl-appendix-ranger-sampling-summary}Weighted class
 distribution before and after ranger undersampling}
@@ -2867,7 +2882,7 @@ After undersampling & Died before age 5 & 872 & 858.80 & 39.97\\
 
 \begingroup\fontsize{11}{13}\selectfont
 
-\begin{longtable}[t]{>{\raggedleft\arraybackslash}p{2.4cm}rrrrrr}
+\begin{longtable}[t]{>{\raggedright\arraybackslash}p{2.4cm}rrrrrr}
 
 \caption{\label{tbl-appendix-ranger-cross-validation}Cross-validation
 results for the predictive ranger model}
@@ -2979,7 +2994,7 @@ details}\label{tree-tuning-and-selection-details}
 
 \begingroup\fontsize{11}{13}\selectfont
 
-\begin{longtable}[t]{rrrrrrr}
+\begin{longtable}[t]{lrrrrrr}
 
 \caption{\label{tbl-appendix-tree-best-controls}Best tree
 hyperparameters selected by validation gain within each impurity
@@ -3006,7 +3021,7 @@ summaries}\label{tree-fit-and-selection-summaries}
 
 \begingroup\fontsize{11}{13}\selectfont
 
-\begin{longtable}[t]{rrrr}
+\begin{longtable}[t]{llrr}
 
 \caption{\label{tbl-appendix-tree-selected-setting-summary}Tree summary
 for the selected settings}
@@ -3050,7 +3065,7 @@ L & Validation gain (\% root) & 70.5254 & 13.4254\\
 
 \begingroup\fontsize{11}{13}\selectfont
 
-\begin{longtable}[t]{>{\raggedleft\arraybackslash}p{1.4cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}}
+\begin{longtable}[t]{>{\raggedright\arraybackslash}p{1.4cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}}
 
 \caption{\label{tbl-appendix-tree-selection}Selection metrics for fitted
 concentration-index trees}
@@ -3137,7 +3152,7 @@ details}\label{forest-tuning-and-selection-details}
 
 \begingroup\fontsize{11}{13}\selectfont
 
-\begin{longtable}[t]{rrrrrrrrr}
+\begin{longtable}[t]{lrrrrrrrr}
 
 \caption{\label{tbl-appendix-forest-best-controls}Best forest
 hyperparameters selected by validation gain within each impurity
@@ -3164,7 +3179,7 @@ summaries}\label{forest-fit-and-selection-summaries}
 
 \begingroup\fontsize{11}{13}\selectfont
 
-\begin{longtable}[t]{rrrr}
+\begin{longtable}[t]{llrr}
 
 \caption{\label{tbl-appendix-forest-selected-setting-summary}Forest
 summary for the selected settings}
@@ -3208,7 +3223,7 @@ L & Validation gain (\% root) & 69.6578 & 13.3968\\
 
 \begingroup\fontsize{11}{13}\selectfont
 
-\begin{longtable}[t]{>{\raggedleft\arraybackslash}p{1.4cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}}
+\begin{longtable}[t]{>{\raggedright\arraybackslash}p{1.4cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}}
 
 \caption{\label{tbl-appendix-forest-selection}Selection metrics for
 fitted concentration-index forests}

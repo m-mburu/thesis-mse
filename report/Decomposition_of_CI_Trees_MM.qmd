@@ -70,7 +70,9 @@ library(ineqTrees)
 library(partykit)
 library(here)
 library(kableExtra)
-use_latex_packages()
+if (isTRUE(knitr::is_latex_output())) {
+  kableExtra::use_latex_packages()
+}
 source(here("R", "report_helpers.R"))
 source(here("R", "ci_rpart_comparison_methods.R"))
 
@@ -207,11 +209,13 @@ method_comparison_table <- report_compact_table(
 )
 
 
-method_comparison_table <- kableExtra::add_header_above(
-    method_comparison_table,
-    c(" " = 1, "Regression" = 3, "Predictive-forest SHAP" = 4),
-    bold = TRUE
-)
+if (report_use_kable_extra()) {
+    method_comparison_table <- kableExtra::add_header_above(
+        method_comparison_table,
+        c(" " = 1, "Regression" = 3, "Predictive-forest SHAP" = 4),
+        bold = TRUE
+    )
+}
 
 
 method_comparison_table
