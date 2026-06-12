@@ -444,9 +444,11 @@ cumulative proportion of the health variable on the vertical axis
 against the cumulative proportion of the population on the horizontal
 axis. Individuals are ordered from the most disadvantaged to the most
 advantaged before constructing the curve
-(\citeproc{ref-wagstaff2003decomposing}{{Wagstaff, van Doorslaer and
-Watanabe}, 2003}). When the curve follows the 45-degree line, the health
-variable has the same distribution across the socioeconomic ranking.
+(\citeproc{ref-kakwani1997socioeconomic}{{Kakwani, Wagstaff and van
+Doorslaer}, 1997}; \citeproc{ref-wagstaff2003decomposing}{{Wagstaff, van
+Doorslaer and Watanabe}, 2003}). When the curve follows the 45-degree
+line, the health variable has the same distribution across the
+socioeconomic ranking.
 
 \(y_i\) denotes the health variable for individual \(i\), and let
 \(R_i\) denote that individual's fractional socioeconomic rank, ordered
@@ -1666,15 +1668,16 @@ mortality}\label{decomposition-of-determinants-of-under-five-mortality}
 predictive-forest
 SHAP)}\label{indirect-methods-comparison-regression-and-predictive-forest-shap}
 
-From the indirect decomposition, we see that the largest regression
-contribution came from mother's education: 23.1\% under CI and 28.7\%
-under CIg/CIc (Table~\ref{tbl-results-method-comparison}). Father's
-occupation in agriculture was second, contributing 17.9\% under CI and
-19.9\% under CIg/CIc. In the predictive-forest SHAP decomposition, the
-contributions were less concentrated in one or two variables. Residence
-and household wealth each contributed about 12\% under CI, CIg and CIc,
-followed by mother's occupation, father's occupation, mother's education
-and skilled birth attendance. The fitted regression model is reported in
+From the indirect decomposition, contribution output gives the largest
+CI regression contribution to mother's education, followed by father's
+occupation in agriculture, mother's occupation in agriculture, household
+wealth, residence, and skilled birth attendance
+(Table~\ref{tbl-results-method-comparison}). In the predictive-forest
+SHAP decomposition, the contributions were less concentrated in one or
+two variables. Residence and household wealth each contributed about
+12\% under CI, CIg and CIc, followed by mother's occupation, father's
+occupation, mother's education and skilled birth attendance. The fitted
+regression model is reported in
 Table~\ref{tbl-appendix-regression-model-summary}. Details of the fitted
 predictive forest are provided in
 Table~\ref{tbl-appendix-ranger-sampling-summary} and
@@ -1695,35 +1698,35 @@ predictive-forest SHAP percentage contributions by criterion.}
 \cmidrule(l{3pt}r{3pt}){2-4} \cmidrule(l{3pt}r{3pt}){5-8}
 \textbf{Variable} & \textbf{CI (\%)} & \textbf{CIg (\%)} & \textbf{CIc (\%)} & \textbf{CI (\%)} & \textbf{CIg (\%)} & \textbf{CIc (\%)} & \textbf{L (\%)}\\
 \midrule
-Mother's education & 23.058 & 28.726 & 28.726 & 11.110 & 11.110 & 11.110 & 12.684\\
-Father's occupation: Agriculture & 17.863 & 19.885 & 19.885 & 4.619 & 4.619 & 4.619 & 5.060\\
-Mother's occupation: Agriculture & 11.684 & 14.393 & 14.393 & 3.474 & 3.474 & 3.474 & 3.262\\
-Household wealth & 9.116 & 8.788 & 8.788 & 11.531 & 11.531 & 11.531 & 6.980\\
-Type of residence & 8.733 & 11.866 & 11.866 & 21.630 & 21.630 & 21.630 & 21.038\\
+Mother's education & 33.080 & -8.251 & -24.861 & 11.110 & 11.110 & 11.110 & 12.684\\
+Father's occupation: Agriculture & 25.627 & -5.712 & -17.210 & 4.619 & 4.619 & 4.619 & 5.060\\
+Mother's occupation: Agriculture & 16.763 & -4.134 & -12.456 & 3.474 & 3.474 & 3.474 & 3.262\\
+Household wealth & 13.079 & -2.524 & -7.605 & 11.531 & 11.531 & 11.531 & 6.980\\
+Type of residence & 12.529 & -3.408 & -10.269 & 21.630 & 21.630 & 21.630 & 21.038\\
 \addlinespace
-Skilled birth attendance & 7.848 & 9.988 & 9.988 & 10.058 & 10.058 & 10.058 & 7.107\\
-Region: Equateur & 3.761 & 1.066 & 1.066 & 3.165 & 3.165 & 3.165 & 4.165\\
-Father's occupation: Household, unskilled, not working & 3.370 & 0.955 & 0.955 & -0.430 & -0.430 & -0.430 & -0.343\\
-Region: Kinshasa & 3.221 & 0.647 & 0.647 & 1.246 & 1.246 & 1.246 & 2.054\\
-Region: Sud-Kivu & 2.006 & 0.213 & 0.213 & -0.688 & -0.688 & -0.688 & -0.434\\
+Skilled birth attendance & 11.259 & -2.869 & -8.644 & 10.058 & 10.058 & 10.058 & 7.107\\
+Region: Equateur & 5.396 & -0.306 & -0.922 & 3.165 & 3.165 & 3.165 & 4.165\\
+Father's occupation: Household, unskilled, not working & -4.835 & 0.274 & 0.827 & -0.430 & -0.430 & -0.430 & -0.343\\
+Region: Kinshasa & -4.621 & 0.186 & 0.560 & 1.246 & 1.246 & 1.246 & 2.054\\
+Region: Sud-Kivu & -2.878 & 0.061 & 0.184 & -0.688 & -0.688 & -0.688 & -0.434\\
 \addlinespace
-Region: Kasai Oriental & 1.746 & 0.513 & 0.513 & 0.106 & 0.106 & 0.106 & 0.096\\
-Father's education & 1.462 & 0.869 & 0.869 & 3.043 & 3.043 & 3.043 & 3.500\\
-Region: Maniema & 1.075 & 0.083 & 0.083 & 3.124 & 3.124 & 3.124 & 4.218\\
-Region: Orientale & 0.984 & 0.251 & 0.251 & 0.283 & 0.283 & 0.283 & 0.107\\
-Region: Bas-Congo & 0.678 & 0.060 & 0.060 & 0.048 & 0.048 & 0.048 & 0.474\\
+Region: Kasai Oriental & -2.505 & 0.147 & 0.444 & 0.106 & 0.106 & 0.106 & 0.096\\
+Father's education & -2.097 & 0.250 & 0.752 & 3.043 & 3.043 & 3.043 & 3.500\\
+Region: Maniema & 1.542 & -0.024 & -0.072 & 3.124 & 3.124 & 3.124 & 4.218\\
+Region: Orientale & -1.412 & 0.072 & 0.217 & 0.283 & 0.283 & 0.283 & 0.107\\
+Region: Bas-Congo & -0.973 & 0.017 & 0.052 & 0.048 & 0.048 & 0.048 & 0.474\\
 \addlinespace
-Mother's occupation: Household, unskilled, not working & 0.599 & 0.306 & 0.306 & 0.094 & 0.094 & 0.094 & -0.068\\
-Birth order and interval: 5+ short interval & 0.528 & 0.118 & 0.118 & 1.214 & 1.214 & 1.214 & 4.518\\
-Region: Kasai Occidental & 0.490 & 0.115 & 0.115 & 0.007 & 0.007 & 0.007 & 0.102\\
-Birth order and interval: 5+ long interval & 0.437 & 0.253 & 0.253 & -0.333 & -0.333 & -0.333 & -0.040\\
-Sex of the child & 0.418 & 0.454 & 0.454 & 0.068 & 0.068 & 0.068 & -0.005\\
+Mother's occupation: Household, unskilled, not working & 0.860 & -0.088 & -0.265 & 0.094 & 0.094 & 0.094 & -0.068\\
+Birth order and interval: 5+ short interval & -0.757 & 0.034 & 0.103 & 1.214 & 1.214 & 1.214 & 4.518\\
+Region: Kasai Occidental & 0.703 & -0.033 & -0.099 & 0.007 & 0.007 & 0.007 & 0.102\\
+Birth order and interval: 5+ long interval & -0.627 & 0.073 & 0.219 & -0.333 & -0.333 & -0.333 & -0.040\\
+Sex of the child & -0.599 & 0.130 & 0.393 & 0.068 & 0.068 & 0.068 & -0.005\\
 \addlinespace
-Region: Katanga & 0.296 & 0.067 & 0.067 & -0.155 & -0.155 & -0.155 & -2.068\\
-Mother's age at birth & 0.261 & 0.249 & 0.249 & 0.505 & 0.505 & 0.505 & 0.613\\
-Region: Nord-Kivu & 0.208 & 0.018 & 0.018 & 0.619 & 0.619 & 0.619 & 0.429\\
-Birth order and interval: 2-4 long interval & 0.154 & 0.115 & 0.115 & 0.409 & 0.409 & 0.409 & 0.106\\
-Birth order and interval: 2-4 short interval & 0.004 & 0.001 & 0.001 & 0.458 & 0.458 & 0.458 & 0.231\\
+Region: Katanga & -0.425 & 0.019 & 0.058 & -0.155 & -0.155 & -0.155 & -2.068\\
+Mother's age at birth & 0.375 & -0.071 & -0.215 & 0.505 & 0.505 & 0.505 & 0.613\\
+Region: Nord-Kivu & 0.299 & -0.005 & -0.015 & 0.619 & 0.619 & 0.619 & 0.429\\
+Birth order and interval: 2-4 long interval & 0.222 & -0.033 & -0.100 & 0.409 & 0.409 & 0.409 & 0.106\\
+Birth order and interval: 2-4 short interval & -0.005 & 0.000 & 0.001 & 0.458 & 0.458 & 0.458 & 0.231\\
 \bottomrule
 
 \end{longtable}
@@ -2155,12 +2158,11 @@ Speybroeck, 2013}; \citeproc{ref-kandala2014drc}{Kandala \emph{et al.},
 al.}, 2019}).
 
 The indirect methods provided a variable view of this inequality. In the
-regression decomposition, mother's education made the largest
-contribution, accounting for 23.1\% under \(CI\) and 28.7\% under
-\(CIg\) and \(CIc\). Father's agricultural occupation was the
-second-largest contributor, accounting for 17.9\% under \(CI\) and
-19.9\% under \(CIg\) and \(CIc\). These results are consistent with
-earlier decomposition work, which found that household wealth, parental
+regression based decomposition, mother's education made the largest
+regression contribution, followed by father's agricultural occupation,
+mother's agricultural occupation, household wealth, residence, and
+skilled birth attendance. These results are consistent with earlier
+decomposition work, which found that household wealth, parental
 education, occupation, and residence were important contributors to
 under-five mortality inequality
 (\citeproc{ref-vanmalderen2013under5}{Van Malderen, Van Oyen and
@@ -2443,6 +2445,12 @@ Research}, 16, pp. 3905--3909. Available at:
 Jones, G. \emph{et al.} (2003) {`How many child deaths can we prevent
 this year?'}, \emph{The Lancet}, 362(9377), pp. 65--71. Available at:
 \url{https://doi.org/10.1016/S0140-6736(03)13811-1}.
+
+\bibitem[\citeproctext]{ref-kakwani1997socioeconomic}
+{Kakwani, N., Wagstaff, A. and van Doorslaer, E.} (1997) {`Socioeconomic
+inequalities in health: Measurement, computation, and statistical
+inference'}, \emph{Journal of Econometrics}, 77(1), pp. 87--103.
+Available at: \url{https://doi.org/10.1016/S0304-4076(96)01807-6}.
 
 \bibitem[\citeproctext]{ref-kandala2014drc}
 Kandala, N.-B. \emph{et al.} (2014) {`Child mortality in the democratic
