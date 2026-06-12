@@ -214,7 +214,7 @@
 \IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
 \urlstyle{same}
 \hypersetup{
-  pdftitle={Decomposition of Concentration-Index Trees},
+  pdftitle={Decomposing health inequalities through regression trees},
   pdfauthor={Moses Mburu},
   colorlinks=true,
   linkcolor={blue},
@@ -224,12 +224,57 @@
   pdfcreator={LaTeX via pandoc}}
 
 
-\title{Decomposition of Concentration-Index Trees}
+\title{Decomposing health inequalities through regression trees}
 \author{Moses Mburu}
 \date{}
 \begin{document}
 \maketitle
 
+
+\section{Abstract}\label{abstract}
+
+Under-five mortality has fallen globally, but large inequalities remain
+between and within countries. Standard decomposition methods can show
+which variables contribute to socioeconomic inequality, but they are
+less direct in showing how determinants combine into subgroups. This
+thesis developed and applied a tree-based method for analysing
+socioeconomic inequality in under-five mortality. The method used the
+concentration index as the impurity measure in recursive partitioning,
+so that splits were chosen to reduce within-node socioeconomic
+inequality in the outcome. The method was applied to child-level data
+from the Democratic Republic of the Congo DHS phase V survey, using
+under-five mortality as the outcome and the DHS wealth index as the
+socioeconomic ranking variable.
+
+The analysis compared indirect decomposition methods with direct
+concentration-index trees and forests. In the indirect methods, a model
+was fitted first, either a generalised linear model or a predictive
+model such as a random forest, and the fitted model was then used to
+decompose inequality. The regression decomposition placed the greatest
+weight on the mother's education and the father's agricultural
+occupation. The SHAP decomposition was less concentrated on these two
+variables. Residence, household wealth, mother's education, skilled
+birth attendance, and parental occupation all appeared across the
+criteria.
+
+The direct trees added the subgroup part of the analysis. The
+rank-dependent trees based on standard concentration index(\(CI\)),
+generalised concentration index(\(CIg\)), and corrected concentration
+index(\(CIc\)) split mainly through mother's education, father's
+agricultural occupation, skilled birth attendance, household wealth, and
+Katanga. The high-mortality branch was made up of children whose mothers
+had no education, who lived in low-wealth households, and who resided in
+Katanga. This pattern was clear in the fitted data, but it did not carry
+well to the validation folds. The level-dependent concentration
+index(\(L\)) method gave a different tree. It was first split by
+residence, then by occupation, wealth, and province. The \(L\) tree and
+forest both kept positive validation gains, so the level-dependent
+result was treated as the more stable direct result in this application.
+
+The thesis shows that concentration-index trees can be used to add
+subgroup rules to the decomposition of health inequality. The fitted
+tree can be read as a decision rule, making the result easier to discuss
+than a table of percentage contributions alone.
 
 \section{Introduction}\label{sec-introduction}
 
@@ -311,8 +356,8 @@ the fitted structure less transparent. To recover a readable summary of
 the forest, we fit a surrogate tree to the forest predictions. This
 follows the idea of using a representative tree to summarise the main
 behaviour of an ensemble in a form that can be read as decision rules
-(\citeproc{ref-banerjee2012representative_trees}{Banerjee, Ding and
-Noone, 2012}). Finally, we use SHAP values to express the fitted
+(\citeproc{ref-dicastro2019surrogate_tree_visualization}{Di Castro and
+Bertini, 2019}). Finally, we use SHAP values to express the fitted
 tree-based predictions as additive feature contributions
 (\citeproc{ref-lundberg2017unified}{Lundberg and Lee, 2017};
 \citeproc{ref-lundberg2018tree}{Lundberg, Erion and Lee, 2018}). The
@@ -698,10 +743,11 @@ subgroup-specific effects.
 \subsubsection{Recursive Partitioning for Inequality
 Analysis}\label{sec-recursive-partitioning-inequality}
 
-In a usual CART(Classification and Regression Trees), splits are chosen
-mainly for prediction. A regression tree searches for splits that reduce
-within-node outcome variation, while a classification tree searches for
-splits that improve class separation
+In a usual CART(Classification and Regression
+Trees)(\citeproc{ref-breiman1984classification}{Breiman \emph{et al.},
+1984}), splits are chosen mainly for prediction. A regression tree
+searches for splits that reduce within-node outcome variation, while a
+classification tree searches for splits that improve class separation
 (\citeproc{ref-hastie2009elements}{Hastie, Tibshirani and Friedman,
 2017}).
 
@@ -880,7 +926,7 @@ G_m(j, s, t).
 The selected split is the candidate pair \((j,s)\) with the largest
 admissible gain.
 
-\subsubsection{Split behaviour under alternative concentration-based
+\paragraph{Split behaviour under alternative concentration-based
 impurity measures}\label{sec-split-behaviour-impurity}
 
 The impurity measure is not separate from the gain function. It enters
@@ -1124,8 +1170,8 @@ values less dependent on any single partition. It allows the model to
 reflect more complex combinations of child, maternal, household, and
 geographic characteristics. The cost is that the final forest is no
 longer explainable. To address unexplainability, we fit a surrogate tree
-(\citeproc{ref-banerjee2012representative_trees}{Banerjee, Ding and
-Noone, 2012}) to summarise the forest. The surrogate tree uses the
+(\citeproc{ref-dicastro2019surrogate_tree_visualization}{Di Castro and
+Bertini, 2019}) to summarise the forest. The surrogate tree uses the
 forest prediction \(\hat{f}_{RF}(x_i)\) as its outcome, with the same
 candidate predictors used in the main analysis. It does not replace the
 forest. Its role is to give a smaller set of rules that approximates the
@@ -2346,16 +2392,22 @@ from the original wealth ranking after each split.
 
 \protect\phantomsection\label{refs}
 \begin{CSLReferences}{0}{1}
-\bibitem[\citeproctext]{ref-banerjee2012representative_trees}
-Banerjee, M., Ding, Y. and Noone, A.-M. (2012) {`Identifying
-representative trees from ensembles'}, \emph{Statistics in Medicine},
-31(15), pp. 1601--1616. Available at:
-\url{https://doi.org/10.1002/sim.4492}.
+\bibitem[\citeproctext]{ref-breiman1984classification}
+Breiman, L. \emph{et al.} (1984) \emph{Classification and regression
+trees}. Available at: \url{https://doi.org/10.1201/9781315139470}.
 
 \bibitem[\citeproctext]{ref-rineq2025}
 Devleesschauwer, B. \emph{et al.} (2025) \emph{Rineq: Concentration
 index and decomposition for health inequalities}. Available at:
 \url{https://doi.org/10.32614/CRAN.package.rineq}.
+
+\bibitem[\citeproctext]{ref-dicastro2019surrogate_tree_visualization}
+Di Castro, F. and Bertini, E. (2019) {`Surrogate decision tree
+visualization: Interpreting and visualizing black-box classification
+models with surrogate decision tree'}, in \emph{Joint proceedings of the
+ACM IUI 2019 workshops}. Los Angeles, USA (CEUR workshop proceedings),
+pp. 1--5. Available at:
+\url{https://ceur-ws.org/Vol-2327/IUI19WS-ExSS2019-15.pdf}.
 
 \bibitem[\citeproctext]{ref-erreygers2009correcting}
 Erreygers, G. (2009) {`Correcting the concentration index'},
@@ -2504,7 +2556,35 @@ random forests for high dimensional data in {C++} and {R}'},
 
 \end{CSLReferences}
 
+\section{Generative AI Disclosure}\label{generative-ai-disclosure}
+
+\begin{itemize}
+\tightlist
+\item
+  I have used ChatGPT (GenAI tool) to support the development of the
+  ineqTrees package after defining the main functions and writing
+  starter code.
+\item
+  I have used ChatGPT and Grammarly (GenAI/writing support tools) for
+  English language improvement, spelling, and clarity.
+\item
+  I used ChatGPT to help develop custom tree plots, especially plots
+  where each node displays wealth, sample size, and the outcome.
+\end{itemize}
+
 \section{Appendix}\label{sec-appendix}
+
+\subsection{Code}\label{code}
+
+\begin{itemize}
+\tightlist
+\item
+  The Analysis code for this thesis is available at
+  https://github.com/m-mburu/thesis-mse
+\item
+  The code for the concentration-index tree and forest implementation is
+  available at https://github.com/m-mburu/ineqTrees
+\end{itemize}
 
 \subsection{Appendix A: Proof that the Centered Ranks Sum to
 Zero}\label{app-centered-rank-proof}
@@ -3139,8 +3219,8 @@ Details}\label{appendix-r4-rpart-comparison-tree-details}
 
 }
 
-\caption{\label{fig-appendix-lecturer-rpart-simple}Lecturer rpart
-comparison tree using absolute CI impurity.}
+\caption{\label{fig-appendix-lecturer-rpart-simple}Rpart comparison tree
+using absolute CI impurity.}
 
 \end{figure}%
 
@@ -3162,7 +3242,7 @@ criterion}
 
 \\
 \toprule
-\textbf{type} & \textbf{ntree} & \textbf{mtry} & \textbf{minsplit} & \textbf{minbucket} & \textbf{minprob} & \textbf{maxdepth} & \textbf{min\_gain} & \textbf{min\_relative\_gain}\\
+\textbf{type} & \textbf{ntree} & \textbf{mtry} & \textbf{minsplit} & \textbf{minbucket} & \textbf{minprob} & \textbf{maxdepth} & \textbf{min gain} & \textbf{min relative gain}\\
 \midrule
 CI & 50 & 15 & 500 & 100 & 0.01 & 15 & 0 & 0.35\\
 CIc & 50 & 15 & 500 & 100 & 0.01 & 15 & 0 & 0.35\\

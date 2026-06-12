@@ -1,0 +1,1697 @@
+% Options for packages loaded elsewhere
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\PassOptionsToPackage{dvipsnames,svgnames,x11names}{xcolor}
+%
+\documentclass[
+  11pt,
+  a4paper,
+]{article}
+\usepackage{xcolor}
+\usepackage[margin=25mm]{geometry}
+\usepackage{amsmath,amssymb}
+\setcounter{secnumdepth}{3}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+% Make \paragraph and \subparagraph free-standing
+\makeatletter
+\ifx\paragraph\undefined\else
+  \let\oldparagraph\paragraph
+  \renewcommand{\paragraph}{
+    \@ifstar
+      \xxxParagraphStar
+      \xxxParagraphNoStar
+  }
+  \newcommand{\xxxParagraphStar}[1]{\oldparagraph*{#1}\mbox{}}
+  \newcommand{\xxxParagraphNoStar}[1]{\oldparagraph{#1}\mbox{}}
+\fi
+\ifx\subparagraph\undefined\else
+  \let\oldsubparagraph\subparagraph
+  \renewcommand{\subparagraph}{
+    \@ifstar
+      \xxxSubParagraphStar
+      \xxxSubParagraphNoStar
+  }
+  \newcommand{\xxxSubParagraphStar}[1]{\oldsubparagraph*{#1}\mbox{}}
+  \newcommand{\xxxSubParagraphNoStar}[1]{\oldsubparagraph{#1}\mbox{}}
+\fi
+\makeatother
+
+
+\usepackage{longtable,booktabs,array}
+\newcounter{none} % for unnumbered tables
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\usepackage{graphicx}
+\makeatletter
+\newsavebox\pandoc@box
+\newcommand*\pandocbounded[1]{% scales image to fit in text height/width
+  \sbox\pandoc@box{#1}%
+  \Gscale@div\@tempa{\textheight}{\dimexpr\ht\pandoc@box+\dp\pandoc@box\relax}%
+  \Gscale@div\@tempb{\linewidth}{\wd\pandoc@box}%
+  \ifdim\@tempb\p@<\@tempa\p@\let\@tempa\@tempb\fi% select the smaller of both
+  \ifdim\@tempa\p@<\p@\scalebox{\@tempa}{\usebox\pandoc@box}%
+  \else\usebox{\pandoc@box}%
+  \fi%
+}
+% Set default figure placement to htbp
+\def\fps@figure{htbp}
+\makeatother
+
+
+% definitions for citeproc citations
+\NewDocumentCommand\citeproctext{}{}
+\NewDocumentCommand\citeproc{mm}{%
+  \begingroup\def\citeproctext{#2}\cite{#1}\endgroup}
+\makeatletter
+ % allow citations to break across lines
+ \let\@cite@ofmt\@firstofone
+ % avoid brackets around text for \cite:
+ \def\@biblabel#1{}
+ \def\@cite#1#2{{#1\if@tempswa , #2\fi}}
+\makeatother
+\newlength{\cslhangindent}
+\setlength{\cslhangindent}{1.5em}
+\newlength{\csllabelwidth}
+\setlength{\csllabelwidth}{3em}
+\newenvironment{CSLReferences}[2] % #1 hanging-indent, #2 entry-spacing
+ {\begin{list}{}{%
+  \setlength{\itemindent}{0pt}
+  \setlength{\leftmargin}{0pt}
+  \setlength{\parsep}{0pt}
+  % turn on hanging indent if param 1 is 1
+  \ifodd #1
+   \setlength{\leftmargin}{\cslhangindent}
+   \setlength{\itemindent}{-1\cslhangindent}
+  \fi
+  % set entry spacing
+  \setlength{\itemsep}{#2\baselineskip}}}
+ {\end{list}}
+\usepackage{calc}
+\newcommand{\CSLBlock}[1]{\hfill\break\parbox[t]{\linewidth}{\strut\ignorespaces#1\strut}}
+\newcommand{\CSLLeftMargin}[1]{\parbox[t]{\csllabelwidth}{\strut#1\strut}}
+\newcommand{\CSLRightInline}[1]{\parbox[t]{\linewidth - \csllabelwidth}{\strut#1\strut}}
+\newcommand{\CSLIndent}[1]{\hspace{\cslhangindent}#1}
+
+
+
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+
+
+
+ 
+
+
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{wrapfig}
+\usepackage{float}
+\usepackage{colortbl}
+\usepackage{pdflscape}
+\usepackage{tabu}
+\usepackage{threeparttable}
+\usepackage{threeparttablex}
+\usepackage[normalem]{ulem}
+\usepackage{makecell}
+\usepackage{xcolor}
+\renewcommand{\baselinestretch}{1.1}
+\usepackage{microtype}
+\frenchspacing
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{makecell}
+\usepackage{pdflscape}
+\usepackage{float}
+\usepackage{fancyhdr}
+\makeatletter
+\@ifpackageloaded{caption}{}{\usepackage{caption}}
+\AtBeginDocument{%
+\ifdefined\contentsname
+  \renewcommand*\contentsname{Table of contents}
+\else
+  \newcommand\contentsname{Table of contents}
+\fi
+\ifdefined\listfigurename
+  \renewcommand*\listfigurename{List of Figures}
+\else
+  \newcommand\listfigurename{List of Figures}
+\fi
+\ifdefined\listtablename
+  \renewcommand*\listtablename{List of Tables}
+\else
+  \newcommand\listtablename{List of Tables}
+\fi
+\ifdefined\figurename
+  \renewcommand*\figurename{Figure}
+\else
+  \newcommand\figurename{Figure}
+\fi
+\ifdefined\tablename
+  \renewcommand*\tablename{Table}
+\else
+  \newcommand\tablename{Table}
+\fi
+}
+\@ifpackageloaded{float}{}{\usepackage{float}}
+\floatstyle{ruled}
+\@ifundefined{c@chapter}{\newfloat{codelisting}{h}{lop}}{\newfloat{codelisting}{h}{lop}[chapter]}
+\floatname{codelisting}{Listing}
+\newcommand*\listoflistings{\listof{codelisting}{List of Listings}}
+\makeatother
+\makeatletter
+\makeatother
+\makeatletter
+\@ifpackageloaded{caption}{}{\usepackage{caption}}
+\@ifpackageloaded{subcaption}{}{\usepackage{subcaption}}
+\makeatother
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  pdftitle={Decomposition of Concentration-Index Trees},
+  pdfauthor={Moses Mburu},
+  colorlinks=true,
+  linkcolor={blue},
+  filecolor={Maroon},
+  citecolor={Blue},
+  urlcolor={Blue},
+  pdfcreator={LaTeX via pandoc}}
+
+
+\title{Decomposition of Concentration-Index Trees}
+\author{Moses Mburu}
+\date{}
+\begin{document}
+\maketitle
+
+
+\section{Results}\label{results}
+
+\subsection{Exploratory Data Analysis}\label{exploratory-data-analysis}
+
+In the DRC Data Set(\citeproc{ref-dhs_drc_2007_dataset}{The DRC Program
+Program, 2007}), 10.32\% of children died before reaching age five
+(Figure~\ref{fig-results-wealth-distribution}). Deaths were more
+commonly observed among children from disadvantaged or rural
+backgrounds. The children who died differed descriptively from those who
+survived. Low-wealth households accounted for a larger share of deaths
+than of survivors (51.3\% versus 42.8\%). The same pattern was present
+for rural residence (69.3\% versus 60.7\%), no skilled attendance at
+birth (65.6\% versus 56.8\%), and mothers with no education (67.5\%
+versus 55.2\%) (Table~\ref{tbl-appendix-weighted-baseline}). Mortality
+also differed across provinces, ranging from 6.2\% in Kinshasa to 14.2\%
+in Katanga (Figure~\ref{fig-appendix-province-mortality-distribution}).
+Next we use the direct and indirect methods for decomposition.
+
+\begin{figure}[H]
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-results-wealth-distribution-1.pdf}}
+
+}
+
+\caption{\label{fig-results-wealth-distribution}Under-five mortality
+distribution and DHS wealth index in the DRC analysis data.}
+
+\end{figure}%
+
+\subsection{Decomposition of determinants of under-five
+mortality}\label{decomposition-of-determinants-of-under-five-mortality}
+
+\subsubsection{Indirect methods comparison (regression and
+predictive-forest
+SHAP)}\label{indirect-methods-comparison-regression-and-predictive-forest-shap}
+
+From the indirect decomposition, we see that the largest regression
+contribution came from mother's education: 23.1\% under CI and 28.7\%
+under CIg/CIc (Table~\ref{tbl-results-method-comparison}). Father's
+occupation in agriculture was second, contributing 17.9\% under CI and
+19.9\% under CIg/CIc. In the predictive-forest SHAP decomposition, the
+contributions were less concentrated in one or two variables. Residence
+and household wealth each contributed about 12\% under CI, CIg and CIc,
+followed by mother's occupation, father's occupation, mother's education
+and skilled birth attendance. The fitted regression model is reported in
+Table~\ref{tbl-appendix-regression-model-summary}. Details of the fitted
+predictive forest are provided in
+Table~\ref{tbl-appendix-ranger-sampling-summary} and
+Table~\ref{tbl-appendix-ranger-cross-validation}, and its SHAP
+contributions are shown in Figure~\ref{fig-appendix-shap-summary}.
+
+\begingroup\fontsize{11}{13}\selectfont
+
+\begin{longtable}[t]{>{\raggedright\arraybackslash}p{4.4cm}>{\raggedleft\arraybackslash}p{1.35cm}>{\raggedleft\arraybackslash}p{1.35cm}>{\raggedleft\arraybackslash}p{1.35cm}>{\raggedleft\arraybackslash}p{1.35cm}>{\raggedleft\arraybackslash}p{1.35cm}>{\raggedleft\arraybackslash}p{1.35cm}>{\raggedleft\arraybackslash}p{1.35cm}}
+
+\caption{\label{tbl-results-method-comparison}Regression and
+predictive-forest SHAP percentage contributions by criterion.}
+
+\tabularnewline
+
+\toprule
+\multicolumn{1}{c}{\textbf{ }} & \multicolumn{3}{c}{\textbf{Regression}} & \multicolumn{4}{c}{\textbf{Predictive-forest SHAP}} \\
+\cmidrule(l{3pt}r{3pt}){2-4} \cmidrule(l{3pt}r{3pt}){5-8}
+\textbf{Variable} & \textbf{CI (\%)} & \textbf{CIg (\%)} & \textbf{CIc (\%)} & \textbf{CI (\%)} & \textbf{CIg (\%)} & \textbf{CIc (\%)} & \textbf{L (\%)}\\
+\midrule
+Mother's education & 23.058 & 28.726 & 28.726 & 11.110 & 11.110 & 11.110 & 12.684\\
+Father's occupation: Agriculture & 17.863 & 19.885 & 19.885 & 4.619 & 4.619 & 4.619 & 5.060\\
+Mother's occupation: Agriculture & 11.684 & 14.393 & 14.393 & 3.474 & 3.474 & 3.474 & 3.262\\
+Household wealth & 9.116 & 8.788 & 8.788 & 11.531 & 11.531 & 11.531 & 6.980\\
+Type of residence & 8.733 & 11.866 & 11.866 & 21.630 & 21.630 & 21.630 & 21.038\\
+\addlinespace
+Skilled birth attendance & 7.848 & 9.988 & 9.988 & 10.058 & 10.058 & 10.058 & 7.107\\
+Region: Equateur & 3.761 & 1.066 & 1.066 & 3.165 & 3.165 & 3.165 & 4.165\\
+Father's occupation: Household, unskilled, not working & 3.370 & 0.955 & 0.955 & -0.430 & -0.430 & -0.430 & -0.343\\
+Region: Kinshasa & 3.221 & 0.647 & 0.647 & 1.246 & 1.246 & 1.246 & 2.054\\
+Region: Sud-Kivu & 2.006 & 0.213 & 0.213 & -0.688 & -0.688 & -0.688 & -0.434\\
+\addlinespace
+Region: Kasai Oriental & 1.746 & 0.513 & 0.513 & 0.106 & 0.106 & 0.106 & 0.096\\
+Father's education & 1.462 & 0.869 & 0.869 & 3.043 & 3.043 & 3.043 & 3.500\\
+Region: Maniema & 1.075 & 0.083 & 0.083 & 3.124 & 3.124 & 3.124 & 4.218\\
+Region: Orientale & 0.984 & 0.251 & 0.251 & 0.283 & 0.283 & 0.283 & 0.107\\
+Region: Bas-Congo & 0.678 & 0.060 & 0.060 & 0.048 & 0.048 & 0.048 & 0.474\\
+\addlinespace
+Mother's occupation: Household, unskilled, not working & 0.599 & 0.306 & 0.306 & 0.094 & 0.094 & 0.094 & -0.068\\
+Birth order and interval: 5+ short interval & 0.528 & 0.118 & 0.118 & 1.214 & 1.214 & 1.214 & 4.518\\
+Region: Kasai Occidental & 0.490 & 0.115 & 0.115 & 0.007 & 0.007 & 0.007 & 0.102\\
+Birth order and interval: 5+ long interval & 0.437 & 0.253 & 0.253 & -0.333 & -0.333 & -0.333 & -0.040\\
+Sex of the child & 0.418 & 0.454 & 0.454 & 0.068 & 0.068 & 0.068 & -0.005\\
+\addlinespace
+Region: Katanga & 0.296 & 0.067 & 0.067 & -0.155 & -0.155 & -0.155 & -2.068\\
+Mother's age at birth & 0.261 & 0.249 & 0.249 & 0.505 & 0.505 & 0.505 & 0.613\\
+Region: Nord-Kivu & 0.208 & 0.018 & 0.018 & 0.619 & 0.619 & 0.619 & 0.429\\
+Birth order and interval: 2-4 long interval & 0.154 & 0.115 & 0.115 & 0.409 & 0.409 & 0.409 & 0.106\\
+Birth order and interval: 2-4 short interval & 0.004 & 0.001 & 0.001 & 0.458 & 0.458 & 0.458 & 0.231\\
+\bottomrule
+
+\end{longtable}
+
+\endgroup{}
+
+\subsection{Direct methods (concentration-index trees and
+forests)}\label{direct-methods-concentration-index-trees-and-forests}
+
+\subsubsection{Rank Dependent Concentration-Index
+Tree}\label{rank-dependent-concentration-index-tree}
+
+\paragraph{\texorpdfstring{The Corrected Concentration-Index Tree
+\(CIc\)}{The Corrected Concentration-Index Tree CIc}}\label{the-corrected-concentration-index-tree-cic}
+
+We start with a tree based on the corrected concentration index,
+appropriate for bounded
+outcomes(\citeproc{ref-erreygers2009correcting}{Erreygers, 2009}). In
+this method, the tree shows that inequality in under-five mortality is
+structured primarily by maternal education, father's agricultural
+occupation, household wealth, skilled birth attendance, and residence in
+Katanga Figure~\ref{fig-appendix-ci-tree-cic}. The lowest-mortality
+terminal group consists of children whose mothers had some education and
+whose fathers were not in agriculture, with an under-five mortality rate
+of about 6.5\%. At the opposite end, children whose mothers had no
+education, who lived in low-wealth households, and who resided in
+Katanga had the highest mortality rate, about 17.8\%. Thus, the
+corrected rank-dependent tree identifies a clear socioeconomic gradient,
+but one that is expressed through combinations of education, occupation,
+household wealth, delivery care, and region rather than through wealth
+alone.
+
+\begin{figure}[H]
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-appendix-ci-tree-cic-1.pdf}}
+
+}
+
+\caption{\label{fig-appendix-ci-tree-cic}Concentration-index tree fitted
+with the CIc criterion.}
+
+\end{figure}%
+
+\paragraph{\texorpdfstring{Generalised and standard concentration-index
+trees \(CIg\) and
+\(CI\)}{Generalised and standard concentration-index trees CIg and CI}}\label{generalised-and-standard-concentration-index-trees-cig-and-ci}
+
+The appendix also shows the trees fitted using the generalised and
+standard concentration indices. The generalised concentration-index tree
+is almost identical to the corrected concentration-index tree
+Figure~\ref{fig-appendix-ci-tree-cig}. It again separates children first
+by maternal education and father's agricultural occupation, then by
+skilled birth attendance, household wealth, and residence in Katanga.
+The mortality pattern is therefore substantively unchanged: the
+lowest-risk group consists of children whose mothers had some education
+and whose fathers were not in agriculture, while the highest-risk group
+consists of children whose mothers had no education, who lived in
+low-wealth households, and who resided in Katanga, with mortality around
+17.8\% Figure~\ref{fig-appendix-ci-tree-cig}. The standard
+concentration-index tree gives a similar structure. However, it adds an
+extra distinction among children whose mothers had some education and
+whose fathers were not in agriculture, splitting them by short preceding
+birth interval Figure~\ref{fig-appendix-ci-tree-ci}. Children in this
+otherwise advantaged group without a short birth interval have the
+lowest mortality, about 6.0\%. In contrast, those with a short birth
+interval have higher mortality, about 11.7\%
+Figure~\ref{fig-appendix-ci-tree-ci}. Apart from this additional
+demographic split, the standard CI tree points to the same main sources
+of inequality as the corrected and generalised trees: maternal
+education, father's agricultural occupation, delivery care, household
+wealth, and residence in Katanga.
+
+\subsubsection{\texorpdfstring{Level dependent Concentration-Index Tree
+\(L\)}{Level dependent Concentration-Index Tree L}}\label{level-dependent-concentration-index-tree-l}
+
+We then fit a tree based on the level-dependent concentration index
+(\citeproc{ref-erreygers2017socioeconomic}{Erreygers and Kessels, 2017})
+criterion, \(L\). In this method, the selected tree shows that
+inequality in under-five mortality is structured primarily by rural
+residence, father's agricultural occupation, household wealth, and
+province, especially Kinshasa, Equateur, and Katanga
+Figure~\ref{fig-results-selected-ci-tree}. The lowest-mortality terminal
+group consists of urban children in Kinshasa whose fathers were not in
+agriculture, with an under-five mortality rate of about 5.1\%. The
+highest-mortality terminal group consists of rural children living in
+low-wealth households in Katanga, with an under-five mortality rate of
+about 18.5\%. Thus, the level-dependent tree tells a more spatial story
+of inequality: mortality risk is first organised by the rural-urban
+divide, then by occupation, wealth, and region. This shows that the
+level-dependent method found a different structure compared to the
+rank-dependent methods
+
+\begin{figure}[H]
+
+\centering{
+
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-results-selected-ci-tree-1.pdf}
+
+}
+
+\caption{\label{fig-results-selected-ci-tree}Level dependent
+concentration-index tree for under-five mortality in the DRC.}
+
+\end{figure}%
+
+\subsubsection{Tree validation plots}\label{tree-validation-plots}
+
+The rank-dependent trees performed well on the training data but poorly
+on the validation data. The CI, CIc, and CIg trees removed approximately
+87 to 88\% of root-node inequality during training, but had negative
+validation gains at the selected settings: -75.5\% for CI and -73.1\%
+for both CIc and CIg
+Figure~\ref{fig-appendix-tree-validation-path}, Table~\ref{tbl-appendix-tree-selected-setting-summary}.
+In this criterion, a negative validation gain means that the sum of the
+terminal-node concentration-index values in the validation fold exceeded
+the concentration-index value at the root node. Thus, although these
+trees identified substantial rank-based structure in the fitted sample,
+the same partitions did not reduce inequality when applied to held-out
+folds. Unlike rank-dependent trees, the level-dependent tree maintained
+a positive validation gain throughout the tuning path. At the selected
+setting, it removed 70.5\% of root-node inequality in held-out folds
+while retaining an average of 6.8 terminal nodes
+Figure~\ref{fig-appendix-tree-validation-path}, Table~\ref{tbl-appendix-tree-selected-setting-summary}.
+The rural-urban, occupational, wealth, and regional partition identified
+by the L tree was therefore more stable under the validation criterion
+used in this thesis.
+
+\begin{figure}[H]
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-appendix-tree-validation-path-1.pdf}}
+
+}
+
+\caption{\label{fig-appendix-tree-validation-path}Tree validation gain
+and complexity by minimum relative split gain.}
+
+\end{figure}%
+
+\paragraph{Tree complexity plots}\label{tree-complexity-plots}
+
+Tree complexity decreased as the minimum relative split gain increased,
+since larger thresholds allowed only splits that removed a larger share
+of parent-node impurity Figure~\ref{fig-appendix-tree-complexity-path}.
+The selected trees remained small, with an average of 7.5 terminal nodes
+for CI, 7.3 for CIc and CIg, and 6.8 for L
+Table~\ref{tbl-appendix-tree-selection}, Figure~\ref{fig-appendix-tree-complexity-path}.
+
+\begin{figure}[H]
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-appendix-tree-complexity-path-1.pdf}}
+
+}
+
+\caption{\label{fig-appendix-tree-complexity-path}Tree complexity by
+number of terminal nodes.}
+
+\end{figure}%
+
+\paragraph{Rpart comparison}\label{rpart-comparison}
+
+The rpart comparison tree recovered the same upper-level structure as
+the main CI tree (Figure~\ref{fig-appendix-ci-tree-ci};
+Figure~\ref{fig-appendix-lecturer-rpart-robust}). Both trees first split
+on maternal education, then separated children by father's agricultural
+occupation among those whose mothers had some education, and by
+household wealth among those whose mothers had no education. The
+high-mortality branch was also similar, identifying children whose
+mothers had no education, who lived in low-wealth households, and who
+resided in Katanga. The main difference was in the lower branches: the
+rpart comparison introduced a split by long preceding birth interval,
+while the main CI tree used a short preceding birth-interval split. This
+suggests that the main rank-dependent structure was not driven only by
+the custom implementation, although some lower-level refinements
+depended on the tree-growing and stopping rules.
+
+\begin{figure}[H]
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-appendix-lecturer-rpart-robust-1.pdf}}
+
+}
+
+\caption{\label{fig-appendix-lecturer-rpart-robust}Rpart comparison tree
+using CI impurity.}
+
+\end{figure}%
+
+\subsubsection{Concentration index forest and surrogate
+tree}\label{concentration-index-forest-and-surrogate-tree}
+
+\paragraph{Forest validation plots}\label{forest-validation-plots}
+
+We evaluated concentration-index forests using the same validation
+criterion as the single trees. For the forests, the minimum relative
+split gain was tuned to 0.35, since larger values produced
+near-root-only forests with mean terminal-node counts close to 1. At
+that point, further validation failed to reveal a meaningful structure.
+For the rank-dependent criteria, the forests reduced overfitting but did
+not stabilise the partitions. The CI, CIc, and CIg forests removed
+29.6\%, 38.5\%, and 38.7\% of root-node inequality in training, compared
+with about 87 to 88\% for the corresponding single trees
+Table~\ref{tbl-appendix-forest-selected-setting-summary}, Table~\ref{tbl-appendix-tree-selected-setting-summary}.
+Their validation gains remained negative: -25.0\% for CI, -28.1\% for
+CIc, and -34.7\% for CIg
+Figure~\ref{fig-appendix-forest-validation-path}, Table~\ref{tbl-appendix-forest-selected-setting-summary}.
+Thus, averaging across trees reduced the validation loss, but did not
+produce a reproducible rank-dependent subgroup structure. The tuning
+path shows the trade-off. Validation gain improved as the minimum
+relative split gain increased, but the component trees also became
+shallower
+Figure~\ref{fig-appendix-forest-validation-path}, Figure~\ref{fig-appendix-forest-complexity-path}.
+At the selected setting, the mean terminal-node counts were 2.4 for CI,
+2.9 for CIc, and 2.9 for CIg Table~\ref{tbl-appendix-forest-selection}.
+The level-dependent forest remained more stable. It removed 95.1\% of
+root-node inequality in training and 69.7\% in validation
+Table~\ref{tbl-appendix-forest-selected-setting-summary}. The selected L
+forest had an average of 4.1 terminal nodes per tree, compared with 6.8
+for the selected L tree
+Table~\ref{tbl-appendix-forest-selection}, Table~\ref{tbl-appendix-tree-selection}.
+
+\begin{figure}[H]
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-appendix-forest-validation-path-1.pdf}}
+
+}
+
+\caption{\label{fig-appendix-forest-validation-path}Forest validation
+gain and complexity by minimum relative split gain.}
+
+\end{figure}%
+
+\paragraph{Surrogate trees from Forest
+Predictions}\label{surrogate-trees-from-forest-predictions}
+
+To interpret the selected forest, we fitted a surrogate tree to
+summarise its predictions (Figure~\ref{fig-results-surrogate-tree}). The
+surrogate tree retained the main structure seen in the level-dependent
+tree.
+
+\begin{figure}[H]
+
+\centering{
+
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-results-surrogate-tree-1.pdf}
+
+}
+
+\caption{\label{fig-results-surrogate-tree}Surrogate tree summarising
+the selected concentration-index forest predictions.}
+
+\end{figure}%
+
+The first split was type of residence, separating urban and rural
+children. Among urban children, the main divisions were father's
+agricultural occupation and household wealth. Among rural children, the
+main divisions were household wealth, maternal education, and residence
+in Katanga. The lowest terminal-node mortality was observed among urban
+children in the high-wealth branch, while the highest terminal-node
+mortality was observed among rural, low-wealth children in Katanga.
+Compared with the single L tree, the surrogate gives a smoother version
+of the same rural-urban, socioeconomic, and regional pattern, with less
+extreme terminal-node mortality differences. The criterion-specific
+forest surrogate trees are shown in the appendix for comparison
+(Figure~\ref{fig-appendix-forest-surrogate-cig};
+Figure~\ref{fig-appendix-forest-surrogate-cic};
+Figure~\ref{fig-appendix-forest-surrogate-ci}).
+
+\subsubsection{Variable importance}\label{variable-importance}
+
+The variable-importance plots support the interpretation of the selected
+level-dependent models. In both the \(L\) tree and \(L\) forest, the
+type of residence gives the largest reduction in concentration-index
+impurity Figure~\ref{fig-results-selected-model-variable-importance}. In
+the single tree, residence is followed by father's agricultural
+occupation, Kinshasa, household wealth, Equateur, and Katanga,
+reflecting a structure organised around the rural-urban divide,
+occupational position, household wealth, and regional differences.
+
+\begin{figure}[H]
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-results-selected-model-variable-importance-1.pdf}}
+
+}
+
+\caption{\label{fig-results-selected-model-variable-importance}Variable
+importance for the selected concentration-index tree and forest.}
+
+\end{figure}%
+
+The \(L\) forest gives a less concentrated ranking than the single tree.
+Residence is still the first variable, but the forest also gives weight
+to mother's agricultural occupation, maternal education, household
+wealth, father's agricultural occupation, and regional indicators. In
+the appendix plots, the same groups of variables appear again under the
+other criteria: residence, region, occupation, education, and wealth
+Figure~\ref{fig-appendix-tree-variable-importance}, Figure~\ref{fig-appendix-forest-variable-importance}.
+
+\subsection{Simulation Study}\label{simulation-study}
+
+\subsubsection{Null case}\label{null-case}
+
+From (Figure~\ref{fig-results-simulation-null-trees}) we see that the
+algorithm developed here did not find a meaningful structure and behaved
+as expected. This shows that the tree-growing rule does not create
+subgroup structure when the outcome and socioeconomic ranking are
+independent, since the tree uses concentraion index as an impurity
+measure, which measures how sociaeconomic ranking and outcome covary.
+
+\begin{figure}[H]
+
+\begin{minipage}[t]{0.50\linewidth}
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-results-simulation-null-trees-1.pdf}}
+
+}
+
+\subcaption{\label{fig-results-simulation-null-trees-1}CI}
+
+\end{minipage}%
+%
+\begin{minipage}[t]{0.50\linewidth}
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-results-simulation-null-trees-2.pdf}}
+
+}
+
+\subcaption{\label{fig-results-simulation-null-trees-2}CIg}
+
+\end{minipage}%
+\newline
+\begin{minipage}[t]{0.50\linewidth}
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-results-simulation-null-trees-3.pdf}}
+
+}
+
+\subcaption{\label{fig-results-simulation-null-trees-3}CIc}
+
+\end{minipage}%
+%
+\begin{minipage}[t]{0.50\linewidth}
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-results-simulation-null-trees-4.pdf}}
+
+}
+
+\subcaption{\label{fig-results-simulation-null-trees-4}L}
+
+\end{minipage}%
+
+\caption{\label{fig-results-simulation-null-trees}Null simulation
+concentration-index trees by criterion.}
+
+\end{figure}%
+
+\subsubsection{Poor subgroup case}\label{poor-subgroup-case}
+
+In the positive-control simulation, the method(the concentration index
+tree with \(CIc\) as an impurity measure) recovered the planted subgroup
+structure. The tree first separated urban from rural observations, then
+split the rural group by province and maternal education
+(Figure~\ref{fig-results-simulation-tree}). This structure matched the
+way the simulated outcome was generated: poorer observations in the
+planted rural, low-education, selected-province subgroup had higher
+outcome prevalence. The terminal nodes also followed the expected
+gradient, with the highest prevalence among observations in the most
+disadvantaged planted subgroup.
+
+\begin{figure}[H]
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-results-simulation-tree-1.pdf}}
+
+}
+
+\caption{\label{fig-results-simulation-tree}CIc concentration-index tree
+recovered from simulated data with a known subgroup-generating
+mechanism.}
+
+\end{figure}%
+
+We see the same pattern across the sensitivity plots in the appendix the
+trees developed using \(CI\), \(CIg\), and \(CIc\), and \(L\) as
+impurity
+measures(Figure~\ref{fig-appendix-simulation-positive-control-ci};
+Figure~\ref{fig-appendix-simulation-positive-control-cic};
+Figure~\ref{fig-appendix-simulation-positive-control-l}).
+
+\section{Discussion}\label{discussion}
+
+\subsection{Main findings}\label{main-findings}
+
+This thesis developed and applied a tree-based model for analysing
+socioeconomic inequality in under-five mortality using the concentration
+index impurity. The main finding is that inequality in the DRC data
+could not be explained by household wealth alone. Under-five mortality
+was also related to residence, maternal education, skilled birth
+attendance, parental occupation, and province. Overall, 10.32\% of
+children died before age five. The children who died were more often
+from low-wealth households, rural households, mothers with no education,
+births without skilled attendance, and some provinces, especially
+Katanga. This is in line with earlier DRC work on geographic variation
+in under-five mortality, and with decomposition studies showing that
+wealth, education, residence, and occupation contribute to mortality
+inequalities in African settings
+(\citeproc{ref-vanmalderen2013under5}{Van Malderen, Van Oyen and
+Speybroeck, 2013}; \citeproc{ref-kandala2014drc}{Kandala \emph{et al.},
+2014}; \citeproc{ref-vanmalderen2019socioeconomic}{Van Malderen \emph{et
+al.}, 2019}).
+
+The indirect methods provided a variable view of this inequality. In the
+regression decomposition, mother's education made the largest
+contribution, accounting for 23.1\% under \(CI\) and 28.7\% under
+\(CIg\) and \(CIc\). Father's agricultural occupation was the
+second-largest contributor, accounting for 17.9\% under \(CI\) and
+19.9\% under \(CIg\) and \(CIc\). These results are consistent with
+earlier decomposition work, which found that household wealth, parental
+education, occupation, and residence were important contributors to
+under-five mortality inequality
+(\citeproc{ref-vanmalderen2013under5}{Van Malderen, Van Oyen and
+Speybroeck, 2013}; \citeproc{ref-vanmalderen2019socioeconomic}{Van
+Malderen \emph{et al.}, 2019}). The SHAP analysis (from the fitted
+random forest) gave a less concentrated picture: residence and household
+wealth each contributed about 12\%, followed by mother's occupation,
+father's occupation, mother's education, and skilled birth attendance.
+Shap-based decomposition provides an addition to the regression methods
+by allowing the use of more flexible models such as Random Forests or
+XGBoost.
+
+The direct concentration-index trees added the subgroup interpretation
+that is less visible in the regression-based decomposition. While the
+indirect methods ranked variables by their contribution to inequality,
+the trees showed how these variables combined within the data to define
+groups with different inequality patterns. The rank-dependent trees
+based on \(CI\), \(CIg\), and \(CIc\) identified a structure involving
+maternal education, father's agricultural occupation, skilled birth
+attendance, household wealth, and Katanga. Mortality was lower among
+children whose mothers had some education and whose fathers were not in
+agriculture, and higher among children whose mothers had no education,
+who lived in low-wealth households, and who resided in Katanga. However,
+these partitions did not validate well. Although the rank-based methods
+removed about 87\% to 88\% of root-node inequality in training, their
+validation gains were negative, suggesting that the strong training
+structure did not transfer well to held-out folds.
+
+\subsection{Rank-dependent and level-dependent views of
+inequality}\label{rank-dependent-and-level-dependent-views-of-inequality}
+
+From these analyses, we see differences in the results
+(Figure~\ref{fig-appendix-ci-tree-ci};
+Figure~\ref{fig-appendix-ci-tree-cig};
+Figure~\ref{fig-appendix-ci-tree-cic}) in subgroups formed by the two
+ways of defining the impurity measure when developing the concentration
+index tree. In the rank-dependent criteria \(CI\), \(CIg\), and \(CIc\),
+a child's contribution depends on the child's position in the current
+node's socioeconomic ranking. After each split, the children in the new
+subgroup are ranked again, so the same child can receive a different
+rank because the comparison group has changed. In the level-dependent
+criterion, re-ranking is still done but in \(L\), the child's observed
+socioeconomic level is carried into the subgroup, so a child's rank also
+reflects their wealth level.
+
+The differences also showed up in cross-validation; the level-dependent
+method outperformed the rank-dependent methods. The rank-dependent trees
+had strong training performance but negative validation gains, while the
+level-dependent tree kept a positive validation gain
+(Figure~\ref{fig-appendix-tree-validation-path};
+Table~\ref{tbl-appendix-tree-selected-setting-summary}). The same
+pattern was seen in the forests: averaging trees reduced the validation
+loss for the rank-dependent criteria, but their validation gains
+remained below zero, whereas the \(L\) forest retained a positive
+validation gain (Figure~\ref{fig-appendix-forest-validation-path};
+Table~\ref{tbl-appendix-forest-selected-setting-summary}). The
+validation results show that \(CI\), \(CIg\), and \(CIc\) identified
+detailed in-sample subgroup rules, whereas \(L\) produced a more
+reproducible subgroup structure in this application.
+
+These results are also mirrored by the subgroup-decomposability argument
+in (\citeproc{ref-erreygers2017subgroup}{Erreygers \emph{et al.},
+2017}). In their comparison of rank-dependent and level-dependent
+measures, they show that the level-dependent index \(L\) is
+subgroup-decomposable and rank-dependent measures are more difficult to
+decompose cleanly across population groups. Decomposability of the
+level-dependent concentration index shown by
+(\citeproc{ref-erreygers2017subgroup}{Erreygers \emph{et al.}, 2017})
+can also explain why \(L\) performed better as a tree impurity criterion
+in this application: children inherit their socioeconomic level within
+each subgroup, rather than being re-weighted only by a new within-node
+rank. Although the DHS wealth index is an asset-based
+score(\citeproc{ref-dhsprogram_wealth_index_construction}{The DHS
+Program, 2007}) and (\citeproc{ref-erreygers2017socioeconomic}{Erreygers
+and Kessels, 2017}) recommends using Level depedent concentration
+index(\(L\)) with a wealth-ranking variable that has ratio properties.
+The cross-validation results show that the \(L\) concentration index
+impurity measure yielded a structure transferable to held-out samples
+using the DHS wealth score.
+
+\subsection{Methodological and data
+limitations}\label{methodological-and-data-limitations}
+
+This thesis uses DHS survey data
+(\citeproc{ref-dhs_drc_2007_dataset}{The DRC Program Program, 2007}). On
+the DHS privacy page(\citeproc{ref-dhs_privacy_respondents}{The DHS
+Program, 2026}), they state that this voluntary survey data is known to
+have some limitations, such as non-response bias and recall bias,
+because deaths were recorded after the fact. We also used an older data
+set because we wanted to compare the new method with a data set with
+known results. So the results might not reflect the current status in
+the Democratic Republic of Congo.
+
+The second limitation is the socioeconomic ranking variable, which is
+reconstructed using PCA
+(\citeproc{ref-dhsprogram_wealth_index_construction}{The DHS Program,
+2007}). The DHS wealth index is useful for ordering households from
+poorest to richest. It is also a relative score within the survey. This
+imitation mainly affects the level-dependent concentration index. This
+specifically affects \(L\), because the level-dependent index has been
+shown to perform best for wealth variables with rational properties
+(\citeproc{ref-erreygers2017socioeconomic}{Erreygers and Kessels,
+2017}).
+
+We also used decision trees, which are known to be unstable. Small
+changes in the data can produce different split variables, split points,
+and tree structures. This instability arises from the recursive, greedy
+nature of tree construction: once an early split changes, all subsequent
+splits are fit to different subsets of the data. Since this is a
+concentration index tree, we tried to address this by introducing a
+minimum relative gain, so that we can admit splits that remove a set
+amount of gain, chosen via cross-validation.
+
+\subsection{Ethical, societal, and stakeholder
+relevance}\label{ethical-societal-and-stakeholder-relevance}
+
+This thesis uses DHS survey data
+(\citeproc{ref-dhs_drc_2007_dataset}{The DRC Program Program, 2007}). On
+the DHS privacy page(\citeproc{ref-dhs_privacy_respondents}{The DHS
+Program, 2026}), they state that this voluntary survey data has some
+limitations, such as non-response bias and recall bias, because deaths
+were recorded after the fact. We also used an older data set to compare
+the new method with one with known results. So the results might not
+reflect the current status in the Democratic Republic of Congo.
+
+The second limitation is the socioeconomic ranking variable, which is
+reconstructed using PCA
+(\citeproc{ref-dhsprogram_wealth_index_construction}{The DHS Program,
+2007}). The DHS wealth index is useful for ordering households from
+poorest to richest. It is also a relative score within the survey. This
+imitation mainly affects the level-dependent concentration index. This
+specifically affects \(L\), because the level-dependent index has been
+shown to perform best for wealth variables with rational properties
+(\citeproc{ref-erreygers2017socioeconomic}{Erreygers and Kessels,
+2017}).
+
+We also used decision trees, which are known to be unstable. Small
+changes in the data can produce different split variables, split points,
+and tree structures. This instability arises from the recursive, greedy
+nature of tree construction: once an early split changes, all subsequent
+splits are fit to different subsets of the data. Since this is a
+concentration index tree, we addressed this by introducing a minimum
+relative gain, so that we can admit splits that remove a set amount of
+gain, chosen via cross-validation.
+
+\section{Future research}\label{future-research}
+
+In this thesis, the level-dependent \(L\) method yielded more stable
+validation results than the rank-dependent criteria. This suggests that
+the choice of concentration index, used here as the tree impurity
+measure, is an important part of the method. One useful direction for
+future work would be to investigate whether rank-dependent
+concentration-index trees can be modified so that a child node retains
+more information about the wealth position from which its observations
+came, rather than relying solely on the new within-node ranking after
+each split. This may help reduce some of the instability seen in the
+rank-dependent trees. Another direction is to study the hyperparameters
+more systematically. Controls such as minimum node size, minimum
+child-node proportion, maximum depth, minimum gain, and minimum relative
+gain can alter the final tree structure, depending on the study's
+purpose. Future work could therefore examine how these controls affect
+validation gain, terminal-node size, and the stability of the subgroups
+found by the model.
+
+\section{Conclusion}\label{conclusion}
+
+This thesis developed and applied a tree-based method for analysing
+socioeconomic inequality in under-five mortality. The method used the
+concentration index as the impurity measure in a recursive partitioning
+method. Instead of ranking determinants by their percentage contribution
+to inequality, the fitted tree produced subgroups that could be
+interpreted as decision rules. This added a subgroup view to the usual
+regression-based decomposition. In the DRC DHS application, inequality
+in under-five mortality was not explained solely by household wealth.
+Residence, maternal education, skilled birth attendance, parental
+occupation, household wealth, and province all appeared in the analysis.
+
+The indirect methods gave the variable-level view, while the direct
+trees showed how these variables combined. The regression decomposition
+emphasised the mother's education and the father's agricultural
+occupation. The SHAP-based decomposition gave a broader pattern, with
+residence, household wealth, mother's education, skilled birth
+attendance, and parental occupation appearing across criteria.
+
+The concentration-index trees acted as a direct method to decomposition,
+which showed directly with subgroups had higher under 5 deaths
+concentration. The rank-dependent trees found an
+education-occupation-wealth pattern, with higher mortality among
+children whose mothers had no education, who lived in low-wealth
+households, and who resided in Katanga. The \(L\) method gave a more
+spatial structure, beginning with residence and then splitting by
+occupation, wealth, and province.
+
+In this thesis, the level-dependent \(L\) method yielded more stable
+validation results than the rank-dependent criteria. This suggests that
+the choice of concentration index, used here as the tree impurity
+measure, is an important part of the method. The rank-dependent trees
+found detailed structures in the fitted data, but these structures did
+not validate well. The \(L\) tree and forest retained positive
+validation gains, so the level-dependent result was the more stable
+descriptive partition in this application.
+
+Since the level-dependent concentration index, as a measure of impurity,
+produced better results on held-out folds, future research should
+examine how to improve rank-dependent trees to retain more information
+from the original wealth ranking after each split.
+
+\section{Appendix}\label{appendix}
+
+\subsection{Results}\label{results-1}
+
+\subsubsection{Appendix R1: Exploratory Data
+Outputs}\label{appendix-r1-exploratory-data-outputs}
+
+\begingroup\fontsize{11}{13}\selectfont
+
+\begin{longtable}[t]{>{\raggedright\arraybackslash}p{4.5cm}>{\raggedleft\arraybackslash}p{3.1cm}>{\raggedleft\arraybackslash}p{3.1cm}>{\raggedleft\arraybackslash}p{3.1cm}}
+
+\caption{\label{tbl-appendix-weighted-baseline}Weighted distribution of
+analysis variables by under-five mortality status}
+
+\tabularnewline
+
+\\
+\toprule
+\multicolumn{1}{c}{\textbf{ }} & \multicolumn{2}{c}{\textbf{Under-five mortality}} & \multicolumn{1}{c}{\textbf{Overall}} \\
+\cmidrule(l{3pt}r{3pt}){2-3} \cmidrule(l{3pt}r{3pt}){4-4}
+\textbf{Variable} & \textbf{Alive at age 5} & \textbf{Died before age 5} & \textbf{Overall}\\
+\midrule
+ & (weighted N=7,464) & (weighted N=859) & (weighted N=8,323)\\
+Household wealth &  &  & \\
+High household wealth & 4,266.9 (57.2\%) & 418.6 (48.7\%) & 4,685.5 (56.3\%)\\
+Low household wealth & 3,197.4 (42.8\%) & 440.2 (51.3\%) & 3,637.6 (43.7\%)\\
+Skilled.birth.attendance &  &  & \\
+\addlinespace
+Skilled.birth.attendance.1 & 3,225.3 (43.2\%) & 295.1 (34.4\%) & 3,520.5 (42.3\%)\\
+No.skilled.birth.attendance & 4,239 (56.8\%) & 563.6 (65.6\%) & 4,802.6 (57.7\%)\\
+Sex of the child &  &  & \\
+Female & 3,828.8 (51.3\%) & 390.4 (45.5\%) & 4,219.2 (50.7\%)\\
+Male & 3,635.5 (48.7\%) & 468.4 (54.5\%) & 4,103.9 (49.3\%)\\
+\addlinespace
+Birth order and interval &  &  & \\
+First birth & 1,396.8 (18.7\%) & 190.9 (22.2\%) & 1,587.7 (19.1\%)\\
+2-4 short interval & 774.3 (10.4\%) & 110.1 (12.8\%) & 884.4 (10.6\%)\\
+2-4 long interval & 2,603.8 (34.9\%) & 216.6 (25.2\%) & 2,820.3 (33.9\%)\\
+5+ short interval & 696.6 (9.3\%) & 150.6 (17.5\%) & 847.2 (10.2\%)\\
+\addlinespace
+5+ long interval & 1,992.8 (26.7\%) & 190.7 (22.2\%) & 2,183.5 (26.2\%)\\
+Mother's age at birth &  &  & \\
+20 or more & 4,256.1 (57.0\%) & 472.6 (55.0\%) & 4,728.8 (56.8\%)\\
+Less than 20 & 3,208.1 (43.0\%) & 386.2 (45.0\%) & 3,594.3 (43.2\%)\\
+Type of residence &  &  & \\
+\addlinespace
+Urban & 2,932.1 (39.3\%) & 263.6 (30.7\%) & 3,195.7 (38.4\%)\\
+Rural & 4,532.2 (60.7\%) & 595.2 (69.3\%) & 5,127.4 (61.6\%)\\
+Mother's education &  &  & \\
+Any education & 3,342.9 (44.8\%) & 278.8 (32.5\%) & 3,621.8 (43.5\%)\\
+No education & 4,121.4 (55.2\%) & 579.9 (67.5\%) & 4,701.3 (56.5\%)\\
+\addlinespace
+Father's education &  &  & \\
+Any education & 5,490 (73.6\%) & 589.1 (68.6\%) & 6,079.2 (73.0\%)\\
+No education & 1,974.3 (26.4\%) & 269.7 (31.4\%) & 2,243.9 (27.0\%)\\
+Mother's occupation &  &  & \\
+Other & 1,610.2 (21.6\%) & 135.1 (15.7\%) & 1,745.4 (21.0\%)\\
+\addlinespace
+Household, unskilled, not working & 1,757.2 (23.5\%) & 172.1 (20.0\%) & 1,929.4 (23.2\%)\\
+Agriculture & 4,096.8 (54.9\%) & 551.6 (64.2\%) & 4,648.4 (55.8\%)\\
+Father's occupation &  &  & \\
+Other & 2,810.3 (37.6\%) & 242.1 (28.2\%) & 3,052.4 (36.7\%)\\
+Household, unskilled, not working & 961.3 (12.9\%) & 108.5 (12.6\%) & 1,069.8 (12.9\%)\\
+\addlinespace
+Agriculture & 3,692.7 (49.5\%) & 508.1 (59.2\%) & 4,200.9 (50.5\%)\\
+\bottomrule
+
+\end{longtable}
+
+\endgroup{}
+
+\begin{figure}[H]
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-appendix-province-mortality-distribution-1.pdf}}
+
+}
+
+\caption{\label{fig-appendix-province-mortality-distribution}Weighted
+province distribution by under-five mortality status.}
+
+\end{figure}%
+
+\subsubsection{Appendix R2: Regression and Predictive-Forest
+Details}\label{appendix-r2-regression-and-predictive-forest-details}
+
+\paragraph{Regression model summary}\label{regression-model-summary}
+
+\begingroup\fontsize{11}{13}\selectfont
+
+\begin{longtable}[t]{>{\raggedleft\arraybackslash}p{4.5cm}rrrrrr}
+
+\caption{\label{tbl-appendix-regression-model-summary}Survey-weighted
+regression model summary}
+
+\tabularnewline
+
+\\
+\toprule
+\textbf{Term} & \textbf{Estimate} & \textbf{Std. error} & \textbf{Statistic} & \textbf{p-value} & \textbf{Conf. low} & \textbf{Conf. high}\\
+\midrule
+Intercept & -2.908 & 0.275 & -10.563 & <0.001 & -3.448 & -2.369\\
+Household wealth & 0.068 & 0.125 & 0.544 & 0.5865 & -0.177 & 0.314\\
+Skilled birth attendance & 0.198 & 0.111 & 1.783 & 0.0746 & -0.020 & 0.416\\
+Sex of the child & 0.242 & 0.105 & 2.294 & 0.0218 & 0.035 & 0.449\\
+Birth order and interval: 2-4 short interval & -0.004 & 0.186 & -0.020 & 0.9838 & -0.367 & 0.360\\
+\addlinespace
+Birth order and interval: 2-4 long interval & -0.509 & 0.169 & -3.013 & 0.0026 & -0.840 & -0.178\\
+Birth order and interval: 5+ short interval & 0.420 & 0.210 & 1.995 & 0.0461 & 0.007 & 0.832\\
+Birth order and interval: 5+ long interval & -0.396 & 0.211 & -1.882 & 0.0599 & -0.809 & 0.017\\
+Mother's age at birth & 0.033 & 0.143 & 0.229 & 0.8186 & -0.247 & 0.312\\
+Type of residence & 0.090 & 0.154 & 0.584 & 0.5591 & -0.212 & 0.392\\
+\addlinespace
+Mother's education & 0.336 & 0.132 & 2.555 & 0.0106 & 0.078 & 0.594\\
+Father's education & -0.036 & 0.128 & -0.280 & 0.7798 & -0.286 & 0.214\\
+Mother's occupation: Household, unskilled, not working & -0.018 & 0.155 & -0.114 & 0.9093 & -0.322 & 0.287\\
+Mother's occupation: Agriculture & 0.140 & 0.163 & 0.861 & 0.3895 & -0.180 & 0.460\\
+Father's occupation: Household, unskilled, not working & 0.235 & 0.162 & 1.450 & 0.1472 & -0.083 & 0.554\\
+\addlinespace
+Father's occupation: Agriculture & 0.225 & 0.149 & 1.509 & 0.1314 & -0.067 & 0.517\\
+Region: Bas-Congo & 0.258 & 0.243 & 1.062 & 0.2883 & -0.218 & 0.734\\
+Region: Equateur & 0.250 & 0.238 & 1.051 & 0.2934 & -0.216 & 0.715\\
+Region: Kasai Occidental & 0.105 & 0.228 & 0.460 & 0.6452 & -0.342 & 0.553\\
+Region: Kasai Oriental & 0.153 & 0.240 & 0.635 & 0.5251 & -0.318 & 0.624\\
+\addlinespace
+Region: Katanga & 0.515 & 0.228 & 2.258 & 0.0240 & 0.068 & 0.962\\
+Region: Kinshasa & 0.081 & 0.262 & 0.310 & 0.7564 & -0.433 & 0.596\\
+Region: Maniema & 0.489 & 0.224 & 2.178 & 0.0294 & 0.049 & 0.929\\
+Region: Nord-Kivu & -0.252 & 0.294 & -0.857 & 0.3915 & -0.827 & 0.324\\
+Region: Orientale & -0.084 & 0.265 & -0.316 & 0.7522 & -0.603 & 0.435\\
+\addlinespace
+Region: Sud-Kivu & 0.300 & 0.270 & 1.111 & 0.2667 & -0.229 & 0.829\\
+\bottomrule
+
+\end{longtable}
+
+\endgroup{}
+
+\paragraph{Predictive ranger tuning
+results}\label{predictive-ranger-tuning-results}
+
+\begingroup\fontsize{11}{13}\selectfont
+
+\begin{longtable}[t]{rrrrr}
+
+\caption{\label{tbl-appendix-ranger-sampling-summary}Weighted class
+distribution before and after ranger undersampling}
+
+\tabularnewline
+
+\\
+\toprule
+\textbf{Sample} & \textbf{Outcome} & \textbf{Rows} & \textbf{Weighted N} & \textbf{Weighted percent}\\
+\midrule
+Before undersampling & Alive at age 5 & 7424 & 7464.30 & 89.68\\
+Before undersampling & Died before age 5 & 872 & 858.80 & 10.32\\
+After undersampling & Alive at age 5 & 1274 & 1289.74 & 60.03\\
+After undersampling & Died before age 5 & 872 & 858.80 & 39.97\\
+\bottomrule
+
+\end{longtable}
+
+\endgroup{}
+
+\begingroup\fontsize{11}{13}\selectfont
+
+\begin{longtable}[t]{>{\raggedleft\arraybackslash}p{2.4cm}rrrrrr}
+
+\caption{\label{tbl-appendix-ranger-cross-validation}Cross-validation
+results for the predictive ranger model}
+
+\tabularnewline
+
+\\
+\toprule
+\textbf{Metric} & \textbf{mtry} & \textbf{min\_n} & \textbf{Mean} & \textbf{Std. error} & \textbf{Folds} & \textbf{Rank}\\
+\midrule
+accuracy & 22 & 500 & 0.6118 & 0.0083 & 10 & 1\\
+accuracy & 10 & 200 & 0.6108 & 0.0090 & 10 & 2\\
+accuracy & 16 & 500 & 0.6104 & 0.0096 & 10 & 3\\
+accuracy & 29 & 200 & 0.6090 & 0.0106 & 10 & 4\\
+accuracy & 10 & 500 & 0.6080 & 0.0081 & 10 & 5\\
+\addlinespace
+accuracy & 22 & 200 & 0.6080 & 0.0098 & 10 & 6\\
+accuracy & 16 & 800 & 0.6076 & 0.0042 & 10 & 7\\
+accuracy & 29 & 800 & 0.6076 & 0.0050 & 10 & 8\\
+accuracy & 10 & 800 & 0.6072 & 0.0032 & 10 & 9\\
+accuracy & 22 & 800 & 0.6071 & 0.0051 & 10 & 10\\
+\addlinespace
+accuracy & 16 & 200 & 0.6066 & 0.0084 & 10 & 11\\
+accuracy & 29 & 500 & 0.6053 & 0.0087 & 10 & 12\\
+f\_meas & 29 & 200 & 0.3888 & 0.0175 & 10 & 1\\
+f\_meas & 22 & 200 & 0.3753 & 0.0185 & 10 & 2\\
+f\_meas & 16 & 200 & 0.3736 & 0.0146 & 10 & 3\\
+\addlinespace
+f\_meas & 10 & 200 & 0.3655 & 0.0155 & 10 & 4\\
+f\_meas & 22 & 500 & 0.3459 & 0.0158 & 10 & 5\\
+f\_meas & 29 & 500 & 0.3425 & 0.0152 & 10 & 6\\
+f\_meas & 16 & 500 & 0.3222 & 0.0176 & 10 & 7\\
+f\_meas & 10 & 500 & 0.2867 & 0.0200 & 10 & 8\\
+\addlinespace
+f\_meas & 29 & 800 & 0.2367 & 0.0157 & 10 & 9\\
+f\_meas & 22 & 800 & 0.2266 & 0.0194 & 10 & 10\\
+f\_meas & 16 & 800 & 0.2068 & 0.0144 & 10 & 11\\
+f\_meas & 10 & 800 & 0.1574 & 0.0167 & 10 & 12\\
+roc\_auc & 10 & 500 & 0.6158 & 0.0097 & 10 & 1\\
+\addlinespace
+roc\_auc & 10 & 200 & 0.6155 & 0.0111 & 10 & 2\\
+roc\_auc & 16 & 500 & 0.6153 & 0.0102 & 10 & 3\\
+roc\_auc & 22 & 500 & 0.6146 & 0.0100 & 10 & 4\\
+roc\_auc & 29 & 500 & 0.6141 & 0.0099 & 10 & 5\\
+roc\_auc & 16 & 200 & 0.6140 & 0.0104 & 10 & 6\\
+\addlinespace
+roc\_auc & 22 & 200 & 0.6132 & 0.0105 & 10 & 7\\
+roc\_auc & 29 & 200 & 0.6126 & 0.0103 & 10 & 8\\
+roc\_auc & 10 & 800 & 0.6100 & 0.0101 & 10 & 9\\
+roc\_auc & 29 & 800 & 0.6084 & 0.0100 & 10 & 10\\
+roc\_auc & 16 & 800 & 0.6082 & 0.0102 & 10 & 11\\
+\addlinespace
+roc\_auc & 22 & 800 & 0.6082 & 0.0104 & 10 & 12\\
+sensitivity & 29 & 200 & 0.3072 & 0.0162 & 10 & 1\\
+sensitivity & 22 & 200 & 0.2923 & 0.0188 & 10 & 2\\
+sensitivity & 16 & 200 & 0.2900 & 0.0143 & 10 & 3\\
+sensitivity & 10 & 200 & 0.2774 & 0.0152 & 10 & 4\\
+\addlinespace
+sensitivity & 22 & 500 & 0.2546 & 0.0159 & 10 & 5\\
+sensitivity & 29 & 500 & 0.2546 & 0.0149 & 10 & 6\\
+sensitivity & 16 & 500 & 0.2293 & 0.0152 & 10 & 7\\
+sensitivity & 10 & 500 & 0.1960 & 0.0161 & 10 & 8\\
+sensitivity & 29 & 800 & 0.1514 & 0.0123 & 10 & 9\\
+\addlinespace
+sensitivity & 22 & 800 & 0.1445 & 0.0149 & 10 & 10\\
+sensitivity & 16 & 800 & 0.1273 & 0.0103 & 10 & 11\\
+sensitivity & 10 & 800 & 0.0917 & 0.0109 & 10 & 12\\
+spec & 10 & 800 & 0.9600 & 0.0056 & 10 & 1\\
+spec & 16 & 800 & 0.9364 & 0.0088 & 10 & 2\\
+\addlinespace
+spec & 22 & 800 & 0.9238 & 0.0115 & 10 & 3\\
+spec & 29 & 800 & 0.9199 & 0.0089 & 10 & 4\\
+spec & 10 & 500 & 0.8900 & 0.0102 & 10 & 5\\
+spec & 16 & 500 & 0.8712 & 0.0131 & 10 & 6\\
+spec & 22 & 500 & 0.8563 & 0.0142 & 10 & 7\\
+\addlinespace
+spec & 29 & 500 & 0.8453 & 0.0147 & 10 & 8\\
+spec & 10 & 200 & 0.8391 & 0.0148 & 10 & 9\\
+spec & 22 & 200 & 0.8241 & 0.0151 & 10 & 10\\
+spec & 16 & 200 & 0.8234 & 0.0131 & 10 & 11\\
+spec & 29 & 200 & 0.8155 & 0.0130 & 10 & 12\\
+\bottomrule
+
+\end{longtable}
+
+\endgroup{}
+
+\paragraph{Predictive ranger SHAP summary
+plot}\label{predictive-ranger-shap-summary-plot}
+
+\begin{figure}[H]
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-appendix-shap-summary-1.pdf}}
+
+}
+
+\caption{\label{fig-appendix-shap-summary}SHAP summary plot for the
+predictive ranger model.}
+
+\end{figure}%
+
+\subsubsection{Appendix R3: Concentration-Index Tree
+Details}\label{appendix-r3-concentration-index-tree-details}
+
+\paragraph{Tree tuning and selection
+details}\label{tree-tuning-and-selection-details}
+
+\begingroup\fontsize{11}{13}\selectfont
+
+\begin{longtable}[t]{rrrrrrr}
+
+\caption{\label{tbl-appendix-tree-best-controls}Best tree
+hyperparameters selected by validation gain within each impurity
+criterion}
+
+\tabularnewline
+
+\\
+\toprule
+\textbf{type} & \textbf{minsplit} & \textbf{minbucket} & \textbf{minprob} & \textbf{maxdepth} & \textbf{min\_gain} & \textbf{min\_relative\_gain}\\
+\midrule
+CI & 500 & 100 & 0.01 & 10 & 1e-04 & 0.3\\
+CIg & 500 & 100 & 0.01 & 10 & 1e-04 & 0.3\\
+CIc & 500 & 100 & 0.01 & 10 & 1e-04 & 0.3\\
+L & 500 & 100 & 0.01 & 10 & 1e-04 & 0.3\\
+\bottomrule
+
+\end{longtable}
+
+\endgroup{}
+
+\paragraph{Tree fit and selection
+summaries}\label{tree-fit-and-selection-summaries}
+
+\begingroup\fontsize{11}{13}\selectfont
+
+\begin{longtable}[t]{rrrr}
+
+\caption{\label{tbl-appendix-tree-selected-setting-summary}Tree summary
+for the selected settings}
+
+\tabularnewline
+
+\\
+\toprule
+\textbf{criterion} & \textbf{metric} & \textbf{estimate} & \textbf{std\_error}\\
+\midrule
+CI & Root impurity & 0.1191 & NA\\
+CI & Training gain & 0.1003 & 0.0016\\
+CI & Training gain (\% root) & 87.0688 & 1.5175\\
+CI & Validation gain & -0.0144 & 0.0236\\
+CI & Validation gain (\% root) & -68.2424 & 44.7524\\
+\addlinespace
+CIc & Root impurity & 0.0483 & NA\\
+CIc & Training gain & 0.0417 & 0.0008\\
+CIc & Training gain (\% root) & 87.5995 & 1.4760\\
+CIc & Validation gain & -0.0107 & 0.0134\\
+CIc & Validation gain (\% root) & -73.1067 & 39.0032\\
+\addlinespace
+CIg & Root impurity & 0.0121 & NA\\
+CIg & Training gain & 0.0104 & 0.0002\\
+CIg & Training gain (\% root) & 87.5995 & 1.4760\\
+CIg & Validation gain & -0.0027 & 0.0034\\
+CIg & Validation gain (\% root) & -73.1067 & 39.0032\\
+\addlinespace
+L & Root impurity & 0.3128 & NA\\
+L & Training gain & 0.1906 & 0.0061\\
+L & Training gain (\% root) & 98.1536 & 0.2271\\
+L & Validation gain & 0.2861 & 0.1077\\
+L & Validation gain (\% root) & 70.5254 & 13.4254\\
+\bottomrule
+
+\end{longtable}
+
+\endgroup{}
+
+\paragraph{Tree selection metrics}\label{tree-selection-metrics}
+
+\begingroup\fontsize{11}{13}\selectfont
+
+\begin{longtable}[t]{>{\raggedleft\arraybackslash}p{1.4cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}}
+
+\caption{\label{tbl-appendix-tree-selection}Selection metrics for fitted
+concentration-index trees}
+
+\tabularnewline
+
+\\
+\toprule
+\textbf{Criterion} & \textbf{Root objective} & \textbf{Train gain} & \textbf{Train gain/root} & \textbf{Validation gain} & \textbf{Validation gain/root} & \textbf{Terminal nodes}\\
+\midrule
+CI & 0.1191 & 0.1003 & 0.8707 & -0.0144 & -0.6824 & 6.8\\
+CIc & 0.0483 & 0.0417 & 0.8760 & -0.0107 & -0.7311 & 7.3\\
+CIg & 0.0121 & 0.0104 & 0.8760 & -0.0027 & -0.7311 & 7.3\\
+L & 0.3128 & 0.1906 & 0.9815 & 0.2861 & 0.7053 & 6.8\\
+\bottomrule
+
+\end{longtable}
+
+\endgroup{}
+
+\begin{figure}[H]
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-appendix-tree-variable-importance-1.pdf}}
+
+}
+
+\caption{\label{fig-appendix-tree-variable-importance}Top tree variables
+by concentration-index criterion.}
+
+\end{figure}%
+
+\subsubsection{Additional Concentration-Index Tree
+Plots}\label{additional-concentration-index-tree-plots}
+
+\begin{figure}[H]
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-appendix-ci-tree-cig-1.pdf}}
+
+}
+
+\caption{\label{fig-appendix-ci-tree-cig}Concentration-index tree fitted
+with the CIg criterion.}
+
+\end{figure}%
+
+\begin{figure}[H]
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-appendix-ci-tree-ci-1.pdf}}
+
+}
+
+\caption{\label{fig-appendix-ci-tree-ci}Concentration-index tree fitted
+with the CI criterion.}
+
+\end{figure}%
+
+\subsubsection{Appendix R4: Rpart Comparison Tree
+Details}\label{appendix-r4-rpart-comparison-tree-details}
+
+\begin{figure}[H]
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-appendix-lecturer-rpart-simple-1.pdf}}
+
+}
+
+\caption{\label{fig-appendix-lecturer-rpart-simple}Lecturer rpart
+comparison tree using absolute CI impurity.}
+
+\end{figure}%
+
+\subsubsection{Appendix 5: Concentration-Index Forest
+Details}\label{appendix-5-concentration-index-forest-details}
+
+\paragraph{Forest tuning and selection
+details}\label{forest-tuning-and-selection-details}
+
+\begingroup\fontsize{11}{13}\selectfont
+
+\begin{longtable}[t]{rrrrrrrrr}
+
+\caption{\label{tbl-appendix-forest-best-controls}Best forest
+hyperparameters selected by validation gain within each impurity
+criterion}
+
+\tabularnewline
+
+\\
+\toprule
+\textbf{type} & \textbf{ntree} & \textbf{mtry} & \textbf{minsplit} & \textbf{minbucket} & \textbf{minprob} & \textbf{maxdepth} & \textbf{min\_gain} & \textbf{min\_relative\_gain}\\
+\midrule
+CI & 50 & 15 & 500 & 100 & 0.01 & 15 & 0 & 0.35\\
+CIc & 50 & 15 & 500 & 100 & 0.01 & 15 & 0 & 0.35\\
+CIg & 50 & 15 & 500 & 100 & 0.01 & 15 & 0 & 0.35\\
+L & 50 & 15 & 500 & 100 & 0.01 & 15 & 0 & 0.35\\
+\bottomrule
+
+\end{longtable}
+
+\endgroup{}
+
+\paragraph{Forest fit and selection
+summaries}\label{forest-fit-and-selection-summaries}
+
+\begingroup\fontsize{11}{13}\selectfont
+
+\begin{longtable}[t]{rrrr}
+
+\caption{\label{tbl-appendix-forest-selected-setting-summary}Forest
+summary for the selected settings}
+
+\tabularnewline
+
+\\
+\toprule
+\textbf{criterion} & \textbf{metric} & \textbf{estimate} & \textbf{std\_error}\\
+\midrule
+CI & Root impurity & 0.1191 & NA\\
+CI & Training gain & 0.0337 & 0.0029\\
+CI & Training gain (\% root) & 29.5891 & 2.8849\\
+CI & Validation gain & -0.0075 & 0.0107\\
+CI & Validation gain (\% root) & -24.9836 & 13.0698\\
+\addlinespace
+CIc & Root impurity & 0.0483 & NA\\
+CIc & Training gain & 0.0182 & 0.0012\\
+CIc & Training gain (\% root) & 38.5250 & 2.8199\\
+CIc & Validation gain & -0.0025 & 0.0054\\
+CIc & Validation gain (\% root) & -28.0573 & 16.5269\\
+\addlinespace
+CIg & Root impurity & 0.0121 & NA\\
+CIg & Training gain & 0.0046 & 0.0003\\
+CIg & Training gain (\% root) & 38.6693 & 2.1250\\
+CIg & Validation gain & -0.0009 & 0.0015\\
+CIg & Validation gain (\% root) & -34.6842 & 19.5160\\
+\addlinespace
+L & Root impurity & 0.3128 & NA\\
+L & Training gain & 0.1847 & 0.0062\\
+L & Training gain (\% root) & 95.0817 & 0.1536\\
+L & Validation gain & 0.2831 & 0.1064\\
+L & Validation gain (\% root) & 69.6578 & 13.3968\\
+\bottomrule
+
+\end{longtable}
+
+\endgroup{}
+
+\paragraph{Forest selection metrics}\label{forest-selection-metrics}
+
+\begingroup\fontsize{11}{13}\selectfont
+
+\begin{longtable}[t]{>{\raggedleft\arraybackslash}p{1.4cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.8cm}}
+
+\caption{\label{tbl-appendix-forest-selection}Selection metrics for
+fitted concentration-index forests}
+
+\tabularnewline
+
+\\
+\toprule
+\textbf{Criterion} & \textbf{Root objective} & \textbf{Train gain} & \textbf{Train gain/root} & \textbf{Validation gain} & \textbf{Validation gain/root} & \textbf{Mean terminal nodes}\\
+\midrule
+CI & 0.1191 & 0.0337 & 0.2959 & -0.0075 & -0.2498 & 2.442\\
+CIc & 0.0483 & 0.0182 & 0.3852 & -0.0025 & -0.2806 & 2.864\\
+CIg & 0.0121 & 0.0046 & 0.3867 & -0.0009 & -0.3468 & 2.930\\
+L & 0.3128 & 0.1847 & 0.9508 & 0.2831 & 0.6966 & 4.070\\
+\bottomrule
+
+\end{longtable}
+
+\endgroup{}
+
+\paragraph{Forest complexity plots}\label{forest-complexity-plots}
+
+\begin{figure}[H]
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-appendix-forest-complexity-path-1.pdf}}
+
+}
+
+\caption{\label{fig-appendix-forest-complexity-path}Forest complexity by
+number of terminal nodes.}
+
+\end{figure}%
+
+\begin{figure}[H]
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-appendix-forest-variable-importance-1.pdf}}
+
+}
+
+\caption{\label{fig-appendix-forest-variable-importance}Top forest
+variables by concentration-index criterion.}
+
+\end{figure}%
+
+\paragraph{Forest Surrogate Trees
+plots}\label{forest-surrogate-trees-plots}
+
+The selected forest surrogate appears in the results section. The
+remaining criterion-specific forest surrogates are retained here for
+comparison.
+
+\begin{figure}[H]
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-appendix-forest-surrogate-ci-1.pdf}}
+
+}
+
+\caption{\label{fig-appendix-forest-surrogate-ci}Surrogate tree for the
+CI concentration-index forest.}
+
+\end{figure}%
+
+\begin{figure}[H]
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-appendix-forest-surrogate-cig-1.pdf}}
+
+}
+
+\caption{\label{fig-appendix-forest-surrogate-cig}Surrogate tree for the
+CIg concentration-index forest.}
+
+\end{figure}%
+
+\begin{figure}[H]
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-appendix-forest-surrogate-cic-1.pdf}}
+
+}
+
+\caption{\label{fig-appendix-forest-surrogate-cic}Surrogate tree for the
+CIc concentration-index forest.}
+
+\end{figure}%
+
+\begin{figure}[H]
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-appendix-forest-surrogate-l-1.pdf}}
+
+}
+
+\caption{\label{fig-appendix-forest-surrogate-l}Surrogate tree for the L
+concentration-index forest.}
+
+\end{figure}%
+
+\subsubsection{Appendix S: Simulation Sensitivity
+Plots}\label{appendix-s-simulation-sensitivity-plots}
+
+The CIg tree is shown in the main results section. The remaining
+positive-control simulation trees are shown here to check whether the
+recovered subgroup pattern is stable across concentration-index
+criteria.
+
+\begin{figure}[H]
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-appendix-simulation-positive-control-ci-1.pdf}}
+
+}
+
+\caption{\label{fig-appendix-simulation-positive-control-ci}Positive-control
+simulation tree fitted with the CI criterion.}
+
+\end{figure}%
+
+\begin{figure}[H]
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-appendix-simulation-positive-control-cic-1.pdf}}
+
+}
+
+\caption{\label{fig-appendix-simulation-positive-control-cic}Positive-control
+simulation tree fitted with the CIc criterion.}
+
+\end{figure}%
+
+\begin{figure}[H]
+
+\centering{
+
+\pandocbounded{\includegraphics[keepaspectratio]{Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-appendix-simulation-positive-control-l-1.pdf}}
+
+}
+
+\caption{\label{fig-appendix-simulation-positive-control-l}Positive-control
+simulation tree fitted with the L criterion.}
+
+\end{figure}%
+
+\protect\phantomsection\label{refs}
+\begin{CSLReferences}{0}{1}
+\bibitem[\citeproctext]{ref-erreygers2009correcting}
+Erreygers, G. (2009) {`Correcting the concentration index'},
+\emph{Journal of Health Economics}, 28(2), pp. 504--515. Available at:
+\url{https://doi.org/10.1016/j.jhealeco.2008.02.003}.
+
+\bibitem[\citeproctext]{ref-erreygers2017subgroup}
+Erreygers, G. \emph{et al.} (2017) {`Subgroup decomposability of
+income-related inequality of health, with an application to australia'},
+\emph{Economic Record} {[}Preprint{]}. Available at:
+\url{https://doi.org/10.1111/1475-4932.12373}.
+
+\bibitem[\citeproctext]{ref-erreygers2017socioeconomic}
+Erreygers, G. and Kessels, R. (2017) {`Socioeconomic status and health:
+A new approach to the measurement of bivariate inequality'},
+\emph{International Journal of Environmental Research and Public
+Health}, 14(7), p. 673. Available at:
+\url{https://doi.org/10.3390/ijerph14070673}.
+
+\bibitem[\citeproctext]{ref-kandala2014drc}
+Kandala, N.-B. \emph{et al.} (2014) {`Child mortality in the democratic
+republic of congo: Cross-sectional evidence of the effect of geographic
+location and prolonged conflict from a national household survey'},
+\emph{BMC Public Health}, 14(1), p. 266. Available at:
+\url{https://doi.org/10.1186/1471-2458-14-266}.
+
+\bibitem[\citeproctext]{ref-dhsprogram_wealth_index_construction}
+The DHS Program (2007) {`Wealth index construction'}. The DHS Program.
+Available at:
+\url{https://dhsprogram.com/topics/wealth-index/Wealth-Index-Construction.cfm}.
+
+\bibitem[\citeproctext]{ref-dhs_privacy_respondents}
+The DHS Program (2026) {`Protecting the privacy of DHS survey
+respondents'}. Methodology webpage. Available at:
+\url{https://dhsprogram.com/methodology/protecting-the-privacy-of-dhs-survey-respondents.cfm}.
+
+\bibitem[\citeproctext]{ref-dhs_drc_2007_dataset}
+The DRC Program Program (2007) {`{Congo Democratic Republic: Standard
+DHS, 2007}'}. Survey dataset page. Available at:
+\url{https://dhsprogram.com/methodology/survey/survey-display-239.cfm}.
+
+\bibitem[\citeproctext]{ref-vanmalderen2019socioeconomic}
+Van Malderen, C. \emph{et al.} (2019) {`Socioeconomic factors
+contributing to under-five mortality in sub-saharan africa: A
+decomposition analysis'}, \emph{BMC Public Health}, 19(1), p. 760.
+Available at: \url{https://doi.org/10.1186/s12889-019-7111-8}.
+
+\bibitem[\citeproctext]{ref-vanmalderen2013under5}
+Van Malderen, C., Van Oyen, H. and Speybroeck, N. (2013) {`Contributing
+determinants of overall and wealth-related inequality in under-5
+mortality in 13 african countries'}, \emph{Journal of Epidemiology and
+Community Health}, 67(8), pp. 667--676. Available at:
+\url{https://doi.org/10.1136/jech-2012-202195}.
+
+\end{CSLReferences}
+
+
+
+
+\end{document}

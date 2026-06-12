@@ -1,5 +1,5 @@
 ---
-title: "Decomposition of Concentration-Index Trees"
+title: "Decomposing health inequalities through regression trees"
 author: "Moses Mburu"
 format:
   pdf:
@@ -101,7 +101,15 @@ if (file.exists(simulation_plot_file)) {
 ```
 
 
+# Abstract
 
+Under-five mortality has fallen globally, but large inequalities remain between and within countries. Standard decomposition methods can show which variables contribute to socioeconomic inequality, but they are less direct in showing how determinants combine into subgroups. This thesis developed and applied a tree-based method for analysing socioeconomic inequality in under-five mortality. The method used the concentration index as the impurity measure in recursive partitioning, so that splits were chosen to reduce within-node socioeconomic inequality in the outcome. The method was applied to child-level data from the Democratic Republic of the Congo DHS phase V survey, using under-five mortality as the outcome and the DHS wealth index as the socioeconomic ranking variable.
+
+The analysis compared indirect decomposition methods with direct concentration-index trees and forests. In the indirect methods, a model was fitted first, either a generalised linear model or a predictive model such as a random forest, and the fitted model was then used to decompose inequality. The regression decomposition placed the greatest weight on the mother’s education and the father’s agricultural occupation. The SHAP decomposition was less concentrated on these two variables. Residence, household wealth, mother’s education, skilled birth attendance, and parental occupation all appeared across the criteria.
+
+The direct trees added the subgroup part of the analysis. The rank-dependent trees based on standard concentration index($CI$), generalised concentration index($CIg$), and corrected concentration index($CIc$) split mainly through mother’s education, father’s agricultural occupation, skilled birth attendance, household wealth, and Katanga. The high-mortality branch was made up of children whose mothers had no education, who lived in low-wealth households, and who resided in Katanga. This pattern was clear in the fitted data, but it did not carry well to the validation folds. The level-dependent concentration index($L$) method gave a different tree. It was first split by residence, then by occupation, wealth, and province. The $L$ tree and forest both kept positive validation gains, so the level-dependent result was treated as the more stable direct result in this application.
+
+The thesis shows that concentration-index trees can be used to add subgroup rules to the decomposition of health inequality. The fitted tree can be read as a decision rule, making the result easier to discuss than a table of percentage contributions alone.
 
 
 # Introduction {#sec-introduction}
@@ -114,7 +122,7 @@ Health inequality analysis commonly begins by ordering individuals or households
 
 In this thesis, we develop a tree-based way of decomposing socioeconomic inequality in health. The method still uses the concentration index, but places it inside the splitting process of a tree. A typical decision tree chooses a split because it improves predictive performance. Here, the split is chosen because it separates the data into groups where socioeconomic inequality in the outcome is lower within each group. The fitted tree then produces decision rules that describe population groups. These rules are easier to discuss in public health work than regression coefficients alone, because they point to groups that policy makers, programme teams, and public health planners can recognise and act on.
 
-At each node, the tree searches across candidate variables and admissible split points, then selects the variable and split pair that gives the largest reduction in weighted within-node concentration-index impurity. The fitted tree is stored using the partykit tree representation for plotting and traversal [@hothorn2015partykit], but the tree-growing rule is not the conditional-inference variable-selection rule. We then apply the same split logic in a random forest setting. The forest is useful because it averages many inequality-oriented trees and is less dependent on any single early split, although this also makes the fitted structure less transparent. To recover a readable summary of the forest, we fit a surrogate tree to the forest predictions. This follows the idea of using a representative tree to summarise the main behaviour of an ensemble in a form that can be read as decision rules [@banerjee2012representative_trees]. Finally, we use SHAP values to express the fitted tree-based predictions as additive feature contributions [@lundberg2017unified; @lundberg2018tree]. The surrogate tree summarises the main subgroup structure, while SHAP provides contributions at the level of the determinants.
+At each node, the tree searches across candidate variables and admissible split points, then selects the variable and split pair that gives the largest reduction in weighted within-node concentration-index impurity. The fitted tree is stored using the partykit tree representation for plotting and traversal [@hothorn2015partykit], but the tree-growing rule is not the conditional-inference variable-selection rule. We then apply the same split logic in a random forest setting. The forest is useful because it averages many inequality-oriented trees and is less dependent on any single early split, although this also makes the fitted structure less transparent. To recover a readable summary of the forest, we fit a surrogate tree to the forest predictions. This follows the idea of using a representative tree to summarise the main behaviour of an ensemble in a form that can be read as decision rules [@dicastro2019surrogate_tree_visualization]. Finally, we use SHAP values to express the fitted tree-based predictions as additive feature contributions [@lundberg2017unified; @lundberg2018tree]. The surrogate tree summarises the main subgroup structure, while SHAP provides contributions at the level of the determinants.
 
 For the analysis, we use child-level data from the Democratic Republic of the Congo DHS phase V survey [@dhs_drc_2007_dataset]. Under-five mortality is treated as the outcome, and the DHS household wealth index serves as the socioeconomic ranking variable. This is appropriate for the DRC setting, where DHS-based research has shown that poverty and education are associated with access to health insurance [@tsala_dimbuene2022_drc_health_insurance]. The splitting variables cover characteristics of the child, the mother, the household, occupation, residence, and province.
 
@@ -521,7 +529,7 @@ From the example above [@fig-dhs-cart-regions], we can see the main difference f
 
 ### Recursive Partitioning for Inequality Analysis {#sec-recursive-partitioning-inequality}
 
-In a usual CART(Classification and Regression Trees), splits are chosen mainly for prediction. A regression tree searches for splits that reduce within-node outcome variation, while a classification tree searches for splits that improve class separation [@hastie2009elements].
+In a usual CART(Classification and Regression Trees)[@breiman1984classification], splits are chosen mainly for prediction. A regression tree searches for splits that reduce within-node outcome variation, while a classification tree searches for splits that improve class separation [@hastie2009elements].
 
 In this thesis, the split target is changed. The tree is used to form subgroups where under-five mortality is less concentrated by socioeconomic position. The outcome level in each subgroup is still reported, but it is not the quantity used to choose the split. A split is preferred when it reduces the within-node concentration index of under-five mortality.
 
@@ -617,7 +625,7 @@ $$
 
 The selected split is the candidate pair $(j,s)$ with the largest admissible gain.
 
-### Split behaviour under alternative concentration-based impurity measures {#sec-split-behaviour-impurity}
+#### Split behaviour under alternative concentration-based impurity measures {#sec-split-behaviour-impurity}
 
 The impurity measure is not separate from the gain function. It enters directly into the definition of the gain. Once an impurity measure has been chosen, the gain function uses that measure to compare and rank all admissible candidate splits at the current node.
 
@@ -766,7 +774,7 @@ $$
 
 The interpretation of $\hat{f}_{RF}(x)$ follows from how the forest is fitted. Since the trees are grown to reduce concentration-index impurity, not to minimise prediction error, we do not read the forest output as a fully calibrated probability of under-five death. It is a mortality-scale score obtained by averaging terminal-node mortality values across many inequality-based trees. We use it to describe the subgroup structure learned by the forest, not as the main target of a predictive risk model.
 
-Averaging over many such inequality-oriented trees makes the fitted values less dependent on any single partition. It allows the model to reflect more complex combinations of child, maternal, household, and geographic characteristics. The cost is that the final forest is no longer explainable. To address unexplainability, we fit a surrogate tree [@banerjee2012representative_trees] to summarise the forest. The surrogate tree uses the forest prediction $\hat{f}_{RF}(x_i)$ as its outcome, with the same candidate predictors used in the main analysis. It does not replace the forest. Its role is to give a smaller set of rules that approximates the main subgroup structure learned by the forest. The terminal nodes of this surrogate tree can then be described using their average forest-predicted mortality risk and their concentration index. This gives a readable summary of how the forest separates children into inequality-relevant groups, while keeping the random forest as the more flexible model.
+Averaging over many such inequality-oriented trees makes the fitted values less dependent on any single partition. It allows the model to reflect more complex combinations of child, maternal, household, and geographic characteristics. The cost is that the final forest is no longer explainable. To address unexplainability, we fit a surrogate tree [@dicastro2019surrogate_tree_visualization] to summarise the forest. The surrogate tree uses the forest prediction $\hat{f}_{RF}(x_i)$ as its outcome, with the same candidate predictors used in the main analysis. It does not replace the forest. Its role is to give a smaller set of rules that approximates the main subgroup structure learned by the forest. The terminal nodes of this surrogate tree can then be described using their average forest-predicted mortality risk and their concentration index. This gives a readable summary of how the forest separates children into inequality-relevant groups, while keeping the random forest as the more flexible model.
 
 
 ### Evaluation and Model Selection of Tree-Based Methods for Inequality Analysis {#sec-model-selection}
@@ -1458,8 +1466,21 @@ Since the level-dependent concentration index, as a measure of impurity, produce
 ::: {#refs}
 :::
 
+# Generative AI Disclosure
+
+- I have used ChatGPT (GenAI tool) to support the development of the ineqTrees package after defining the main functions and writing starter code.
+- I have used ChatGPT and Grammarly (GenAI/writing support tools) for English language improvement, spelling, and clarity.
+- I used ChatGPT to help develop custom tree plots, especially plots where each node displays wealth, sample size, and the outcome.
+
+
 
 # Appendix {#sec-appendix}
+
+## Code 
+
+- The Analysis code for this thesis is available at https://github.com/m-mburu/thesis-mse
+- The code for the concentration-index tree and forest implementation is available at https://github.com/m-mburu/ineqTrees
+
 
 ## Appendix A: Proof that the Centered Ranks Sum to Zero {#app-centered-rank-proof}
 
@@ -2029,7 +2050,7 @@ if (isTRUE(params$render_appendix_tree_plots) && "CI" %in% names(tree_models_by_
 
 ```{r appendix-lecturer-rpart-simple, fig.width=14, fig.height=8}
 #| label: fig-appendix-lecturer-rpart-simple
-#| fig-cap: "Lecturer rpart comparison tree using absolute CI impurity."
+#| fig-cap: "Rpart comparison tree using absolute CI impurity."
 #| fig-pos: "H"
 
 if (isTRUE(params$render_appendix_tree_plots) && "simple_abs" %in% names(lecturer_rpart_models)) {
@@ -2047,6 +2068,9 @@ if (isTRUE(params$render_appendix_tree_plots) && "simple_abs" %in% names(lecture
 #| tbl-cap: "Best forest hyperparameters selected by validation gain within each impurity criterion."
 
 forest_best_controls_out <- copy(drc_results_objects$forest_best_controls %||% data.table())
+nms <- names(forest_best_controls_out)
+nms_new <- gsub("_", " ", nms)
+setnames(forest_best_controls_out, nms, nms_new)
 if (!nrow(forest_best_controls_out)) {
   forest_best_controls_out <- data.table(
     note = "Run Generate_DRC_Results_Objects.qmd with RUN_FOREST=true"
@@ -2151,7 +2175,7 @@ report_compact_table(
   )
 ```
 
-```{r appendix-forest-variable-importance-plot, fig.width=10, fig.height=7}
+```{r appendix-forest-variable-importance-plot, fig.width=8, fig.height=7.5}
 #| label: fig-appendix-forest-variable-importance
 #| fig-cap: "Top forest variables by concentration-index criterion."
 #| fig-pos: "H"
