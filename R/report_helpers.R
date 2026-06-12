@@ -742,7 +742,7 @@ plot_importance_by_criterion <- function(
     theme_minimal(base_size = 11) +
     theme(
       plot.title = element_text(face = "bold", size = 11),
-      axis.text.y = element_text(size = 9),
+      axis.text.y = element_text(size = 11),
       panel.grid.minor = element_blank()
     )
 }

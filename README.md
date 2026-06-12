@@ -1,0 +1,55 @@
+# MSc Thesis: Decomposing health inequalities through regression trees
+
+2026-06-12
+
+## Overview
+
+Health inequalities are often studied using linear regression–based
+decompositions, but these impose restrictive functional-form and
+additivity assumptions that may obscure important heterogeneity. This
+project develops and evaluates a non-parametric, regression-tree–based
+decomposition method that pairs classification and regression trees with
+standard inequality indices.
+
+The goal is to:
+
+1.  Minimise within-group and/or between-group disparities.
+2.  Reveal how determinants jointly segment the population into
+    subgroups relevant to inequality.
+
+## Research Questions
+
+1.  Does tree-based partitioning reveal more policy-relevant subgroup
+    structures than linear decompositions under non-linear or
+    interactive relationships?
+2.  How do decomposition results vary across different outcome
+    definitions (e.g., concentration index–based measures)?
+3.  What is the marginal contribution of each determinant in a
+    recursively partitioned model?
+
+## Data
+
+The method will be applied to demographic surveillance datasets that
+include socioeconomic status, health outcomes, and a range of
+covariates.
+
+Methodological considerations include algorithm implementation and
+accounting for survey design features such as weights and
+stratification.
+
+## Repository Structure
+
+- [**R /**](./R) - R scripts and functions
+- [**Report/**](./report) - methodology, results, and discussion
+  write-up
+- [**Simulation/**](./simulation) - code and results for simulation
+  studies
+- [**MSE
+  Report/**](./report/MSE_Thesis_Decomposition_of_CI_Trees_MM.qmd) - QMD
+  used to generate thesis report
+- [**MSE
+  Report/**](./report/MSE_Thesis_Decomposition_of_CI_Trees_MM_Generate_DRC_Results_Objects.qmd) -
+  QMD used for analysis
+- [**Inequality Tree
+  Implementation**](https://github.com/m-mburu/ineqTrees) - R package
+  for concentration index tree and forest implementation

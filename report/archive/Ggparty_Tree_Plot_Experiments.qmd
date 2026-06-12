@@ -1,0 +1,311 @@
+---
+title: "ggparty Tree Plot Experiments"
+author: "Moses Mburu"
+format:
+  html:
+    toc: true
+    number-sections: true
+    df-print: paged
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+```{r setup}
+knitr::opts_chunk$set(
+  fig.width = 12,
+  fig.height = 6,
+  dpi = 300,
+  warning = FALSE,
+  message = FALSE
+)
+
+library(data.table)
+library(ggplot2)
+library(ggparty)
+library(here)
+
+source(here("R", "report_helpers.R"))
+
+results_object_file <- here("data", "drc_report_results_objects.rda")
+report_results <- load_drc_report_results(results_object_file)
+drc_results_objects <- report_results$drc_results_objects
+
+congo_model_dt <- drc_results_objects$congo_model_dt
+congo_var_labels <- drc_results_objects$congo_var_labels
+selected_tree_type <- drc_results_objects$selected_tree_type
+selected_tree_fit <- drc_results_objects$selected_tree_fit
+selected_forest_surrogate <- drc_results_objects$selected_forest_surrogate
+forest_surrogates <- drc_results_objects$forest_surrogates_by_type %||% list()
+
+repel_mode <- if (requireNamespace("ggrepel", quietly = TRUE)) {
+  "terminal"
+} else {
+  "none"
+}
+font_11 <- 11 / ggplot2::.pt
+
+data.table(
+  object_file = results_object_file,
+  selected_tree_type = selected_tree_type,
+  ggrepel_available = requireNamespace("ggrepel", quietly = TRUE),
+  repel_mode_used = repel_mode
+)
+```
+
+# Purpose
+
+This notebook tests ggplot-based tree rendering from the saved DRC results
+object. The existing `ci_report_tree_plot()` uses the package/base plotting
+method. The experimental `ci_tree_gg()` helper uses `ggparty`, which means the
+tree can be styled with ordinary `ggplot2` layers and can optionally use
+`ggrepel::geom_label_repel()` when `ggrepel` is installed.
+
+# Selected CI Tree
+
+## Current Base/partykit Plot
+
+```{r selected-tree-base, fig.width=12, fig.height=6}
+ci_report_tree_plot(
+  fit = selected_tree_fit,
+  data = congo_model_dt,
+  outcome_name = "deadu5_num",
+  outcome_label = "U5",
+  ci_type = selected_tree_type,
+  var_labels = congo_var_labels,
+  fontsize = 11
+)
+```
+
+## ggparty Plot
+
+```{r selected-tree-ggparty, fig.width=12, fig.height=6}
+ci_tree_gg(
+  fit = selected_tree_fit,
+  data = congo_model_dt,
+  outcome_name = "deadu5_num",
+  outcome_label = "U5",
+  ci_type = selected_tree_type,
+  var_labels = congo_var_labels,
+  inner_text_size = 3.2,
+  terminal_text_size = 2.8,
+  edge_text_size = 2.8,
+  split_label_width = 24,
+  edge_label_width = 20,
+  terminal_label_width = 16,
+  use_repel = repel_mode
+)
+```
+
+## ggparty Wider Labels
+
+```{r selected-tree-ggparty-wide-labels, fig.width=13, fig.height=6.5}
+ci_tree_gg(
+  fit = selected_tree_fit,
+  data = congo_model_dt,
+  outcome_name = "deadu5_num",
+  outcome_label = "U5",
+  ci_type = selected_tree_type,
+  var_labels = congo_var_labels,
+  inner_text_size = 3.0,
+  terminal_text_size = 2.6,
+  edge_text_size = 2.6,
+  split_label_width = 30,
+  edge_label_width = 26,
+  terminal_label_width = 20,
+  terminal_space = 0.35,
+  use_repel = repel_mode
+)
+```
+
+## ggparty Partykit-Like Layout
+
+This variant uses true node depth from the `partykit` object, so terminal nodes
+are not forced into a common bottom band. The selected single tree has leaves at
+one common depth, but this setting matters for the forest surrogate trees below.
+
+```{r selected-tree-ggparty-level-layout, fig.width=9.5, fig.height=6.5}
+ci_tree_gg(
+  fit = selected_tree_fit,
+  data = congo_model_dt,
+  outcome_name = "deadu5_num",
+  outcome_label = "U5",
+  ci_type = selected_tree_type,
+  var_labels = congo_var_labels,
+  inner_text_size = font_11,
+  terminal_text_size = font_11,
+  edge_text_size = font_11,
+  split_label_width = 28,
+  edge_label_width = 24,
+  terminal_label_width = 18,
+  terminal_layout = "level",
+  node_box_style = "ci_report_tree",
+  edge_label_style = "text",
+  use_repel = repel_mode
+)
+```
+
+# Selected Forest Surrogate
+
+```{r selected-forest-surrogate-ggparty, fig.width=12, fig.height=6}
+ci_tree_gg(
+  fit = selected_forest_surrogate$fit,
+  data = selected_forest_surrogate$data,
+  outcome_name = selected_forest_surrogate$prediction_name,
+  outcome_label = "U5",
+  ci_type = selected_tree_type,
+  var_labels = congo_var_labels,
+  inner_text_size = 3.1,
+  terminal_text_size = 2.7,
+  edge_text_size = 2.7,
+  split_label_width = 26,
+  edge_label_width = 22,
+  terminal_label_width = 17,
+  terminal_space = 0.35,
+  use_repel = repel_mode
+)
+```
+
+## Selected Forest Surrogate: Partykit-Like Layout
+
+```{r selected-forest-surrogate-ggparty-level-layout, fig.width=9.5, fig.height=6.5}
+ci_tree_gg(
+  fit = selected_forest_surrogate$fit,
+  data = selected_forest_surrogate$data,
+  outcome_name = selected_forest_surrogate$prediction_name,
+  outcome_label = "U5",
+  ci_type = selected_tree_type,
+  var_labels = congo_var_labels,
+  inner_text_size = font_11,
+  terminal_text_size = font_11,
+  edge_text_size = font_11,
+  split_label_width = 28,
+  edge_label_width = 24,
+  terminal_label_width = 18,
+  terminal_layout = "level",
+  node_box_style = "ci_report_tree",
+  edge_label_style = "text",
+  use_repel = repel_mode
+)
+```
+
+```{r terminal-depth-diagnostic}
+terminal_depths <- function(fit, label) {
+  p <- ci_tree_gg(
+    fit = fit,
+    data = selected_forest_surrogate$data,
+    outcome_name = selected_forest_surrogate$prediction_name,
+    outcome_label = "U5",
+    ci_type = selected_tree_type,
+    var_labels = congo_var_labels,
+    terminal_layout = "level"
+  )
+  depth_dt <- as.data.table(p$data)[kids == 0L]
+  depth_dt[, plot := label]
+  depth_dt[, .N, by = .(plot, true_level)][
+    order(plot, true_level)
+  ]
+}
+
+terminal_depths(
+  selected_forest_surrogate$fit,
+  "Selected forest surrogate"
+)
+```
+
+# Criterion-Specific Forest Surrogates
+
+These chunks render each saved surrogate from `forest_surrogates_by_type` using
+the same ggparty helper.
+
+```{r forest-surrogate-ci, fig.width=12, fig.height=6}
+if ("CI" %in% names(forest_surrogates)) {
+  surrogate <- forest_surrogates[["CI"]]
+  ci_tree_gg(
+    fit = surrogate$fit,
+    data = surrogate$data,
+    outcome_name = surrogate$prediction_name,
+    outcome_label = "U5",
+    ci_type = "CI",
+    var_labels = congo_var_labels,
+    inner_text_size = font_11,
+    terminal_text_size = font_11,
+    edge_text_size = font_11,
+    terminal_layout = "level",
+    node_box_style = "ci_report_tree",
+    edge_label_style = "text",
+    use_repel = repel_mode
+  )
+}
+```
+
+```{r forest-surrogate-cig, fig.width=12, fig.height=6}
+if ("CIg" %in% names(forest_surrogates)) {
+  surrogate <- forest_surrogates[["CIg"]]
+  ci_tree_gg(
+    fit = surrogate$fit,
+    data = surrogate$data,
+    outcome_name = surrogate$prediction_name,
+    outcome_label = "U5",
+    ci_type = "CIg",
+    var_labels = congo_var_labels,
+    inner_text_size = font_11,
+    terminal_text_size = font_11,
+    edge_text_size = font_11,
+    terminal_layout = "level",
+    node_box_style = "ci_report_tree",
+    edge_label_style = "text",
+    use_repel = repel_mode
+  )
+}
+```
+
+```{r forest-surrogate-cic, fig.width=12, fig.height=6}
+if ("CIc" %in% names(forest_surrogates)) {
+  surrogate <- forest_surrogates[["CIc"]]
+  ci_tree_gg(
+    fit = surrogate$fit,
+    data = surrogate$data,
+    outcome_name = surrogate$prediction_name,
+    outcome_label = "U5",
+    ci_type = "CIc",
+    var_labels = congo_var_labels,
+    inner_text_size = font_11,
+    terminal_text_size = font_11,
+    edge_text_size = font_11,
+    terminal_layout = "level",
+    node_box_style = "ci_report_tree",
+    edge_label_style = "text",
+    use_repel = repel_mode
+  )
+}
+```
+
+```{r forest-surrogate-l, fig.width=12, fig.height=6}
+if ("L" %in% names(forest_surrogates)) {
+  surrogate <- forest_surrogates[["L"]]
+  ci_tree_gg(
+    fit = surrogate$fit,
+    data = surrogate$data,
+    outcome_name = surrogate$prediction_name,
+    outcome_label = "U5",
+    ci_type = "L",
+    var_labels = congo_var_labels,
+    inner_text_size = font_11,
+    terminal_text_size = font_11,
+    edge_text_size = font_11,
+    terminal_layout = "level",
+    node_box_style = "ci_report_tree",
+    edge_label_style = "text",
+    use_repel = repel_mode
+  )
+}
+```
+
+# Notes
+
+The ggparty layout uses the tree's node structure but does not promise pixel
+identity with the base `partykit` plot. Its advantage is that the returned
+object is a normal `ggplot`, so labels, margins, text sizes, fills, and optional
+repelling can be tuned in the usual ggplot ecosystem.
