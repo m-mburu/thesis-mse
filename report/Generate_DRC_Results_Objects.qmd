@@ -568,7 +568,8 @@ summarise_rineq_decomposition <- function(object, method_name) {
         term,
         elasticity = Elasticity,
         concentration_index_of_variable = `Concentration Index`,
-        regression_contribution = `Contribution (Abs)`
+        regression_contribution = `Contribution (Abs)`,
+        regression_pct_contribution = `Contribution (%)`
       )
     ],
     by = "term",
@@ -578,13 +579,6 @@ summarise_rineq_decomposition <- function(object, method_name) {
   out[, `:=`(
     criterion = method_name,
     variable_label = format_variable_label(variable)
-  )]
-
-  total_abs_contribution <- out[, sum(abs(regression_contribution), na.rm = TRUE)]
-  out[, regression_pct_contribution := fifelse(
-    rep(is.finite(total_abs_contribution) && total_abs_contribution > .Machine$double.eps, .N),
-    100 * abs(regression_contribution) / total_abs_contribution,
-    NA_real_
   )]
 
   setcolorder(
@@ -606,14 +600,11 @@ summarise_rineq_decomposition <- function(object, method_name) {
 ```
 
 ```{r build-rineq-ci-decomposition}
-rineq_ci_decomp <- rineq::decomposition(
-  outcome = raw_congo_model_dt$deadu5_num,
-  betas = unname(linear_beta[linear_terms]),
-  mm = linear_x[, linear_terms, drop = FALSE],
-  ranker = raw_congo_model_dt$wealth,
-  wt = raw_congo_model_dt$sample_weight,
+rineq_ci_decomp <- rineq::contribution(
+  linear_decomp_fit,
+  raw_congo_model_dt$wealth,
   correction = TRUE,
-  citype = "CI"
+  type = "CI"
 )
 rineq_ci_summary <- decomposition_to_table(rineq_ci_decomp, digits = 4L)
 classical_ci_table <- summarise_rineq_decomposition(rineq_ci_decomp, "CI")
@@ -634,14 +625,11 @@ plot(
 ```
 
 ```{r build-rineq-cig-decomposition}
-rineq_cig_decomp <- rineq::decomposition(
-  outcome = raw_congo_model_dt$deadu5_num,
-  betas = unname(linear_beta[linear_terms]),
-  mm = linear_x[, linear_terms, drop = FALSE],
-  ranker = raw_congo_model_dt$wealth,
-  wt = raw_congo_model_dt$sample_weight,
+rineq_cig_decomp <- rineq::contribution(
+  linear_decomp_fit,
+  raw_congo_model_dt$wealth,
   correction = TRUE,
-  citype = "CIg"
+  type = "CIg"
 )
 rineq_cig_summary <- decomposition_to_table(rineq_cig_decomp, digits = 4L)
 classical_cig_table <- summarise_rineq_decomposition(rineq_cig_decomp, "CIg")
@@ -662,14 +650,11 @@ plot(
 ```
 
 ```{r build-rineq-cic-decomposition}
-rineq_cic_decomp <- rineq::decomposition(
-  outcome = raw_congo_model_dt$deadu5_num,
-  betas = unname(linear_beta[linear_terms]),
-  mm = linear_x[, linear_terms, drop = FALSE],
-  ranker = raw_congo_model_dt$wealth,
-  wt = raw_congo_model_dt$sample_weight,
+rineq_cic_decomp <- rineq::contribution(
+  linear_decomp_fit,
+  raw_congo_model_dt$wealth,
   correction = TRUE,
-  citype = "CIc"
+  type = "CIc"
 )
 rineq_cic_summary <- decomposition_to_table(rineq_cic_decomp, digits = 4L)
 classical_cic_table <- summarise_rineq_decomposition(rineq_cic_decomp, "CIc")
@@ -690,14 +675,11 @@ plot(
 ```
 
 ```{r build-rineq-ciw-decomposition}
-rineq_ciw_decomp <- rineq::decomposition(
-  outcome = raw_congo_model_dt$deadu5_num,
-  betas = unname(linear_beta[linear_terms]),
-  mm = linear_x[, linear_terms, drop = FALSE],
-  ranker = raw_congo_model_dt$wealth,
-  wt = raw_congo_model_dt$sample_weight,
+rineq_ciw_decomp <- rineq::contribution(
+  linear_decomp_fit,
+  raw_congo_model_dt$wealth,
   correction = TRUE,
-  citype = "CIw"
+  type = "CIw"
 )
 rineq_ciw_summary <- decomposition_to_table(rineq_ciw_decomp, digits = 4L)
 classical_ciw_table <- summarise_rineq_decomposition(rineq_ciw_decomp, "CIw")
