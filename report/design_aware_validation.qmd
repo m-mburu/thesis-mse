@@ -1,0 +1,634 @@
+---
+title: "DRC Selected Tree Bootstrap Stability"
+author: "Moses Mburu"
+format:
+  html:
+    toc: true
+    number-sections: true
+    embed-resources: true
+    df-print: paged
+execute:
+  echo: true
+  warning: false
+  message: false
+params:
+  bootstrap_replicates: 1000
+  bootstrap_seed: 20260615
+  bootstrap_unit: "PSU"
+  refresh_bootstrap: false
+  save_results: true
+---
+
+```{r setup}
+knitr::opts_chunk$set(
+  fig.width = 9,
+  fig.height = 5.5,
+  dpi = 500,
+  dev = "png"
+)
+
+library(data.table)
+library(ggplot2)
+library(here)
+library(ineqTrees)
+library(knitr)
+library(partykit)
+
+source(here("R", "report_helpers.R"))
+source(here("R", "ci_rpart_comparison_methods.R"))
+```
+
+# Purpose
+
+This notebook does not retune the concentration-index trees. The generator QMD
+now handles design-aware validation using PSU fold IDs. This file only checks
+the stability of the already selected tree settings by refitting those settings
+under bootstrap samples.
+
+The selected tuning parameters are loaded from the saved results object. Each
+bootstrap sample refits the same tree criterion and the same selected controls,
+then compares the refitted tree with the corresponding selected tree from the
+generator.
+
+The default bootstrap unit is the primary sampling unit (PSU). This keeps the
+stability check aligned with the clustered DHS design and avoids treating all
+children as independent row-level draws. The bootstrap is still a sensitivity
+analysis for tree structure. It is not a replicate-weight analysis and it does
+not produce formal survey-design confidence intervals for individual splits.
+
+# Load Generated Results
+
+```{r load-generated-results}
+results_object_file <- here("data", "drc_report_results_objects.rda")
+stopifnot(file.exists(results_object_file))
+
+load(results_object_file)
+stopifnot(exists("drc_results_objects"))
+list2env(drc_results_objects, envir = environment())
+
+required_objects <- c(
+  "congo_model_dt",
+  "raw_congo_model_dt",
+  "congo_ci_formula",
+  "congo_var_labels",
+  "tree_best_by_type"
+)
+missing_objects <- setdiff(required_objects, names(drc_results_objects))
+if (length(missing_objects)) {
+  stop(
+    "Missing required generated objects: ",
+    paste(missing_objects, collapse = ", "),
+    call. = FALSE
+  )
+}
+
+stopifnot(nrow(congo_model_dt) == nrow(raw_congo_model_dt))
+if (!"PSU" %in% names(raw_congo_model_dt)) {
+  stop(
+    "The generated data do not contain `PSU`. Rerender the generator QMD ",
+    "so that `raw_congo_model_dt` includes the DHS cluster variable.",
+    call. = FALSE
+  )
+}
+
+criterion_types <- intersect(c("CI", "CIg", "CIc", "L"), tree_best_by_type$type)
+if (!length(criterion_types)) {
+  stop("No selected tree criteria were found in `tree_best_by_type`.", call. = FALSE)
+}
+bootstrap_unit <- toupper(as.character(params$bootstrap_unit)[1L])
+if (!bootstrap_unit %in% c("PSU", "ROW")) {
+  stop("`bootstrap_unit` must be either 'PSU' or 'ROW'.", call. = FALSE)
+}
+
+bootstrap_replicates <- max(1L, as.integer(params$bootstrap_replicates))
+bootstrap_seed <- as.integer(params$bootstrap_seed)
+
+bootstrap_source_dt <- data.table(
+  PSU = raw_congo_model_dt$PSU,
+  congo_model_dt
+)
+
+loaded_summary <- data.table(
+  item = c(
+    "Generated object",
+    "Rows",
+    "PSUs",
+    "Selected criteria",
+    "Bootstrap unit",
+    "Bootstrap replicates"
+  ),
+  value = c(
+    results_object_file,
+    format(nrow(congo_model_dt), big.mark = ","),
+    format(uniqueN(raw_congo_model_dt$PSU), big.mark = ","),
+    paste(criterion_types, collapse = ", "),
+    bootstrap_unit,
+    format(bootstrap_replicates, big.mark = ",")
+  )
+)
+
+report_compact_table(
+  loaded_summary,
+  caption = "Generated results used for selected-tree bootstrap stability checks"
+)
+```
+
+# Selected Settings
+
+```{r selected-tree-settings}
+selected_tree_settings <- copy(tree_best_by_type[type %in% criterion_types])
+
+report_compact_table(
+  selected_tree_settings[
+    ,
+    .(
+      type,
+      grid_id,
+      minsplit,
+      minbucket,
+      minprob,
+      maxdepth,
+      min_gain,
+      min_relative_gain,
+      mean_score,
+      mean_terminal_nodes
+    )
+  ],
+  digits = 4,
+  caption = "Selected tuning settings held fixed across bootstrap refits"
+)
+```
+
+```{r fit-reference-trees}
+fit_selected_tree <- function(setting, data) {
+  ci_tree(
+    formula = congo_ci_formula,
+    data = data,
+    rank_name = "wealth",
+    outcome_name = "deadu5_num",
+    weights = data[["sample_weight"]],
+    type = setting$type[1L],
+    control = ci_control_from_row(setting)
+  )
+}
+
+have_saved_tree_models <- exists("tree_models_by_type") &&
+  all(criterion_types %in% names(tree_models_by_type))
+
+reference_tree_models_by_type <- if (have_saved_tree_models) {
+  tree_models_by_type[criterion_types]
+} else {
+  setNames(
+    lapply(seq_len(nrow(selected_tree_settings)), function(i) {
+      fit_selected_tree(selected_tree_settings[i], congo_model_dt)
+    }),
+    selected_tree_settings$type
+  )
+}
+
+reference_tree_summary <- rbindlist(
+  lapply(names(reference_tree_models_by_type), function(type) {
+    out <- as.data.table(
+      ci_tree_terminal_summary(reference_tree_models_by_type[[type]])
+    )
+    out[, criterion := type]
+    setcolorder(out, "criterion")
+    out
+  }),
+  fill = TRUE
+)
+
+report_compact_table(
+  reference_tree_summary,
+  digits = 4,
+  caption = "Reference selected-tree terminal-node summaries before bootstrap refitting"
+)
+```
+
+# Bootstrap Stability
+
+```{r bootstrap-helpers}
+scalar_numeric <- function(x) {
+  if (is.null(x) || !length(x)) {
+    return(NA_real_)
+  }
+  x <- suppressWarnings(as.numeric(x[1L]))
+  if (is.na(x) || !is.finite(x)) NA_real_ else x
+}
+
+scalar_character <- function(x) {
+  if (is.null(x) || !length(x) || is.na(x[1L]) || !nzchar(as.character(x[1L]))) {
+    return(NA_character_)
+  }
+  as.character(x[1L])
+}
+
+label_tree_variable <- function(x) {
+  if (is.na(x) || !nzchar(x)) {
+    return(NA_character_)
+  }
+  if (x %in% names(congo_var_labels)) {
+    return(unname(congo_var_labels[x]))
+  }
+  x
+}
+
+collapse_split_variables <- function(x) {
+  x <- unique(x[!is.na(x) & nzchar(x)])
+  if (!length(x)) {
+    return(NA_character_)
+  }
+  paste(x, collapse = "; ")
+}
+
+collect_split_variables <- function(node) {
+  if (partykit::is.terminal(node)) {
+    return(character())
+  }
+
+  info <- partykit::info_node(node)
+  this_var <- scalar_character(info$varname)
+  kids <- partykit::kids_node(node)
+  child_vars <- if (is.null(kids) || !length(kids)) {
+    character()
+  } else {
+    unlist(lapply(kids, collect_split_variables), use.names = FALSE)
+  }
+
+  c(this_var, child_vars)
+}
+
+terminal_node_summary <- function(fit) {
+  out <- as.data.table(ci_tree_terminal_summary(fit))
+  out[, abs_impurity := abs(ci)]
+  out
+}
+
+tree_leaf_similarity <- function(reference_fit,
+                                 bootstrap_fit,
+                                 reference_data,
+                                 recovery_threshold = 0.50) {
+  reference_leaf <- as.integer(partykit::predict.party(
+    reference_fit,
+    newdata = as.data.frame(reference_data),
+    type = "node"
+  ))
+  bootstrap_leaf <- as.integer(partykit::predict.party(
+    bootstrap_fit,
+    newdata = as.data.frame(reference_data),
+    type = "node"
+  ))
+
+  reference_leaves <- sort(unique(reference_leaf))
+  bootstrap_leaves <- sort(unique(bootstrap_leaf))
+
+  best_jaccard <- vapply(reference_leaves, function(reference_id) {
+    reference_rows <- reference_leaf == reference_id
+    max(vapply(bootstrap_leaves, function(bootstrap_id) {
+      bootstrap_rows <- bootstrap_leaf == bootstrap_id
+      sum(reference_rows & bootstrap_rows) / sum(reference_rows | bootstrap_rows)
+    }, numeric(1L)))
+  }, numeric(1L))
+
+  list(
+    tree_similarity_score = stats::median(best_jaccard, na.rm = TRUE),
+    reference_leaves_recovered_percent =
+      100 * mean(best_jaccard >= recovery_threshold, na.rm = TRUE)
+  )
+}
+
+draw_bootstrap_data <- function(unit) {
+  if (identical(unit, "PSU")) {
+    sampled_psus <- sample(
+      unique(bootstrap_source_dt$PSU),
+      size = uniqueN(bootstrap_source_dt$PSU),
+      replace = TRUE
+    )
+    boot_key <- data.table(
+      bootstrap_draw_id = seq_along(sampled_psus),
+      PSU = sampled_psus
+    )
+    out <- bootstrap_source_dt[boot_key, on = "PSU", allow.cartesian = TRUE]
+    out[, bootstrap_draw_id := NULL]
+    out[, PSU := NULL]
+    return(out)
+  }
+
+  congo_model_dt[sample.int(nrow(congo_model_dt), size = nrow(congo_model_dt), replace = TRUE)]
+}
+
+summarise_bootstrap_tree <- function(fit, type, replicate, reference_fit) {
+  root_info <- partykit::info_node(partykit::node_party(fit))
+  terminal_summary <- terminal_node_summary(fit)
+  split_variables <- collect_split_variables(partykit::node_party(fit))
+  similarity <- tree_leaf_similarity(
+    reference_fit = reference_fit,
+    bootstrap_fit = fit,
+    reference_data = congo_model_dt
+  )
+
+  weighted_terminal_impurity <- if (nrow(terminal_summary)) {
+    sum(
+      terminal_summary$abs_impurity * terminal_summary$weight,
+      na.rm = TRUE
+    ) / sum(terminal_summary$weight, na.rm = TRUE)
+  } else {
+    NA_real_
+  }
+
+  data.table(
+    type = type,
+    bootstrap_replicate = replicate,
+    bootstrap_unit = bootstrap_unit,
+    success = TRUE,
+    error_message = NA_character_,
+    terminal_nodes = nrow(terminal_summary),
+    no_split = nrow(terminal_summary) <= 1L,
+    root_split_variable = scalar_character(root_info$varname),
+    root_split_variable_label = label_tree_variable(scalar_character(root_info$varname)),
+    all_split_variables = collapse_split_variables(split_variables),
+    all_split_variable_labels = collapse_split_variables(vapply(
+      split_variables,
+      label_tree_variable,
+      character(1L)
+    )),
+    root_impurity = abs(scalar_numeric(root_info$ci)),
+    weighted_terminal_impurity = weighted_terminal_impurity,
+    absolute_gain = scalar_numeric(root_info$gain),
+    relative_gain = scalar_numeric(root_info$relative_gain),
+    terminal_mortality_min = min(terminal_summary$outcome_mean, na.rm = TRUE),
+    terminal_mortality_median = stats::median(terminal_summary$outcome_mean, na.rm = TRUE),
+    terminal_mortality_max = max(terminal_summary$outcome_mean, na.rm = TRUE),
+    terminal_abs_impurity_min = min(terminal_summary$abs_impurity, na.rm = TRUE),
+    terminal_abs_impurity_median = stats::median(terminal_summary$abs_impurity, na.rm = TRUE),
+    terminal_abs_impurity_max = max(terminal_summary$abs_impurity, na.rm = TRUE),
+    tree_similarity_score = similarity$tree_similarity_score,
+    reference_leaves_recovered_percent = similarity$reference_leaves_recovered_percent
+  )
+}
+
+failed_bootstrap_tree <- function(type, replicate, error_message) {
+  data.table(
+    type = type,
+    bootstrap_replicate = replicate,
+    bootstrap_unit = bootstrap_unit,
+    success = FALSE,
+    error_message = error_message,
+    terminal_nodes = NA_integer_,
+    no_split = NA,
+    root_split_variable = NA_character_,
+    root_split_variable_label = NA_character_,
+    all_split_variables = NA_character_,
+    all_split_variable_labels = NA_character_,
+    root_impurity = NA_real_,
+    weighted_terminal_impurity = NA_real_,
+    absolute_gain = NA_real_,
+    relative_gain = NA_real_,
+    terminal_mortality_min = NA_real_,
+    terminal_mortality_median = NA_real_,
+    terminal_mortality_max = NA_real_,
+    terminal_abs_impurity_min = NA_real_,
+    terminal_abs_impurity_median = NA_real_,
+    terminal_abs_impurity_max = NA_real_,
+    tree_similarity_score = NA_real_,
+    reference_leaves_recovered_percent = NA_real_
+  )
+}
+
+format_interval <- function(x, digits = 3L, percent = FALSE) {
+  x <- x[is.finite(x)]
+  if (!length(x)) {
+    return(NA_character_)
+  }
+  qs <- stats::quantile(x, probs = c(0.025, 0.5, 0.975), na.rm = TRUE)
+  if (percent) {
+    return(sprintf(
+      "%s%% (%s%%, %s%%)",
+      format(round(qs[[2L]], 1), nsmall = 1),
+      format(round(qs[[1L]], 1), nsmall = 1),
+      format(round(qs[[3L]], 1), nsmall = 1)
+    ))
+  }
+  fmt <- paste0("%.", digits, "f (%.", digits, "f, %.", digits, "f)")
+  sprintf(fmt, qs[[2L]], qs[[1L]], qs[[3L]])
+}
+
+format_count_interval <- function(x) {
+  x <- x[is.finite(x)]
+  if (!length(x)) {
+    return(NA_character_)
+  }
+  qs <- stats::quantile(x, probs = c(0.025, 0.5, 0.975), na.rm = TRUE)
+  sprintf("%s (%s, %s)", round(qs[[2L]]), round(qs[[1L]]), round(qs[[3L]]))
+}
+
+most_common_root <- function(dt) {
+  dt <- dt[success == TRUE & !is.na(root_split_variable_label)]
+  if (!nrow(dt)) {
+    return(NA_character_)
+  }
+  root_dt <- dt[
+    ,
+    .(n = .N),
+    by = .(root_split_variable_label)
+  ][order(-n, root_split_variable_label)]
+  sprintf(
+    "%s, %.1f%%",
+    root_dt$root_split_variable_label[1L],
+    100 * root_dt$n[1L] / nrow(dt)
+  )
+}
+
+most_common_split_variables <- function(dt, max_vars = 5L) {
+  dt <- dt[success == TRUE]
+  if (!nrow(dt)) {
+    return(NA_character_)
+  }
+
+  split_dt <- rbindlist(lapply(seq_len(nrow(dt)), function(i) {
+    value <- dt$all_split_variable_labels[i]
+    if (is.na(value) || !nzchar(value)) {
+      return(NULL)
+    }
+    data.table(
+      bootstrap_replicate = dt$bootstrap_replicate[i],
+      variable = unique(strsplit(value, "; ", fixed = TRUE)[[1L]])
+    )
+  }), fill = TRUE)
+
+  if (!nrow(split_dt)) {
+    return(NA_character_)
+  }
+
+  split_dt <- split_dt[
+    ,
+    .(n = uniqueN(bootstrap_replicate)),
+    by = variable
+  ][order(-n, variable)]
+
+  top_split_variables <- split_dt[
+    seq_len(min(.N, max_vars)),
+    paste0(variable, ", ", sprintf("%.1f%%", 100 * n / nrow(dt)))
+  ]
+
+  paste(top_split_variables, collapse = "; ")
+}
+
+summarise_bootstrap_table <- function(raw_dt) {
+  raw_dt[
+    ,
+    {
+      successful <- .SD[success == TRUE]
+      .(
+        successful_replicates = nrow(successful),
+        failed_replicates = sum(success == FALSE),
+        no_split_trees = if (nrow(successful)) {
+          sprintf("%.1f%%", 100 * mean(successful$no_split, na.rm = TRUE))
+        } else {
+          NA_character_
+        },
+        terminal_nodes = format_count_interval(successful$terminal_nodes),
+        most_common_root_split = most_common_root(.SD),
+        most_common_split_variables = most_common_split_variables(.SD),
+        absolute_gain = format_interval(successful$absolute_gain, digits = 3L),
+        relative_gain = format_interval(successful$relative_gain, digits = 3L),
+        tree_similarity_score = format_interval(
+          successful$tree_similarity_score,
+          digits = 3L
+        ),
+        recovered_reference_leaves = format_interval(
+          successful$reference_leaves_recovered_percent,
+          digits = 1L,
+          percent = TRUE
+        )
+      )
+    },
+    by = type
+  ][match(criterion_types, type)]
+}
+```
+
+```{r run-bootstrap}
+results_dir <- here("data")
+bootstrap_label <- paste0(
+  "selected_tree_",
+  tolower(bootstrap_unit),
+  "_bootstrap_B",
+  bootstrap_replicates,
+  "_seed",
+  bootstrap_seed
+)
+bootstrap_tree_stability_raw_file <- file.path(
+  results_dir,
+  paste0(bootstrap_label, "_raw.rds")
+)
+bootstrap_tree_stability_table_file <- file.path(
+  results_dir,
+  paste0(bootstrap_label, "_table.rds")
+)
+bootstrap_tree_stability_table_csv <- file.path(
+  results_dir,
+  paste0(bootstrap_label, "_table.csv")
+)
+
+if (
+  !isTRUE(params$refresh_bootstrap) &&
+    file.exists(bootstrap_tree_stability_raw_file) &&
+    file.exists(bootstrap_tree_stability_table_file)
+) {
+  bootstrap_tree_stability_raw <- readRDS(bootstrap_tree_stability_raw_file)
+  bootstrap_tree_stability_table <- readRDS(bootstrap_tree_stability_table_file)
+} else {
+  set.seed(bootstrap_seed)
+  bootstrap_rows <- vector("list", length(criterion_types) * bootstrap_replicates)
+  row_id <- 0L
+
+  for (criterion in criterion_types) {
+    setting <- selected_tree_settings[type == criterion]
+    reference_fit <- reference_tree_models_by_type[[criterion]]
+
+    for (b in seq_len(bootstrap_replicates)) {
+      row_id <- row_id + 1L
+      bootstrap_dt <- draw_bootstrap_data(bootstrap_unit)
+
+      bootstrap_rows[[row_id]] <- tryCatch({
+        fit <- fit_selected_tree(setting, bootstrap_dt)
+        summarise_bootstrap_tree(
+          fit = fit,
+          type = criterion,
+          replicate = b,
+          reference_fit = reference_fit
+        )
+      }, error = function(e) {
+        failed_bootstrap_tree(
+          type = criterion,
+          replicate = b,
+          error_message = conditionMessage(e)
+        )
+      })
+    }
+  }
+
+  bootstrap_tree_stability_raw <- rbindlist(bootstrap_rows, fill = TRUE)
+  bootstrap_tree_stability_table <- summarise_bootstrap_table(
+    bootstrap_tree_stability_raw
+  )
+
+  saveRDS(bootstrap_tree_stability_raw, bootstrap_tree_stability_raw_file)
+  saveRDS(bootstrap_tree_stability_table, bootstrap_tree_stability_table_file)
+  fwrite(bootstrap_tree_stability_table, bootstrap_tree_stability_table_csv)
+}
+
+if (!file.exists(bootstrap_tree_stability_table_csv)) {
+  fwrite(bootstrap_tree_stability_table, bootstrap_tree_stability_table_csv)
+}
+
+report_compact_table(
+  bootstrap_tree_stability_table,
+  caption = "Cluster-level bootstrap stability of selected concentration-index trees"
+)
+```
+
+For tree similarity, each bootstrap tree is applied to the original analysis
+data and compared with the corresponding selected tree from the generator.
+Terminal-leaf membership is compared using best Jaccard overlap, and a reference
+leaf is counted as recovered when its best overlap is at least 0.50.
+
+The bootstrap analysis keeps the tree tuning settings fixed. It therefore checks
+stability of the fitted subgroup structure after model selection, rather than
+repeating the full tuning process. These results should be described in the
+thesis as stability or sensitivity evidence. They should not be reported as
+p-values, formal split-level inference, or full survey-design uncertainty.
+
+# Save Objects
+
+```{r save-bootstrap-objects}
+bootstrap_tree_results <- list(
+  results_object_file = results_object_file,
+  bootstrap_seed = bootstrap_seed,
+  bootstrap_replicates = bootstrap_replicates,
+  bootstrap_unit = bootstrap_unit,
+  selected_tree_settings = selected_tree_settings,
+  reference_tree_summary = reference_tree_summary,
+  bootstrap_tree_stability_raw_file = bootstrap_tree_stability_raw_file,
+  bootstrap_tree_stability_table_file = bootstrap_tree_stability_table_file,
+  bootstrap_tree_stability_table_csv = bootstrap_tree_stability_table_csv,
+  bootstrap_tree_stability_table = bootstrap_tree_stability_table
+)
+
+bootstrap_tree_results_file <- here(
+  "data",
+  paste0(bootstrap_label, "_objects.rda")
+)
+
+if (isTRUE(params$save_results)) {
+  save(bootstrap_tree_results, file = bootstrap_tree_results_file)
+}
+
+data.table(
+  saved = isTRUE(params$save_results),
+  file = bootstrap_tree_results_file,
+  bootstrap_unit = bootstrap_unit,
+  bootstrap_replicates = bootstrap_replicates
+)
+```

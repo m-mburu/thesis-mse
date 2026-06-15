@@ -28,6 +28,10 @@ params:
   analysis_rows: 1
   tuning_folds: 10
   undersample: 0.4
+  shap_rows: 200
+  shap_n_mc_samples: 2
+  shap_seed: 20260328
+  shap_workers: 4
 always_allow_html: true
 ---
 
@@ -52,47 +56,54 @@ source(here("R", "ci_rpart_comparison_methods.R"))
 kableExtra::use_latex_packages()
 ```
 
-```{r env-int-helper}
-env_int <- function(name, default) {
-  value <- suppressWarnings(as.integer(Sys.getenv(name, unset = NA_character_)))
-  as.integer(ifelse(is.na(value) || value <= 0L, default, value))
-}
-
-env_num_or_null <- function(name, default = NULL) {
-  value <- Sys.getenv(name, unset = NA_character_)
-  if (is.na(value) || !nzchar(value)) {
-    return(default)
-  }
-
-  parsed <- suppressWarnings(as.numeric(value))
-  if (is.na(parsed)) {
-    return(default)
-  }
-  parsed
-}
-```
-
 ```{r runtime-parameter-config}
 default_params <- list(
   analysis_rows = 1L,
   tuning_folds = 10L,
-  undersample = 0.4
+  undersample = 0.4,
+  shap_rows = 0,
+  shap_n_mc_samples = 8L,
+  shap_seed = 20260328L,
+  shap_workers = 4L
 )
 
 runtime_params <- utils::modifyList(default_params, as.list(params))
 
-runtime_params$analysis_rows <- env_int("ANALYSIS_ROWS", runtime_params$analysis_rows)
-runtime_params$tuning_folds <- max(2L, env_int("TUNING_FOLDS", runtime_params$tuning_folds))
-runtime_params$undersample <- env_num_or_null("UNDERSAMPLE", runtime_params$undersample)
+runtime_params$analysis_rows <- as.integer(runtime_params$analysis_rows)
+runtime_params$tuning_folds <- max(2L, as.integer(runtime_params$tuning_folds))
+runtime_params$undersample <- as.numeric(runtime_params$undersample)
+runtime_params$shap_rows <- as.integer(runtime_params$shap_rows)
+runtime_params$shap_n_mc_samples <- as.integer(runtime_params$shap_n_mc_samples)
+runtime_params$shap_seed <- as.integer(runtime_params$shap_seed)
+runtime_params$shap_workers <- max(1L, as.integer(runtime_params$shap_workers))
 
-shap_n <- 300L
-shap_nsim <- 8L
+if (is.na(runtime_params$analysis_rows) || runtime_params$analysis_rows <= 0L) {
+  runtime_params$analysis_rows <- default_params$analysis_rows
+}
+if (is.na(runtime_params$undersample)) {
+  runtime_params$undersample <- default_params$undersample
+}
+if (is.na(runtime_params$shap_rows) || runtime_params$shap_rows < 0L) {
+  runtime_params$shap_rows <- default_params$shap_rows
+}
+if (is.na(runtime_params$shap_n_mc_samples) || runtime_params$shap_n_mc_samples <= 0L) {
+  runtime_params$shap_n_mc_samples <- default_params$shap_n_mc_samples
+}
+if (is.na(runtime_params$shap_seed)) {
+  runtime_params$shap_seed <- default_params$shap_seed
+}
+
+shap_n_mc_samples <- runtime_params$shap_n_mc_samples
+shap_seed <- runtime_params$shap_seed
+shap_workers <- runtime_params$shap_workers
+shap_rows_requested <- runtime_params$shap_rows
 ```
 
 ```{r criterion-config}
 criterion_types <- c("CI", "CIg", "CIc", "L")
 rineq_ci_types <- c("CI", "CIg", "CIc", "CIw")
 results_object_file <- here("data", "drc_report_results_objects.rda")
+tree_tuning_file <- here("data", "tree_tuning.rda")
 source_data_file <- here("prev_analysis", "DRCongo .dta")
 paper_reference_file <- here("prev_analysis", "667.full.pdf")
 outcome_labels <- c(
@@ -222,6 +233,9 @@ raw_congo_model_dt <- drc_2007_dt[
     wealth = as.numeric(wealth),
     deadu5_num = as.integer(deadu5),
     sample_weight = as.numeric(weight),
+    PSU = as.integer(PSU),
+    household = as.integer(household),
+    country = as.integer(country),
     quint = factor_from_codes(quint, drc_wealth_group_labels),
     unskilled = binary_factor(
       unskilled,
@@ -489,14 +503,16 @@ decomposition method is built in its own chunk before being displayed.
 ```{r fit-classical-model}
 library(survey)
 library(rineq)
+library(margins)
 linear_decomp_formula <- as.formula(
   paste("deadu5_num ~", paste(raw_congo_predictors, collapse = " + "))
 )
 linear_decomp_design <- survey::svydesign(
-  ids = ~1,
-  weights = ~sample_weight,
+  id = as.formula("~PSU+household"),
+  weights = as.formula("~sample_weight"),
   data = raw_congo_model_dt
 )
+
 linear_decomp_fit <- survey::svyglm(
   linear_decomp_formula,
   design = linear_decomp_design,
@@ -513,10 +529,47 @@ linear_x <- model.matrix(linear_decomp_formula, data = raw_congo_model_dt)
 linear_beta <- coef(linear_decomp_fit)
 linear_terms <- setdiff(colnames(linear_x), "(Intercept)")
 
+linear_margins <- tryCatch(
+  margins::margins(
+    linear_decomp_fit,
+    design = linear_decomp_design,
+    type = "response"
+  ),
+  error = function(e) {
+    stop(
+      "margins::margins() does not work with the svyglm object: ",
+      conditionMessage(e),
+      call. = FALSE
+    )
+  }
+)
+linear_ame_table <- as.data.table(summary(linear_margins))
+ame_col <- intersect(c("AME", "dydx"), names(linear_ame_table))[1L]
+if (is.na(ame_col)) {
+  stop("Could not identify the average marginal effect column in margins output.")
+}
+if (!"factor" %in% names(linear_ame_table)) {
+  stop("margins output does not contain a factor column for term alignment.")
+}
+linear_average_marginal_effects <- setNames(
+  linear_ame_table[[ame_col]],
+  linear_ame_table$factor
+)
+missing_from_margins <- setdiff(linear_terms, names(linear_average_marginal_effects))
+extra_from_margins <- setdiff(names(linear_average_marginal_effects), linear_terms)
+if (length(missing_from_margins) > 0L) {
+  stop(
+    "AME names from margins do not match model-matrix terms: ",
+    paste(missing_from_margins, collapse = ", "),
+    call. = FALSE
+  )
+}
+
 linear_term_info <- data.table(
   term = linear_terms,
   variable = canonicalize_regression_terms(linear_terms),
   linear_coefficient = unname(linear_beta[linear_terms]),
+  average_marginal_effect = unname(linear_average_marginal_effects[linear_terms]),
   mean_of_variable = vapply(
     linear_terms,
     function(term) weighted_mean_safe(linear_x[, term], raw_congo_model_dt$sample_weight),
@@ -541,6 +594,53 @@ setcolorder(
   regression_model_summary,
   c("term", "term_label", "variable", setdiff(names(regression_model_summary), c("term", "term_label", "variable")))
 )
+```
+
+```{r margins-rineq-decomposition-helper}
+rineq_decomposition <- getFromNamespace("decomposition", "rineq")
+expected_decomposition_args <- c(
+  "outcome",
+  "betas",
+  "mm",
+  "ranker",
+  "wt",
+  "correction",
+  "citype"
+)
+actual_decomposition_args <- names(formals(rineq_decomposition))
+if (!all(expected_decomposition_args %in% actual_decomposition_args)) {
+  stop(
+    "Rineq's internal decomposition() function has different argument names. ",
+    "Expected: ",
+    paste(expected_decomposition_args, collapse = ", "),
+    ". Actual: ",
+    paste(actual_decomposition_args, collapse = ", "),
+    call. = FALSE
+  )
+}
+
+build_margins_rineq_decomposition <- function(type) {
+  tryCatch(
+    rineq_decomposition(
+      outcome = raw_congo_model_dt$deadu5_num,
+      betas = linear_average_marginal_effects[linear_terms],
+      mm = linear_x[, linear_terms, drop = FALSE],
+      ranker = raw_congo_model_dt$wealth,
+      wt = raw_congo_model_dt$sample_weight,
+      correction = TRUE,
+      citype = type
+    ),
+    error = function(e) {
+      stop(
+        "Margins-based Rineq decomposition failed for ",
+        type,
+        ": ",
+        conditionMessage(e),
+        call. = FALSE
+      )
+    }
+  )
+}
 ```
 
 ```{r decomposition-to-table-helper}
@@ -588,6 +688,7 @@ summarise_rineq_decomposition <- function(object, method_name) {
       "variable_label",
       "criterion",
       "linear_coefficient",
+      "average_marginal_effect",
       "mean_of_variable",
       "elasticity",
       "concentration_index_of_variable",
@@ -600,12 +701,7 @@ summarise_rineq_decomposition <- function(object, method_name) {
 ```
 
 ```{r build-rineq-ci-decomposition}
-rineq_ci_decomp <- rineq::contribution(
-  linear_decomp_fit,
-  raw_congo_model_dt$wealth,
-  correction = TRUE,
-  type = "CI"
-)
+rineq_ci_decomp <- build_margins_rineq_decomposition("CI")
 rineq_ci_summary <- decomposition_to_table(rineq_ci_decomp, digits = 4L)
 classical_ci_table <- summarise_rineq_decomposition(rineq_ci_decomp, "CI")
 ```
@@ -625,12 +721,7 @@ plot(
 ```
 
 ```{r build-rineq-cig-decomposition}
-rineq_cig_decomp <- rineq::contribution(
-  linear_decomp_fit,
-  raw_congo_model_dt$wealth,
-  correction = TRUE,
-  type = "CIg"
-)
+rineq_cig_decomp <- build_margins_rineq_decomposition("CIg")
 rineq_cig_summary <- decomposition_to_table(rineq_cig_decomp, digits = 4L)
 classical_cig_table <- summarise_rineq_decomposition(rineq_cig_decomp, "CIg")
 ```
@@ -650,12 +741,7 @@ plot(
 ```
 
 ```{r build-rineq-cic-decomposition}
-rineq_cic_decomp <- rineq::contribution(
-  linear_decomp_fit,
-  raw_congo_model_dt$wealth,
-  correction = TRUE,
-  type = "CIc"
-)
+rineq_cic_decomp <- build_margins_rineq_decomposition("CIc")
 rineq_cic_summary <- decomposition_to_table(rineq_cic_decomp, digits = 4L)
 classical_cic_table <- summarise_rineq_decomposition(rineq_cic_decomp, "CIc")
 ```
@@ -675,12 +761,7 @@ plot(
 ```
 
 ```{r build-rineq-ciw-decomposition}
-rineq_ciw_decomp <- rineq::contribution(
-  linear_decomp_fit,
-  raw_congo_model_dt$wealth,
-  correction = TRUE,
-  type = "CIw"
-)
+rineq_ciw_decomp <- build_margins_rineq_decomposition("CIw")
 rineq_ciw_summary <- decomposition_to_table(rineq_ciw_decomp, digits = 4L)
 classical_ciw_table <- summarise_rineq_decomposition(rineq_ciw_decomp, "CIw")
 ```
@@ -861,6 +942,111 @@ tree_grid <- ci_tree_control_grid(
 tree_grid <- tree_grid[minbucket <= 0.5 * minsplit]
 ```
 
+```{r make-tree-psu-folds}
+make_psu_fold_id <- function(psu,
+                             outcome,
+                             weights = NULL,
+                             v = 10L,
+                             seed = 20260508) {
+    psu <- as.integer(psu)
+    outcome <- as.integer(outcome)
+    if (length(psu) != length(outcome)) {
+        stop("`psu` and `outcome` must have the same length.", call. = FALSE)
+    }
+    if (anyNA(psu)) {
+        stop("`psu` cannot contain missing values.", call. = FALSE)
+    }
+    if (is.null(weights)) {
+        weights <- rep(1, length(psu))
+    }
+    weights <- as.numeric(weights)
+
+    psu_frame <- data.table(
+        PSU = psu,
+        outcome = outcome,
+        weight = weights
+    )[
+        ,
+        .(
+            rows = .N,
+            deaths = sum(outcome == 1L, na.rm = TRUE),
+            weighted_deaths = sum(weight * outcome, na.rm = TRUE),
+            weighted_rows = sum(weight, na.rm = TRUE)
+        ),
+        by = PSU
+    ]
+
+    v <- max(2L, as.integer(v[1L]))
+    v <- min(v, nrow(psu_frame))
+
+    set.seed(seed)
+    psu_frame[, random_order := runif(.N)]
+    setorder(psu_frame, -deaths, -weighted_deaths, random_order)
+    psu_frame[, fold_id := NA_integer_]
+
+    fold_load <- data.table(
+        fold_id = seq_len(v),
+        deaths = 0,
+        weighted_deaths = 0,
+        rows = 0,
+        weighted_rows = 0
+    )
+
+    for (i in seq_len(nrow(psu_frame))) {
+        setorder(fold_load, deaths, weighted_deaths, rows, fold_id)
+        chosen_fold <- fold_load$fold_id[1L]
+        psu_frame[i, fold_id := chosen_fold]
+        fold_load[
+            fold_id == chosen_fold,
+            `:=`(
+                deaths = deaths + psu_frame$deaths[i],
+                weighted_deaths = weighted_deaths + psu_frame$weighted_deaths[i],
+                rows = rows + psu_frame$rows[i],
+                weighted_rows = weighted_rows + psu_frame$weighted_rows[i]
+            )
+        ]
+    }
+
+    row_frame <- data.table(row_id = seq_along(psu), PSU = psu)
+    row_frame[psu_frame[, .(PSU, fold_id)], on = "PSU", fold_id := i.fold_id]
+    row_frame$fold_id
+}
+
+tree_psu_fold_id <- make_psu_fold_id(
+    psu = raw_congo_model_dt$PSU,
+    outcome = congo_model_dt$deadu5_num,
+    weights = congo_model_dt$sample_weight,
+    v = runtime_params$tuning_folds,
+    seed = 20260508
+)
+
+psu_fold_check <- data.table(
+    PSU = raw_congo_model_dt$PSU,
+    fold_id = tree_psu_fold_id
+)[, .(fold_count = uniqueN(fold_id)), by = PSU]
+if (any(psu_fold_check$fold_count > 1L)) {
+    stop("At least one PSU was assigned to more than one fold.", call. = FALSE)
+}
+
+tree_psu_fold_summary <- data.table(
+    fold_id = tree_psu_fold_id,
+    PSU = raw_congo_model_dt$PSU,
+    deadu5_num = congo_model_dt$deadu5_num,
+    sample_weight = congo_model_dt$sample_weight
+)[
+    ,
+    .(
+        rows = .N,
+        psus = uniqueN(PSU),
+        deaths = sum(deadu5_num == 1L, na.rm = TRUE),
+        non_deaths = sum(deadu5_num == 0L, na.rm = TRUE),
+        weighted_death_percent =
+            100 * weighted.mean(deadu5_num, sample_weight, na.rm = TRUE)
+    ),
+    by = fold_id
+][order(fold_id)]
+```
+
 ```{r tune-ci-trees}
 ci_tuning_metrics <- c(
     "validation_gain",
@@ -871,23 +1057,24 @@ ci_tuning_metrics <- c(
     "roc_auc"
 )
 
-# tree_tuning <- tune_ci_tree(
-#     formula = congo_ci_formula,
-#     data = congo_model_dt,
-#     rank_name = "wealth",
-#     outcome_name = "deadu5_num",
-#     weights = congo_model_dt$sample_weight,
-#     type = criterion_types,
-#     control_grid = tree_grid,
-#     v = runtime_params$tuning_folds,
-#     strata = "deadu5_num",
-#     seed = 20260508,
-#     metric = ci_tuning_metrics,
-#     refit = FALSE,
-#     control = control_ci_tune(save_pred = TRUE)
-# )
-# save(tree_tuning, file = here("data", "tree_tuning.rda"))
-load(here("data", "tree_tuning.rda"))
+tree_tuning <- tune_ci_tree(
+    formula = congo_ci_formula,
+    data = congo_model_dt,
+    rank_name = "wealth",
+    outcome_name = "deadu5_num",
+    weights = congo_model_dt$sample_weight,
+    type = criterion_types,
+    control_grid = tree_grid,
+    fold_id = tree_psu_fold_id,
+    seed = 20260508,
+    metric = ci_tuning_metrics,
+    refit = FALSE,
+    control = control_ci_tune(save_pred = TRUE)
+)
+
+
+save(tree_tuning, file = tree_tuning_file)
+load(tree_tuning_file)
 ```
 
 ```{r select-ci-tree-settings}
@@ -907,7 +1094,7 @@ tree_selection_table[
 ]
 tree_selection_table[, selection_basis := paste(
     runtime_params$tuning_folds,
-    "fold cross-validation"
+    "PSU-held-out folds"
 )]
 report_compact_table(
     tree_selection_table,
@@ -1088,13 +1275,15 @@ forest_grid <- ci_tree_control_grid(
     minprob = 0.01,
     maxdepth = 15L,
     min_gain = 0.00001,
-    min_relative_gain = c( 0.25, 0.30, 0.35), #0.3,0.35,
+    min_relative_gain = c(0.10, 0.15, 0.20, 0.25), #0.3,0.35,
     mtry = c(15),
     ntree = c(50L, 100L)
 )
 ```
 
 ```{r tune-ci-forests}
+
+
 # forest_tuning <- run_forest_tuning_batches(
 #   formula = congo_ci_formula,
 #   data = congo_model_dt,
@@ -1107,14 +1296,17 @@ forest_grid <- ci_tree_control_grid(
 #   weights = congo_model_dt$sample_weight,
 #   folds = runtime_params$tuning_folds,
 #   workers = 4L,
+#   fold_id = tree_psu_fold_id,
 #   progress_steps = min(20L, nrow(forest_grid)),
 #   log_file = here("logs", "forest_tuning.log"),
 #   seed = 20260508,
 #   perturb = list(replace = FALSE, fraction = 0.7)
 # )
 
+
 # library(here)
 # save(forest_tuning, file = here("data", "forest_tuning.rdata"))
+
 load(here("data", "forest_tuning.rdata"))
 ```
 
@@ -1217,16 +1409,16 @@ forest_surrogates_by_type <- setNames(
     type = setting$type[1L]
 
     if (type == "CIc"){
-      setting$min_relative_gain <- 0.25
+      setting$min_relative_gain <- 0.15
       #setting$minsplit <- 500L
-      setting$minbucket <- 200L
+      #setting$minbucket <- 200L
     }else if (type == "L"){
       setting$min_relative_gain <- 0.3
       # setting$minsplit <- 1000L
       #setting$minbucket <- 200L
       setting$maxdepth <- 3L
     } else {
-      setting$min_relative_gain <- 0.5
+      setting$min_relative_gain <- 0.3
       setting$maxdepth <- 4L
       #setting$minsplit <- 1000L
       #setting$minbucket <- 200L
@@ -1234,7 +1426,7 @@ forest_surrogates_by_type <- setNames(
     }
 
     # # setting$minsplit <- 500L
-    # # setting$minbucket <- 300L
+    setting$minbucket <- 500L
     # # setting$maxdepth <- 6L
     ci_forest_surrogate(
       forest_fit = forest_models_by_type[[setting$type[1L]]],
@@ -1304,7 +1496,10 @@ ci_report_tree_plot(
 ```{r build-ranger-analysis-data}
 library(tidymodels)
 ranger_analysis <- build_ranger_analysis_data(
-  data = congo_model_dt,
+  data = data.table(
+    raw_congo_model_dt[, .(PSU)],
+    congo_model_dt
+  ),
   predictor_terms = congo_predictors,
   undersample = runtime_params$undersample,
   outcome_labels = outcome_labels
@@ -1327,10 +1522,60 @@ ranger_model_spec <- rand_forest(
 ```
 
 ```{r build-ranger-resamples}
-ranger_resamples <- vfold_cv(
-  ranger_fit_df,
+make_manual_fold_rset <- function(data, fold_id) {
+  fold_values <- sort(unique(as.integer(fold_id)))
+  splits <- lapply(fold_values, function(fold_value) {
+    rsample::make_splits(
+      list(
+        analysis = as.integer(which(fold_id != fold_value)),
+        assessment = as.integer(which(fold_id == fold_value))
+      ),
+      data = data
+    )
+  })
+  rsample::manual_rset(
+    splits,
+    ids = sprintf("Fold%02d", seq_along(fold_values))
+  )
+}
+
+ranger_psu_fold_id <- make_psu_fold_id(
+  psu = ranger_dt$PSU,
+  outcome = as.integer(ranger_dt$deadu5_factor == "Died"),
+  weights = ranger_dt$sample_weight,
   v = runtime_params$tuning_folds,
-  strata = deadu5_factor
+  seed = 20260508
+)
+
+ranger_psu_fold_check <- data.table(
+  PSU = ranger_dt$PSU,
+  fold_id = ranger_psu_fold_id
+)[, .(fold_count = uniqueN(fold_id)), by = PSU]
+if (any(ranger_psu_fold_check$fold_count > 1L)) {
+  stop("At least one ranger PSU was assigned to more than one fold.", call. = FALSE)
+}
+
+ranger_psu_fold_summary <- data.table(
+  fold_id = ranger_psu_fold_id,
+  PSU = ranger_dt$PSU,
+  deadu5_factor = ranger_dt$deadu5_factor,
+  sample_weight = ranger_dt$sample_weight
+)[
+  ,
+  .(
+    rows = .N,
+    psus = uniqueN(PSU),
+    deaths = sum(deadu5_factor == "Died", na.rm = TRUE),
+    non_deaths = sum(deadu5_factor == "Survived", na.rm = TRUE),
+    weighted_death_percent =
+      100 * weighted.mean(deadu5_factor == "Died", sample_weight, na.rm = TRUE)
+  ),
+  by = fold_id
+][order(fold_id)]
+
+ranger_resamples <- make_manual_fold_rset(
+  data = ranger_fit_df,
+  fold_id = ranger_psu_fold_id
 )
 ```
 
@@ -1492,7 +1737,12 @@ predictive_forest_fit <- workflows::fit(final_ranger_workflow, data = ranger_fit
 
 ```{r predict-ranger-risk-helper}
 predict_ranger_risk <- function(object, newdata) {
-  predict(object, new_data = as.data.frame(newdata), type = "prob")$.pred_Died
+  pred <- workflows:::predict.workflow(
+    object,
+    new_data = as.data.frame(newdata),
+    type = "prob"
+  )
+  as.numeric(pred$.pred_Died)
 }
 
 predict_ranger_class <- function(
@@ -1508,20 +1758,43 @@ predict_ranger_class <- function(
 ```
 
 ```{r prepare-shap-data}
-shap_rows <- sort(sample.int(nrow(ranger_fit_df), max(shap_n, nrow(ranger_fit_df))))
+if (!requireNamespace("fastshap", quietly = TRUE)) {
+  stop(
+    paste(
+      "Package fastshap is required for SHAP estimation.",
+      "Install it from GitHub with:",
+      "remotes::install_github('bgreenwell/fastshap')"
+    ),
+    call. = FALSE
+  )
+}
+
+shap_rows <- if (shap_rows_requested == 0L) {
+  seq_len(nrow(ranger_fit_df))
+} else {
+  seq_len(min(shap_rows_requested, nrow(ranger_fit_df)))
+}
 shap_x_background <- ranger_fit_df[, ranger_predictor_terms, drop = FALSE]
 shap_x_eval <- ranger_fit_df[shap_rows, ranger_predictor_terms, drop = FALSE]
 shap_prediction <- as.numeric(predict_ranger_risk(predictive_forest_fit, shap_x_eval))
+shap_parallel_config <- data.table(
+  requested_rows = shap_rows_requested,
+  explanation_rows = nrow(shap_x_eval),
+  nsim = max(2L, shap_n_mc_samples),
+  workers = 1L,
+  backend = "fastshap serial"
+)
 ```
 
 ```{r compute-fastshap-values}
-selected_forest_shap <- fastshap::explain(
+selected_forest_shap <- estimate_fastshap_values(
   object = predictive_forest_fit,
-  X = shap_x_background,
+  x_train = shap_x_background,
+  x_explain = shap_x_eval,
   pred_wrapper = predict_ranger_risk,
-  newdata = shap_x_eval,
-  nsim = shap_nsim,
-  adjust = shap_nsim > 1L
+  seed = shap_seed,
+  nsim = shap_n_mc_samples,
+  adjust = TRUE
 )
 colnames(selected_forest_shap) <- canonicalize_model_terms(
   colnames(selected_forest_shap),
@@ -1891,6 +2164,8 @@ drc_results_objects <- list(
   published_drc_table3_reference = published_drc_table3_reference,
   published_drc_table3_comparison = published_drc_table3_comparison,
   rineq_summary = rineq_summary,
+  tree_psu_fold_id = tree_psu_fold_id,
+  tree_psu_fold_summary = tree_psu_fold_summary,
   tree_tuning = tree_tuning,
   tree_best_by_type = tree_best_by_type,
   tree_best_controls = tree_best_controls,
@@ -1923,8 +2198,11 @@ drc_results_objects <- list(
   predictive_forest_threshold_performance = ranger_threshold_performance,
   selected_predictive_forest_threshold = selected_ranger_threshold,
   predictive_forest_sampling = ranger_sampling_summary,
+  predictive_forest_psu_fold_id = ranger_psu_fold_id,
+  predictive_forest_psu_fold_summary = ranger_psu_fold_summary,
   predictive_forest_feature_lookup = ranger_feature_lookup,
   predictive_forest_fit = predictive_forest_fit,
+  shap_parallel_config = shap_parallel_config,
   shap_contributions = selected_shap_contributions,
   shap_diagnostics = selected_shap_diagnostics,
   shap_summary_long = shap_summary_long,

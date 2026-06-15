@@ -1,0 +1,42 @@
+**MOSES - Notes & Comments**
+
+**The L result is not fully defensible with the DHS wealth index**
+
+The thesis finds that the rank-dependent trees (CI, CIg, and CIc) perform well in training but badly in validation, while the L tree and forest retain positive validation gains. This could be a central result. However, the thesis also acknowledges that the DHS wealth index is a PCA-derived asset score, not income, consumption, or expenditure, and that the L index is more appropriate when the socioeconomic variable has ratio-scale properties. The package code gives a similar warning: L should not be used naively with centered PCA wealth scores whose scale and zero point have no direct substantive interpretation. This creates tension. The thesis treats L as the more stable direct result, but the very measure that validates best is also the least defensible with the chosen socioeconomic variable. The L result should be presented as a **sensitivity analysis**, not as the main stable result, unless a ratio-scale socioeconomic variable such as income, consumption, or expenditure is used.
+
+**Rank-dependent trees fail validation in the main application** The core concentration-index trees based on CI, CIg, and CIc do not validate well. The thesis reports that these trees removed about 87-88% of root-node inequality in training, but their validation gains were negative. Table 8 reports validation gain/root values of approximately −0.68 for CI and −0.73 for CIc and CIg, while the L tree has a positive validation gain/root of about 0.71. This is an honest and important result, but it weakens the central claim. The thesis cannot claim that rank-dependent concentration-index trees are ready as a stable applied method on DHS data. It can claim that they identify plausible in-sample subgroups, but that their out-of-sample behavior may be problematic.
+
+**The survey design is only partly handled**
+
+The thesis uses DHS survey weights as case weights in the tree and decomposition. DHS data have clustering and stratification. The tree validation, tree uncertainty, forest uncertainty, and SHAP uncertainty do not appear to account fully for the survey design.
+
+I would expect at least one of the following:
+
+- a design-aware bootstrap, ideally resampling primary sampling units within strata;
+- replicate-weight-based inference if available;
+- sensitivity analyses showing that results are stable under cluster-level resampling;
+- clear separation between descriptive weighted analysis and formal survey-design inference.
+
+At present, the thesis treats survey weights seriously but does not yet provide design-aware uncertainty for the tree structure, validation gains, forests, or SHAP decomposition.
+
+**The regression decomposition still needs clarification:** The thesis uses survey-weighted logistic regression and the Rineq package for decomposition. This is plausible, but the text does not make sufficiently clear whether the decomposition is done on the probability scale, with marginal effects, or on the logit scale. For binary outcomes, this matters. A Wagstaff-style decomposition using logistic-regression coefficients directly on the log-odds scale is not equivalent to decomposing inequality in the observed binary health outcome. The thesis should explicitly state the estimand and the exact decomposition formula used by the software. If the current decomposition uses logit coefficients without marginal-effect correction, it may need to be redone.
+
+**SHAP decomposition is interesting but underdeveloped:** The SHAP-based decomposition is one of the original parts of the thesis. The algebraic idea is reasonable: if fitted predictions can be written as a baseline plus feature-level SHAP contributions, then the concentration index of fitted predictions can be written as a sum of rank-weighted SHAP contributions. The thesis presents this clearly and notes that it decomposes the concentration index of the fitted outcome, not the observed outcome.
+
+**But several problems remain:** First, SHAP contributions depend on the fitted prediction model and on the SHAP convention used, especially when covariates are correlated. Education, occupation, residence, and wealth are strongly correlated in DHS data, so SHAP contributions should not be interpreted like causal determinant contributions. Second, the predictive random forest is weak and affected by undersampling. The appendix shows that the alive class was undersampled, changing the weighted class distribution from about 89.7% alive / 10.3% died to about 60.0% alive / 40.0% died. Unless predictions are recalibrated, the fitted values are not mortality probabilities. The thesis partly acknowledges that the forest output should not be read as fully calibrated, but then it still decomposes these predictions as if they reflected mortality risk. Third, the predictive model performance is modest. The reported ROC AUC values are around 0.61, which suggests limited predictive signal. That does not invalidate SHAP decomposition, but it reduces confidence in detailed feature rankings.
+
+**The simulation study is too small:** The simulation section is useful as a sanity check. The null simulation gives no meaningful split, and the positive-control simulation recovers the planted residence-province-education structure. But this is far from enough for a methods paper. The simulation study should be repeated many times and should report recovery probability, false-split rate, validation gain, bias in impurity reduction, sensitivity to outcome prevalence, sensitivity to sample size, and sensitivity to survey weights. It should also include scenarios where the true structure is additive, interaction-based, threshold-based, and absent. At present, the simulation supports "the code can behave as expected in simple examples," but not "the method is scientifically validated."
+
+**There are presentation problems.**
+
+**Problem 1: the text misreports Table 1:** The text says that, in the predictive-forest SHAP decomposition, "residence and household wealth each contributed about 12%." But Table 1 shows type of residence contributing about **21.6%** under CI, CIg, and CIc, while household wealth contributes about **11.5%**. That changes the interpretation of the SHAP result. Residence is the dominant SHAP contributor, not simply tied with household wealth.
+
+**Problem 2: validation numbers are not fully consistent:** The results text says that the selected rank-dependent trees had validation gains of about −75.5% for CI and −73.1% for CIc and CIg. But Table 8 reports −68.2% for CI and −73.1% for CIc/CIg. The difference is not huge, but these numbers should be made consistent.
+
+**Problem 3: "terminal nodes" are sometimes reported as non-integers:** Table 8 reports 6.8, 7.3, 7.3, and 6.8 terminal nodes for selected trees. A fitted tree has an integer number of terminal nodes. These are probably averages across validation folds, but the table title says "fitted concentration-index trees," which is confusing. The table should distinguish clearly between final fitted-tree complexity and average cross-validation complexity.
+
+**Problem 4: absolute versus signed indices are not always clear:** The tree impurity uses absolute concentration indices. That is appropriate for an impurity criterion, but the results should still report signed CIs separately, because direction matters. A leaf with pro-poor mortality inequality and a leaf with pro-rich mortality inequality should not be interpreted in the same way, even if their absolute CIs are similar.
+
+At present, many tree labels show only positive CI, CIg, CIc, or L values. This makes the trees easier to read, but it hides the direction of inequality.
+
+**Problem 5: the surrogate forest interpretation is too strong:** The forest is trained to reduce inequality impurity, not to optimize predictive performance. The thesis correctly says that the forest prediction should not be read as a fully calibrated probability. But the results then describe the surrogate tree in terms of mortality rates and high-/low-mortality leaves. That is acceptable only if it is made very clear whether these are observed mortality rates, average forest scores, or calibrated predicted risks. The current presentation is not always clear enough.

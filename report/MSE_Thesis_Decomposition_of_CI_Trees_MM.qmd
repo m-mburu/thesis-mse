@@ -1,6 +1,4 @@
 ---
-title: "Decomposing health inequalities through regression trees"
-author: "Moses Mburu"
 format:
   pdf:
     documentclass: article
@@ -89,6 +87,19 @@ results_object_file <- here("data", "drc_report_results_objects.rda")
 report_results <- load_drc_report_results(results_object_file)
 list2env(report_results, envir = environment())
 var_labels <- str_wrap(congo_var_labels, width = 25)
+
+bootstrap_tree_results_file <- here(
+  "data",
+  "selected_tree_psu_bootstrap_B1000_seed20260615_objects.rda"
+)
+
+bootstrap_tree_results <- NULL
+
+if (file.exists(bootstrap_tree_results_file)) {
+  bootstrap_env <- new.env(parent = emptyenv())
+  load(bootstrap_tree_results_file, envir = bootstrap_env)
+  bootstrap_tree_results <- bootstrap_env$bootstrap_tree_results
+}
 
 simulation_plot_file <- here("simulation", "simulation_tree_plots.rda")
 if (file.exists(simulation_plot_file)) {
@@ -1026,10 +1037,16 @@ We ran a small simulation study to check whether the algorithm behaved as expect
 
 ## Analysis {#sec-analysis-methods}
 
+We divided the analysis into direct and indirect decomposition methods. The direct methods use concentration-index trees and forests, developed here, in which the model is built to reduce socioeconomic inequality in under-five mortality at each split. In these methods, the subgroup structure is part of the decomposition because the tree is fitted using the concentration-index criterion. The indirect methods first fit a model for under-five mortality and then decompose the fitted mortality pattern across the socioeconomic ranking.
 
-We divided the analysis into direct and indirect decomposition methods. The direct methods use concentration-index trees and forests, developed here, in which the model is built to reduce socioeconomic inequality in under-five mortality at each split. In these methods, the subgroup structure is part of the decomposition because the tree is fitted using the concentration index criterion. The indirect methods first fit a model for under-five mortality and then decompose the fitted mortality pattern across the socioeconomic ranking. For the indirect methods, we use a regression-based decomposition in which we fitted a survey-weighted logistic regression with a quasibinomial family using svyglm from the survey package, and the fitted equation separates the contribution of each determinant through its coefficient [@wagstaff2003decomposing; @speybroeck2010decomposing; @survey2026]. We then used the Rineq R package[@rineq2025] for decomposition. The second indirect method is the SHAP-based decomposition described in [shap section](#sec-shap-decomposition-definition). For this method, a predictive random forest is fitted using the tidymodels package with the ranger package as backend, and the fitted predictions are then decomposed into SHAP contributions at the determinant level before applying the concentration-index decomposition [@tidymodels2020; @wright2017ranger].
+For the regression-based indirect decomposition, we fitted a survey-weighted logistic regression with a quasibinomial family using the survey R package [@survey2026]. The model was fitted using the DHS survey design object, including the sampling weights and the available clustering and stratification variables. This allowed the regression model to account for the DHS sampling design when estimating the association between under-five mortality and the observed child, maternal, household, occupational, and regional determinants. We then used the margins R package to obtain average marginal effects from the fitted survey-weighted model [@margins2024]. These average marginal effects express the average change in predicted under-five mortality associated with each determinant on the response scale. We then passed these marginal effects, together with the model matrix, the DHS wealth ranking variable, the under-five mortality outcome, and the sampling weights, into the Rineq R package to compute the concentration-index decomposition [@rineq2025; @wagstaff2003decomposing; @speybroeck2010decomposing].
 
-We also fitted a comparison concentration-index tree using the rpart R package [@rpart2026] with a custom concentration-index splitting method. The comparison used the same outcome, socioeconomic ranking variable, and analysis weights as the main concentration-index tree. Node impurity was also defined using the absolute concentration index. The main difference was in the tree-growing tools. In the main implementation, we used custom and Partykit controls [@hothorn2015partykit]. A split was accepted only if it satisfied the concentration-index tree controls: minimum parent-node size, minimum child-node size, minimum child-node proportion, maximum depth, minimum absolute gain, and minimum relative gain (introduced for this thesis). In the rpart comparison, split search and stopping were controlled via rpart controls, primarily minsplit, minbucket, and the complexity parameter cp. 
+The second indirect method is the [SHAP-based decomposition](#sec-shap-decomposition-definition). For this method, we fitted a predictive random forest using the tidymodels R package with the ranger R package as the modelling backend [@tidymodels2020; @wright2017ranger]. Because under-five deaths were rare relative to surviving children, the alive class was undersampled during model fitting to reduce class imbalance. The resulting forest was therefore used as a predictive scoring model rather than as a calibrated probability model. We then used the shapr R package to estimate SHAP contributions from the fitted forest [@jullum2025shapr]. The SHAP analysis was used to describe how the fitted forest used the predictors, not to estimate causal or population-level contributions of predictors to under-five mortality.
+
+We also fitted a comparison concentration-index tree using the rpart R package with a custom concentration-index splitting method [@rpart2026]. The comparison used the same outcome, socioeconomic ranking variable, and analysis weights as the main concentration-index tree. Node impurity was also defined using the absolute concentration index. The main difference was in the tree-growing tools. In the main implementation, we used custom tree-growing controls and the partykit R package for tree representation and plotting [@hothorn2015partykit]. A split was accepted only if it satisfied the concentration index tree stopping rules described in the [tree the tree stopping rules section](#sec-stopping-rules). In the rpart comparison, split search and stopping were controlled via rpart controls, primarily minsplit, minbucket, and the complexity parameter cp. 
+
+For the concentration-index trees and forests, validation folds were created at the DHS primary sampling unit level. All children from the same PSU were kept in the same fold. The model was fitted on the training PSUs and then evaluated on held-out PSUs using the same validation-gain measure. This was done because children in the same survey cluster may share local conditions and should not be treated as fully independent observations during validation. This follows the idea of blocked cross-validation for structured data [@roberts2017crossvalidation]. We report the training gain, validation gain, relative validation gain, and tree size for the selected setting. We performed a stability check of gain and relative gain using a bootstrap. All children from the sampled PSUs were retained, and the tree was refitted using the selected tuning settings using sampling with replacement. The bootstrap results were used to describe how often the same split variables and similar terminal-node structures were recovered, not as a formal replicate-weight survey inference procedure. Tree similarity was measured using Jaccard overlap between terminal-node memberships in the selected tree and the bootstrap-refitted tree. A higher Jaccard value means that the two trees placed more of the same children into comparable terminal subgroups.
+
 
 # Results
 
@@ -1089,7 +1106,7 @@ grid.arrange(outcome_gg, wealth_distr, ncol = 2)
 
 ### Indirect methods comparison (regression and predictive-forest SHAP)
 
-From the indirect decomposition, contribution output gives the largest CI regression contribution to mother’s education, followed by father’s occupation in agriculture, mother’s occupation in agriculture, household wealth, residence, and skilled birth attendance (@tbl-results-method-comparison). In the predictive-forest SHAP decomposition, the contributions were less concentrated in one or two variables. Residence and household wealth each contributed about 12% under CI, CIg and CIc, followed by mother’s occupation, father’s occupation, mother’s education and skilled birth attendance. The fitted regression model is reported in @tbl-appendix-regression-model-summary. Details of the fitted predictive forest are provided in @tbl-appendix-ranger-sampling-summary and @tbl-appendix-ranger-cross-validation, and its SHAP contributions are shown in @fig-appendix-shap-summary.
+From the indirect decomposition, the largest CI regression contribution was mother’s education, followed by father’s occupation in agriculture, mother’s occupation in agriculture, household wealth, residence, and skilled birth attendance (@tbl-results-method-comparison). In the predictive-forest SHAP decomposition, the contributions were less concentrated in the education and occupation variables. Residence gave the largest SHAP contribution under CI, CIg, CIc, and L. Under CI, CIg, and CIc, residence contributed about 19%, followed by father’s agricultural occupation, household wealth, mother’s education, Maniema, mother’s agricultural occupation, and skilled birth attendance. Under L, residence was again the largest contributor, followed by father’s agricultural occupation, mother’s education, Maniema, mother’s agricultural occupation, Kinshasa, and household wealth. The fitted regression model is reported in @tbl-appendix-regression-model-summary. Details of the fitted predictive forest are provided in @tbl-appendix-ranger-sampling-summary and @tbl-appendix-ranger-cross-validation, and its SHAP contributions are shown in @fig-appendix-shap-summary.
 
 ```{r results-method-comparison}
 #| label: tbl-results-method-comparison
@@ -1159,8 +1176,7 @@ method_comparison_table
 #### The Corrected Concentration-Index Tree $CIc$
 
 
-We start with a tree based on the corrected concentration index, appropriate for bounded outcomes[@erreygers2009correcting]. In this method, the tree shows that inequality in under-five mortality is structured primarily by maternal education, father’s agricultural occupation, household wealth, skilled birth attendance, and residence in Katanga [@fig-appendix-ci-tree-cic]. The lowest-mortality terminal group consists of children whose mothers had some education and whose fathers were not in agriculture, with an under-five mortality rate of about 6.5%. At the opposite end, children whose mothers had no education, who lived in low-wealth households, and who resided in Katanga had the highest mortality rate, about 17.8%. Thus, the corrected rank-dependent tree identifies a clear socioeconomic gradient, but one that is expressed through combinations of education, occupation, household wealth, delivery care, and region rather than through wealth alone.
-
+We start with a tree based on the corrected concentration index, appropriate for bounded outcomes [@erreygers2009correcting]. In the fitted data, the selected $CIc$ tree shows that inequality in under-five mortality is structured mainly through maternal education, father’s agricultural occupation, skilled birth attendance, household wealth, and residence in Katanga [@fig-appendix-ci-tree-cic]. The first separation is by maternal education. Among children whose mothers had some education, the tree then separates the father’s agricultural occupation and skilled birth attendance. Among children whose mothers had no education, the tree separates household wealth and then Katanga. The lowest-mortality terminal group consists of children whose mothers had some education and whose fathers were not in agriculture, with an under-five mortality rate of about 6.5%. The highest-mortality terminal group consists of children whose mothers had no education, who lived in low-wealth households, and who resided in Katanga, with a mortality of about 17.8%.
 
 
 ```{r fig.width=9, fig.height=4}
@@ -1184,16 +1200,17 @@ We start with a tree based on the corrected concentration index, appropriate for
 #### Generalised and standard concentration-index trees $CIg$ and $CI$
 
 
-The appendix also shows the trees fitted using the generalised and standard concentration indices. The generalised concentration-index tree is almost identical to the corrected concentration-index tree [@fig-appendix-ci-tree-cig]. It again separates children first by maternal education and father’s agricultural occupation, then by skilled birth attendance, household wealth, and residence in Katanga. The mortality pattern is therefore substantively unchanged: the lowest-risk group consists of children whose mothers had some education and whose fathers were not in agriculture, while the highest-risk group consists of children whose mothers had no education, who lived in low-wealth households, and who resided in Katanga, with mortality around 17.8% [@fig-appendix-ci-tree-cig]. The standard concentration-index tree gives a similar structure. However, it adds an extra distinction among children whose mothers had some education and whose fathers were not in agriculture, splitting them by short preceding birth interval [@fig-appendix-ci-tree-ci]. Children in this otherwise advantaged group without a short birth interval have the lowest mortality, about 6.0%. In contrast, those with a short birth interval have higher mortality, about 11.7% [@fig-appendix-ci-tree-ci]. Apart from this additional demographic split, the standard CI tree points to the same main sources of inequality as the corrected and generalised trees: maternal education, father’s agricultural occupation, delivery care, household wealth, and residence in Katanga.
+The appendix also shows the trees fitted using the generalised and standard concentration indices. The generalised concentration-index tree gives the same fitted subgroup structure as the corrected concentration-index tree [@fig-appendix-ci-tree-cig]. The mortality pattern is therefore substantively unchanged. 
 
+The standard concentration-index tree gives a closely related structure, but it adds one further split among children whose mothers had some education and whose fathers were not in agriculture [@fig-appendix-ci-tree-ci]. In this branch, children without a short preceding birth interval have the lowest mortality, about 6.0%, while children with a short preceding birth interval have a mortality of about 11.7%. Apart from this additional demographic distinction, the standard $CI$ tree points to the same main sources of inequality as the corrected and generalised trees: maternal education, father’s agricultural occupation, skilled birth attendance, household wealth, and residence in Katanga.
 
 
 ### Level dependent Concentration-Index Tree $L$
 
-We then fit a tree based on the level-dependent concentration index [@erreygers2017socioeconomic] criterion, $L$. In this method, the selected tree shows that inequality in under-five mortality is structured primarily by rural residence, father’s agricultural occupation, household wealth, and province, especially Kinshasa, Equateur, and Katanga [@fig-results-selected-ci-tree]. The lowest-mortality terminal group consists of urban children in Kinshasa whose fathers were not in agriculture, with an under-five mortality rate of about 5.1%. The highest-mortality terminal group consists of rural children living in low-wealth households in Katanga, with an under-five mortality rate of about 18.5%. Thus, the level-dependent tree tells a more spatial story of inequality: mortality risk is first organised by the rural-urban divide, then by occupation, wealth, and region. This shows that the level-dependent method found a different structure compared to the rank-dependent methods
+We then fit a tree based on the level-dependent concentration index criterion, $L$ [@erreygers2017socioeconomic]. This index is most appropriate when the socioeconomic variable has ratio-scale properties.
+We treat it as a sensitivity analysis; the selected $L$ tree shows that inequality in under-five mortality is structured primarily by rural residence, father’s agricultural occupation, household wealth, and province, especially Kinshasa, Equateur, and Katanga [@fig-results-selected-ci-tree]. The lowest-mortality terminal group consists of urban children in Kinshasa whose fathers were not in agriculture, with an under-five mortality rate of about 5.1%. The highest-mortality terminal group consists of rural children living in low-wealth households in Katanga, with an under-five mortality rate of about 18.5%. Thus, the level-dependent tree tells a more spatial story of inequality: mortality risk is first organised by the rural-urban divide, then by occupation, wealth, and region. This structure differs from the rank-dependent trees, which first organise the fitted subgroups around maternal education and father’s agricultural occupation.
 
-
-```{r results-selected-tree, fig.width=9, fig.height=4.5, out.width="100%"}
+```{r results-selected-tree, fig.width=10, fig.height=4.5, out.width="100%"}
 #| label: fig-results-selected-ci-tree
 #| fig-cap: "Level dependent concentration-index tree for under-five mortality in the DRC."
 #| fig-pos: "H"
@@ -1212,7 +1229,9 @@ ci_report_tree_plot(
 
 ### Tree validation plots
 
-The rank-dependent trees performed well on the training data but poorly on the validation data. The CI, CIc, and CIg trees removed approximately 87 to 88% of root-node inequality during training, but had negative validation gains at the selected settings: -75.5% for CI and -73.1% for both CIc and CIg [@fig-appendix-tree-validation-path; @tbl-appendix-tree-selected-setting-summary]. In this criterion, a negative validation gain means that the sum of the terminal-node concentration-index values in the validation fold exceeded the concentration-index value at the root node. Thus, although these trees identified substantial rank-based structure in the fitted sample, the same partitions did not reduce inequality when applied to held-out folds. Unlike rank-dependent trees, the level-dependent tree maintained a positive validation gain throughout the tuning path. At the selected setting, it removed 70.5% of root-node inequality in held-out folds while retaining an average of 6.8 terminal nodes [@fig-appendix-tree-validation-path; @tbl-appendix-tree-selected-setting-summary]. The rural-urban, occupational, wealth, and regional partition identified by the L tree was therefore more stable under the validation criterion used in this thesis.
+The validation results indicated that the subgroup structure learned by these trees during training did not generalise well to held-out samples. The rank-dependent trees based on $CI$, $CIg$, and $CIc$ gave strong training gains, removing 83.3% of root-node impurity for $CI$ and 81.6% for both $CIc$ and $CIg$ [@tbl-appendix-tree-selected-setting-summary]. However, their validation gains were negative under the PSU-held-out folds [@fig-appendix-tree-validation-path; @tbl-appendix-tree-selected-setting-summary]. A negative validation gain indicates that the fitted terminal nodes did not reduce the concentration-index impurity in the held-out PSUs relative to the root node. Thus, although the rank-dependent trees identified plausible subgroup structure in the fitted sample, the same partitions did not generalise well to clusters not used to fit the tree.
+
+The level-dependent $L$ tree showed a different validation pattern. It removed 98.2% of root-node impurity during training. It retained a positive validation gain of 64.5% under the same PSU-held-out validation criterion, so the rural-urban, occupational, wealth, and regional partition was more reproducible across held-out clusters [@fig-appendix-tree-validation-path; @tbl-appendix-tree-selected-setting-summary]. This does not make $L$ the definitive main result, because $L$ is most appropriate when the socioeconomic variable has ratio-scale properties, and the DHS wealth index is a PCA-derived asset score. 
 
 ```{r appendix-tree-validation-path-plots, fig.width= 6.3, fig.height=3}
 #| label: fig-appendix-tree-validation-path
@@ -1229,7 +1248,7 @@ plot_validation_percent_gain_path(
 
 #### Tree complexity plots
 
-Tree complexity decreased as the minimum relative split gain increased, since larger thresholds allowed only splits that removed a larger share of parent-node impurity [@fig-appendix-tree-complexity-path]. The selected trees remained small, with an average of 7.5 terminal nodes for CI, 7.3 for CIc and CIg, and 6.8 for L [@tbl-appendix-tree-selection; @fig-appendix-tree-complexity-path].
+Tree complexity decreased as the minimum relative split gain increased, since larger thresholds allowed only splits that removed a larger share of parent-node impurity [@fig-appendix-tree-complexity-path]. The selected settings produced relatively small trees across the 10 PSU-held-out validation folds, with mean terminal-node counts of 6.9 for $CI$, 6.0 for $CIc$, 6.0 for $CIg$, and 7.5 for $L$ [@tbl-appendix-tree-selection; @fig-appendix-tree-complexity-path]. These decimal values are averages across validation-fold refits. They should not be read as the number of terminal nodes in a single final fitted tree, which must be an integer.
 
 
 ```{r}
@@ -1244,6 +1263,175 @@ plot_terminal_nodes_path(
     title = "Tree Complexity"
 )
 ```
+
+#### Bootstrap stability of selected trees
+
+```{r results-bootstrap-tree-stability}
+#| label: tbl-results-bootstrap-tree-stability
+#| tbl-cap: "Bootstrap stability of selected concentration-index trees."
+
+clean_bootstrap_display_value <- function(x) {
+  x <- as.character(x)
+
+  label_lookup <- c(
+    c(
+      mother_education = "Mother's education",
+      father_occupation = "Father's occupation",
+      father_agriculture = "Father's occupation: Agriculture",
+      mother_occupation = "Mother's occupation",
+      mother_agriculture = "Mother's occupation: Agriculture",
+      household_wealth = "Household wealth",
+      type_of_residence = "Type of residence",
+      skilled_birth_attendance = "Skilled birth attendance",
+      short_birth_interval = "Short preceding birth interval",
+      long_birth_interval = "Long preceding birth interval"
+    ),
+    congo_var_labels
+  )
+
+  label_lookup <- label_lookup[order(nchar(names(label_lookup)), decreasing = TRUE)]
+
+  for (label_name in names(label_lookup)) {
+    x <- gsub(
+      paste0("\\b", gsub("([.|()\\^{}+$*?\\[\\]\\\\])", "\\\\\\1", label_name), "\\b"),
+      unname(label_lookup[[label_name]]),
+      x,
+      perl = TRUE
+    )
+  }
+
+  x <- gsub("_", " ", x, fixed = TRUE)
+  x <- gsub("\\s+", " ", x)
+  trimws(x)
+}
+
+if (is.null(bootstrap_tree_results) ||
+    is.null(bootstrap_tree_results$bootstrap_tree_stability_table)) {
+
+  bootstrap_replication_note <- paste(
+    "The bootstrap stability object was not available, so replication counts",
+    "could not be reported."
+  )
+
+  bootstrap_table_out <- data.table(
+    Note = "Run design aware validation first to create the PSU-level bootstrap stability object."
+  )
+
+  bootstrap_split_variable_note <- paste(
+    "The repeated split-variable summary could not be reported because the",
+    "bootstrap stability object was not available."
+  )
+
+} else {
+
+  bootstrap_table_out <- as.data.table(
+    bootstrap_tree_results$bootstrap_tree_stability_table
+  )
+
+  keep_cols <- intersect(
+    c(
+      "type",
+      "no_split_trees",
+      "terminal_nodes",
+      "most_common_root_split",
+      "relative_gain",
+      "tree_similarity_score"
+    ),
+    names(bootstrap_table_out)
+  )
+
+  replication_cols <- intersect(
+    c("type", "successful_replicates", "failed_replicates"),
+    names(bootstrap_table_out)
+  )
+
+  bootstrap_replication_note <- NULL
+  bootstrap_split_variable_note <- NULL
+
+  if (all(c("type", "successful_replicates", "failed_replicates") %in%
+          replication_cols)) {
+    replication_summary <- bootstrap_table_out[
+      ,
+      .(
+        type = clean_bootstrap_display_value(type),
+        successful_replicates = successful_replicates,
+        failed_replicates = failed_replicates
+      )
+    ]
+
+    bootstrap_replication_note <- paste(
+      paste0(
+        replication_summary$type,
+        ": ",
+        replication_summary$successful_replicates,
+        " successful and ",
+        replication_summary$failed_replicates,
+        " failed"
+      ),
+      collapse = "; "
+    )
+  }
+
+  if (all(c("type", "most_common_split_variables") %in%
+          names(bootstrap_table_out))) {
+    split_variable_summary <- bootstrap_table_out[
+      ,
+      .(
+        type = clean_bootstrap_display_value(type),
+        most_common_split_variables = clean_bootstrap_display_value(
+          most_common_split_variables
+        )
+      )
+    ]
+
+    bootstrap_split_variable_note <- paste(
+      paste0(
+        split_variable_summary$type,
+        ": ",
+        split_variable_summary$most_common_split_variables
+      ),
+      collapse = "; "
+    )
+  }
+
+  bootstrap_table_out <- bootstrap_table_out[, ..keep_cols]
+
+  setnames(
+    bootstrap_table_out,
+    old = keep_cols,
+    new = c(
+      "Criterion",
+      "No split refits",
+      "Terminal nodes",
+      "Root split",
+      "Relative gain",
+      "Tree similarity"
+    )[seq_along(keep_cols)]
+  )
+
+  character_cols <- names(bootstrap_table_out)[
+    vapply(bootstrap_table_out, is.character, logical(1))
+  ]
+
+  for (col_name in character_cols) {
+    bootstrap_table_out[
+      ,
+      (col_name) := clean_bootstrap_display_value(get(col_name))
+    ]
+  }
+}
+
+report_compact_table(
+  bootstrap_table_out,
+  digits = 3,
+  caption = "Bootstrap stability of selected concentration-index trees",
+  column_widths = c("1.2cm", "1.6cm", "1.8cm", "4.0cm", "2.7cm", "2.7cm"),
+  font_size = 11,
+  scale_down = TRUE
+)
+```
+
+The bootstrap stability checks resampled primary sampling units and refitted the selected tree settings. All criteria completed 1000 successful refits with no failures. The table shows that the rank-dependent trees most often split first on mother’s education, while the $L$ tree most often split first on residence. The $L$ tree had the highest relative gain, but tree similarity remained modest across all criteria.
 
 #### Rpart comparison
 
@@ -1269,10 +1457,11 @@ if (isTRUE(params$render_appendix_tree_plots) &&
 
 #### Forest validation plots
 
-We evaluated concentration-index forests using the same validation criterion as the single trees. For the forests, the minimum relative split gain was tuned to 0.35, since larger values produced near-root-only forests with mean terminal-node counts close to 1. At that point, further validation failed to reveal a meaningful structure.
-For the rank-dependent criteria, the forests reduced overfitting but did not stabilise the partitions. The CI, CIc, and CIg forests removed 29.6%, 38.5%, and 38.7% of root-node inequality in training, compared with about 87 to 88% for the corresponding single trees [@tbl-appendix-forest-selected-setting-summary; @tbl-appendix-tree-selected-setting-summary]. Their validation gains remained negative: -25.0% for CI, -28.1% for CIc, and -34.7% for CIg [@fig-appendix-forest-validation-path; @tbl-appendix-forest-selected-setting-summary]. Thus, averaging across trees reduced the validation loss, but did not produce a reproducible rank-dependent subgroup structure.
-The tuning path shows the trade-off. Validation gain improved as the minimum relative split gain increased, but the component trees also became shallower [@fig-appendix-forest-validation-path; @fig-appendix-forest-complexity-path]. At the selected setting, the mean terminal-node counts were 2.4 for CI, 2.9 for CIc, and 2.9 for CIg [@tbl-appendix-forest-selection]. 
-The level-dependent forest remained more stable. It removed 95.1% of root-node inequality in training and 69.7% in validation [@tbl-appendix-forest-selected-setting-summary]. The selected L forest had an average of 4.1 terminal nodes per tree, compared with 6.8 for the selected L tree [@tbl-appendix-forest-selection; @tbl-appendix-tree-selection]. 
+We evaluated concentration-index forests using the same impurity-reduction validation criterion as the single trees. The selected forest settings used a minimum relative split gain of 0.20 to 0.25; larger values produced very shallow forests with mean terminal-node counts close to the root, so they did not reveal additional subgroup structure [@fig-appendix-forest-validation-path; @fig-appendix-forest-complexity-path].
+
+For rank-dependent criteria, forests reduced training gains relative to corresponding single trees but did not yield a stable validation pattern. The $CI$, $CIc$, and $CIg$ forests removed 48.1%, 51.7%, and 51.6% of root-node impurity in training [@tbl-appendix-forest-selected-setting-summary; @tbl-appendix-tree-selected-setting-summary]. Their validation-gain ratios remained negative: -1038.3% for $CI$, -1108.5% for $CIc$, and -1063.0% for $CIg$ [@fig-appendix-forest-validation-path; @tbl-appendix-forest-selected-setting-summary]. Thus, averaging across trees reduced the size of the training gain, but it did not make the rank-dependent forest partitions reproducible under the validation criterion.
+
+The tuning path shows the trade-off between validation performance and complexity. As the minimum relative split gain increased, the component trees became shallower [@fig-appendix-forest-validation-path; @fig-appendix-forest-complexity-path]. The level-dependent forest remained the most stable. It removed 95.3% of root-node impurity in training and retained a positive validation gain of 56.7% [@tbl-appendix-forest-selected-setting-summary]. As with the $L$ tree, this result is interpreted as a sensitivity analysis because the DHS wealth index is not a ratio-scale socioeconomic variable.
 
 ```{r appendix-forest-validation-path-plots, fig.width=6.3, fig.height=3.8}
 #| label: fig-appendix-forest-validation-path
@@ -1291,54 +1480,59 @@ plot_validation_percent_gain_path(
 ####  Surrogate trees from Forest Predictions
 
 
-To interpret the selected forest, we fitted a surrogate tree to summarise its predictions (@fig-results-surrogate-tree). The surrogate tree retained the main structure seen in the level-dependent tree. 
+To interpret the selected forest, we fitted a surrogate tree to summarise its predictions (@fig-results-surrogate-tree). The surrogate tree retained the main structure seen in the $CIg$ forest. We present the $CIg$ surrogate because the $CIc$ surrogate did not identify terminal nodes with concentration-index values close to zero.
 
 
-```{r  fig.width=9, fig.height=5, out.width="100%"}
+```{r results-forest-surrogate-tree, fig.width=9, fig.height=5}
 #| label: fig-results-surrogate-tree
-#| fig-cap: "Surrogate tree summarising the selected concentration-index forest predictions."
+#| fig-cap: "Surrogate tree for the CIg concentration-index forest."
 #| fig-pos: "H"
-selected_forest_surrogate <- drc_results_objects$selected_forest_surrogate
 
+forest_surrogates <- drc_results_objects$forest_surrogates_by_type %||% list()
 
-ci_report_tree_plot(
-    fit = selected_forest_surrogate$fit,
-    data = selected_forest_surrogate$data,
-    outcome_name = selected_forest_surrogate$prediction_name,
+if ("CIg" %in% names(forest_surrogates)) {
+  forest_surrogate_cig <- forest_surrogates[["CIg"]]
+  ci_report_tree_plot(
+    fit = forest_surrogate_cig$fit,
+    data = forest_surrogate_cig$data,
+    outcome_name = forest_surrogate_cig$prediction_name,
     outcome_label = "U5",
-    ci_type = selected_tree_type,
+    ci_type = "CIg",
     var_labels = var_labels,
     fontsize = 11
-)
+  )
+}
+
 
 
 ```
 
-The first split was type of residence, separating urban and rural children. Among urban children, the main divisions were father’s agricultural occupation and household wealth. Among rural children, the main divisions were household wealth, maternal education, and residence in Katanga. The lowest terminal-node mortality was observed among urban children in the high-wealth branch, while the highest terminal-node mortality was observed among rural, low-wealth children in Katanga. Compared with the single L tree, the surrogate gives a smoother version of the same rural-urban, socioeconomic, and regional pattern, with less extreme terminal-node mortality differences. The criterion-specific forest surrogate trees are shown in the appendix for comparison (@fig-appendix-forest-surrogate-cig; @fig-appendix-forest-surrogate-cic; @fig-appendix-forest-surrogate-ci).
+
+ The other surrogate trees can be found in the appendix (@fig-appendix-forest-surrogate-l; @fig-appendix-forest-surrogate-cic; @fig-appendix-forest-surrogate-ci).
 
 ### Variable importance
 
-The variable-importance plots support the interpretation of the selected level-dependent models. In both the $L$ tree and $L$ forest, the type of residence gives the largest reduction in concentration-index impurity [@fig-results-selected-model-variable-importance]. In the single tree, residence is followed by father’s agricultural occupation, Kinshasa, household wealth, Equateur, and Katanga, reflecting a structure organised around the rural-urban divide, occupational position, household wealth, and regional differences.
+The variable-importance plots compare the fitted $CIc$ tree with the $CIg$ forest that is summarised by the displayed surrogate tree [@fig-results-selected-model-variable-importance]. In the $CIc$ tree, the largest reductions in concentration-index impurity come from mother’s education, father’s agricultural occupation, household wealth, Katanga, and skilled birth attendance.
 
 ```{r results-selected-model-variable-importance, fig.width=8, fig.height=4}
 #| label: fig-results-selected-model-variable-importance
-#| fig-cap: "Variable importance for the selected concentration-index tree and forest."
+#| fig-cap: "Variable importance for the CIc concentration-index tree and CIg concentration-index forest."
 #| fig-pos: "H"
 selected_tree_importance <- copy(drc_results_objects$tree_variable_importance[
-    criterion == selected_tree_type
+    criterion == "CIc"
 ])
 selected_forest_importance <- copy(drc_results_objects$forest_variable_importance[
-    criterion == selected_tree_type
+    criterion == "CIg"
 ])
 
 tree_importance_plot <- make_importance_plot(
     selected_tree_importance,
-    title = paste("Selected tree:", selected_tree_type),
+    title = "CIc tree",
     fill = "#2F6F9F"
 )
 forest_importance_plot <- make_importance_plot(
     selected_forest_importance,
-    title = paste("Selected forest:", selected_tree_type),
+    title = "CIg forest",
     fill = "#4B7F52"
 )
 
@@ -1348,7 +1542,7 @@ gridExtra::grid.arrange(tree_importance_plot,
 )
 ```
 
-The $L$ forest gives a less concentrated ranking than the single tree. Residence is still the first variable, but the forest also gives weight to mother’s agricultural occupation, maternal education, household wealth, father’s agricultural occupation, and regional indicators. In the appendix plots, the same groups of variables appear again under the other criteria: residence, region, occupation, education, and wealth [@fig-appendix-tree-variable-importance; @fig-appendix-forest-variable-importance].
+The $CIg$ forest gives a broader ranking than the single $CIc$ tree. Mother’s education remains the leading variable, but the forest also gives weight to household wealth, father’s agricultural occupation, mother’s agricultural occupation, residence, and regional indicators. In the appendix plots, the same groups of variables appear again under the other criteria: residence, region, occupation, education, and wealth [@fig-appendix-tree-variable-importance; @fig-appendix-forest-variable-importance].
 
 
 ## Simulation Study
@@ -1408,7 +1602,7 @@ We see the same pattern across the sensitivity plots in the appendix the trees d
 
 This thesis developed and applied a tree-based model for analysing socioeconomic inequality in under-five mortality using the concentration index impurity. The main finding is that inequality in the DRC data could not be explained by household wealth alone. Under-five mortality was also related to residence, maternal education, skilled birth attendance, parental occupation, and province. Overall, 10.32% of children died before age five. The children who died were more often from low-wealth households, rural households, mothers with no education, births without skilled attendance, and some provinces, especially Katanga. This is in line with earlier DRC work on geographic variation in under-five mortality, and with decomposition studies showing that wealth, education, residence, and occupation contribute to mortality inequalities in African settings [@kandala2014drc; @vanmalderen2013under5; @vanmalderen2019socioeconomic].
 
-The indirect methods provided a variable view of this inequality. In the regression based decomposition, mother’s education made the largest regression contribution, followed by father’s agricultural occupation, mother’s agricultural occupation, household wealth, residence, and skilled birth attendance. These results are consistent with earlier decomposition work, which found that household wealth, parental education, occupation, and residence were important contributors to under-five mortality inequality [@vanmalderen2013under5; @vanmalderen2019socioeconomic]. The SHAP analysis (from the fitted random forest) gave a less concentrated picture: residence and household wealth each contributed about 12%, followed by mother’s occupation, father’s occupation, mother’s education, and skilled birth attendance. Shap-based decomposition provides an addition to the regression methods by allowing the use of more flexible models such as Random Forests or XGBoost. 
+The indirect methods provided a variable view of this inequality. In the regression based decomposition, mother’s education made the largest regression contribution, followed by father’s agricultural occupation, mother’s agricultural occupation, household wealth, residence, and skilled birth attendance. These results are consistent with earlier decomposition work, which found that household wealth, parental education, occupation, and residence were important contributors to under-five mortality inequality [@vanmalderen2013under5; @vanmalderen2019socioeconomic]. The SHAP analysis, from the fitted random forest, gave a less concentrated picture. Residence was the largest SHAP contributor, while household wealth, parental occupation, mother’s education, skilled birth attendance, and some regional indicators also appeared across criteria. SHAP-based decomposition therefore adds to the regression methods by allowing a more flexible fitted model, such as a random forest, to be summarised at the determinant level. These SHAP results should be read as an explanation of the fitted predictive model rather than as causal or population-level determinant contributions.
 
 The direct concentration-index trees added the subgroup interpretation that is less visible in the regression-based decomposition. While the indirect methods ranked variables by their contribution to inequality, the trees showed how these variables combined within the data to define groups with different inequality patterns. The rank-dependent trees based on $CI$, $CIg$, and $CIc$ identified a structure involving maternal education, father’s agricultural occupation, skilled birth attendance, household wealth, and Katanga. Mortality was lower among children whose mothers had some education and whose fathers were not in agriculture, and higher among children whose mothers had no education, who lived in low-wealth households, and who resided in Katanga. However, these partitions did not validate well. Although the rank-based methods removed about 87% to 88% of root-node inequality in training, their validation gains were negative, suggesting that the strong training structure did not transfer well to held-out folds.
 
@@ -1434,6 +1628,9 @@ Decision trees are known to be unstable: small changes in the data can produce d
 
 Another limitation is the use of a surrogate tree to summarise the forest. The forest was added to reduce dependence on a single greedy tree, but the resulting forest is harder to interpret than a single tree. To obtain an interpretable summary, a surrogate tree was fitted using the forest's risk estimates. The surrogate still chooses splits by maximising concentration-index gain, but the outcome used in that split rule is the forest-predicted risk rather than the observed mortality outcome. This approximation of the forest, therefore, depends on the correctness of the forest.
 
+
+Another limitation comes from SHAP-based decomposition. This analysis was based on a predictive random forest and should be interpreted as an explanation of that fitted prediction model, not as a decomposition of population mortality risk. SHAP values depend on the fitted model and on the SHAP convention used. This is important in DHS data because maternal education, occupation, residence, and household wealth are correlated. The allocation of predictive contribution across these variables is therefore not unique, and the SHAP results should not be interpreted as causal or determinant contributions.
+The predictive forest used for the SHAP analysis was also affected by undersampling. As shown in the appendix, the alive class was undersampled, changing the weighted class distribution from about 89.7% alive and 10.3% died to about 60.0% alive and 40.0% died. Unless the predictions are recalibrated, the fitted values from this model should be treated as prediction scores rather than calibrated mortality probabilities. The predictive performance of this forest was modest, with ROC AUC values around 0.61. This does not invalidate the SHAP analysis, but it limits confidence in detailed feature rankings. For this reason, the SHAP results are treated as a descriptive explanation of the fitted predictive model, rather than as evidence that the listed variables contribute those proportions to the risk of under-five mortality.
 
 ## Ethical, societal, and stakeholder relevance
 

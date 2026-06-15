@@ -1,0 +1,390 @@
+---
+title: "Test svyglm Margins Rineq Decomposition"
+format:
+  html:
+    toc: true
+    number-sections: true
+    embed-resources: true
+    df-print: paged
+execute:
+  echo: true
+  warning: false
+  message: false
+params:
+  analysis_rows: 1
+---
+
+```{r setup}
+library(data.table)
+library(haven)
+library(survey)
+library(rineq)
+library(margins)
+library(here)
+
+source(here("R", "report_helpers.R"))
+```
+
+# Aim
+
+This notebook tests whether survey-weighted average marginal effects can be
+extracted from the existing `survey::svyglm()` model using `margins::margins()`
+and then passed into Rineq's lower-level decomposition function.
+
+It does not run the tree, forest, SHAP, simulation, or final saving sections.
+
+# Prepare Data
+
+```{r runtime-config}
+runtime_params <- list(
+  analysis_rows = as.integer(params$analysis_rows)
+)
+
+if (is.na(runtime_params$analysis_rows) || runtime_params$analysis_rows <= 0L) {
+  runtime_params$analysis_rows <- 1L
+}
+
+source_data_file <- here("prev_analysis", "DRCongo .dta")
+stopifnot(file.exists(source_data_file))
+```
+
+```{r load-2007-drc-data}
+drc_2007_dt <- as.data.table(haven::read_dta(source_data_file))
+```
+
+```{r prepare-2007-drc-analysis-data}
+factor_from_codes <- function(x, labels) {
+  factor(labels[as.character(as.integer(x))], levels = unname(labels))
+}
+
+binary_factor <- function(x, labels) {
+  factor(labels[as.character(as.integer(x))], levels = unname(labels))
+}
+
+drc_birth_labels <- c(
+  "1" = "First birth",
+  "2" = "2-4 short interval",
+  "3" = "2-4 long interval",
+  "4" = "5+ short interval",
+  "5" = "5+ long interval"
+)
+drc_wealth_group_labels <- c(
+  "1" = "High household wealth",
+  "2" = "Low household wealth"
+)
+drc_age_mother_labels <- c("1" = "20 or more", "2" = "Less than 20")
+drc_education_labels <- c("1" = "Any education", "2" = "No education")
+drc_occupation_labels <- c(
+  "1" = "Other",
+  "2" = "Household, unskilled, not working",
+  "3" = "Agriculture"
+)
+drc_region_labels <- c(
+  "1" = "Bandundu",
+  "2" = "Bas-Congo",
+  "3" = "Equateur",
+  "4" = "Kasai Occidental",
+  "5" = "Kasai Oriental",
+  "6" = "Katanga",
+  "7" = "Kinshasa",
+  "8" = "Maniema",
+  "9" = "Nord-Kivu",
+  "10" = "Orientale",
+  "11" = "Sud-Kivu"
+)
+
+raw_congo_model_dt <- drc_2007_dt[
+  ,
+  .(
+    wealth = as.numeric(wealth),
+    deadu5_num = as.integer(deadu5),
+    sample_weight = as.numeric(weight),
+    PSU = as.integer(PSU),
+    household = as.integer(household),
+    country = as.integer(country),
+    quint = factor_from_codes(quint, drc_wealth_group_labels),
+    unskilled = binary_factor(
+      unskilled,
+      c("0" = "Skilled birth attendance", "1" = "No skilled birth attendance")
+    ),
+    male = binary_factor(male, c("0" = "Female", "1" = "Male")),
+    birth = factor_from_codes(birth, drc_birth_labels),
+    agemoth = factor_from_codes(agemoth, drc_age_mother_labels),
+    rural = binary_factor(rural, c("0" = "Urban", "1" = "Rural")),
+    ed = factor_from_codes(ed, drc_education_labels),
+    ped = factor_from_codes(ped, drc_education_labels),
+    mocc = factor_from_codes(mocc, drc_occupation_labels),
+    pocc = factor_from_codes(pocc, drc_occupation_labels),
+    reg = factor_from_codes(reg, drc_region_labels)
+  )
+]
+raw_congo_model_dt <- na.omit(raw_congo_model_dt)
+
+raw_congo_var_labels <- c(
+  quint = "Household wealth",
+  unskilled = "Skilled birth attendance",
+  male = "Sex of the child",
+  birth = "Birth order and interval",
+  agemoth = "Mother's age at birth",
+  rural = "Type of residence",
+  ed = "Mother's education",
+  ped = "Father's education",
+  mocc = "Mother's occupation",
+  pocc = "Father's occupation",
+  reg = "Region"
+)
+raw_congo_predictors <- names(raw_congo_var_labels)
+```
+
+```{r sample-2007-drc-analysis-data}
+raw_congo_model_dt <- sample_analysis_rows(
+  raw_congo_model_dt,
+  use_full = runtime_params$analysis_rows == 1L,
+  n = runtime_params$analysis_rows,
+  seed = 20260516
+)
+
+data.table(
+  rows = nrow(raw_congo_model_dt),
+  deaths = sum(raw_congo_model_dt$deadu5_num == 1L),
+  non_deaths = sum(raw_congo_model_dt$deadu5_num == 0L),
+  psus = uniqueN(raw_congo_model_dt$PSU)
+)
+```
+
+# Fit Survey-Weighted Regression
+
+```{r fit-classical-model}
+linear_decomp_formula <- as.formula(
+  paste("deadu5_num ~", paste(raw_congo_predictors, collapse = " + "))
+)
+
+linear_decomp_design <- survey::svydesign(
+  id = as.formula("~PSU+household"),
+  weights = as.formula("~sample_weight"),
+  data = raw_congo_model_dt
+)
+
+linear_decomp_fit <- survey::svyglm(
+  linear_decomp_formula,
+  design = linear_decomp_design,
+  family = quasibinomial()
+)
+
+cat("svyglm fitted: yes\n")
+```
+
+# Test Margins
+
+```{r create-model-matrix}
+linear_x <- model.matrix(linear_decomp_formula, data = raw_congo_model_dt)
+linear_terms <- setdiff(colnames(linear_x), "(Intercept)")
+```
+
+```{r run-margins}
+linear_margins <- tryCatch(
+  margins::margins(
+    linear_decomp_fit,
+    design = linear_decomp_design,
+    type = "response"
+  ),
+  error = function(e) {
+    stop(
+      "margins::margins() does not work with the svyglm object: ",
+      conditionMessage(e),
+      call. = FALSE
+    )
+  }
+)
+
+linear_ame_table <- as.data.table(summary(linear_margins))
+print(linear_ame_table)
+```
+
+```{r inspect-margins-columns}
+print(names(linear_ame_table))
+
+ame_col <- intersect(c("AME", "dydx"), names(linear_ame_table))[1L]
+
+if (is.na(ame_col)) {
+  stop("Could not identify the average marginal effect column in margins output.")
+}
+
+if (!"factor" %in% names(linear_ame_table)) {
+  stop("margins output does not contain a factor column for term alignment.")
+}
+```
+
+# Check Term Alignment
+
+```{r inspect-term-alignment}
+print(linear_terms)
+print(linear_ame_table$factor)
+
+linear_average_marginal_effects <- setNames(
+  linear_ame_table[[ame_col]],
+  linear_ame_table$factor
+)
+
+missing_from_margins <- setdiff(
+  linear_terms,
+  names(linear_average_marginal_effects)
+)
+extra_from_margins <- setdiff(
+  names(linear_average_marginal_effects),
+  linear_terms
+)
+
+cat("\nTerms missing from margins output:\n")
+print(missing_from_margins)
+
+cat("\nExtra terms from margins output:\n")
+print(extra_from_margins)
+
+if (length(missing_from_margins) > 0L) {
+  stop(
+    "AME names from margins do not match model-matrix terms. ",
+    "Need a term-mapping step before using these in Rineq.",
+    call. = FALSE
+  )
+}
+```
+
+# Test Rineq Lower-Level Decomposition
+
+```{r check-rineq-decomposition-signature}
+rineq_decomposition <- getFromNamespace("decomposition", "rineq")
+expected_decomposition_args <- c(
+  "outcome",
+  "betas",
+  "mm",
+  "ranker",
+  "wt",
+  "correction",
+  "citype"
+)
+actual_decomposition_args <- names(formals(rineq_decomposition))
+
+if (!all(expected_decomposition_args %in% actual_decomposition_args)) {
+  stop(
+    "Rineq's internal decomposition() function has different argument names. ",
+    "Expected: ",
+    paste(expected_decomposition_args, collapse = ", "),
+    ". Actual: ",
+    paste(actual_decomposition_args, collapse = ", "),
+    call. = FALSE
+  )
+}
+```
+
+```{r run-ci-decomposition}
+test_ci_decomp <- tryCatch(
+  rineq_decomposition(
+    outcome = raw_congo_model_dt$deadu5_num,
+    betas = linear_average_marginal_effects[linear_terms],
+    mm = linear_x[, linear_terms, drop = FALSE],
+    ranker = raw_congo_model_dt$wealth,
+    wt = raw_congo_model_dt$sample_weight,
+    correction = TRUE,
+    citype = "CI"
+  ),
+  error = function(e) {
+    stop(
+      "Rineq lower-level decomposition failed for CI: ",
+      conditionMessage(e),
+      call. = FALSE
+    )
+  }
+)
+
+print(test_ci_decomp)
+```
+
+```{r run-bounded-decompositions}
+test_cig_decomp <- tryCatch(
+  rineq_decomposition(
+    outcome = raw_congo_model_dt$deadu5_num,
+    betas = linear_average_marginal_effects[linear_terms],
+    mm = linear_x[, linear_terms, drop = FALSE],
+    ranker = raw_congo_model_dt$wealth,
+    wt = raw_congo_model_dt$sample_weight,
+    correction = TRUE,
+    citype = "CIg"
+  ),
+  error = function(e) {
+    stop("Rineq lower-level decomposition failed for CIg: ", conditionMessage(e), call. = FALSE)
+  }
+)
+
+test_cic_decomp <- tryCatch(
+  rineq_decomposition(
+    outcome = raw_congo_model_dt$deadu5_num,
+    betas = linear_average_marginal_effects[linear_terms],
+    mm = linear_x[, linear_terms, drop = FALSE],
+    ranker = raw_congo_model_dt$wealth,
+    wt = raw_congo_model_dt$sample_weight,
+    correction = TRUE,
+    citype = "CIc"
+  ),
+  error = function(e) {
+    stop("Rineq lower-level decomposition failed for CIc: ", conditionMessage(e), call. = FALSE)
+  }
+)
+
+test_ciw_decomp <- tryCatch(
+  rineq_decomposition(
+    outcome = raw_congo_model_dt$deadu5_num,
+    betas = linear_average_marginal_effects[linear_terms],
+    mm = linear_x[, linear_terms, drop = FALSE],
+    ranker = raw_congo_model_dt$wealth,
+    wt = raw_congo_model_dt$sample_weight,
+    correction = TRUE,
+    citype = "CIw"
+  ),
+  error = function(e) {
+    stop("Rineq lower-level decomposition failed for CIw: ", conditionMessage(e), call. = FALSE)
+  }
+)
+
+print(test_cig_decomp)
+print(test_cic_decomp)
+print(test_ciw_decomp)
+```
+
+# Compare With Old Coefficient-Based Route
+
+```{r compare-with-old-rineq-route}
+old_ci_decomp <- rineq::contribution(
+  linear_decomp_fit,
+  raw_congo_model_dt$wealth,
+  correction = TRUE,
+  type = "CI"
+)
+
+cat("\nOld coefficient-based CI decomposition:\n")
+print(old_ci_decomp)
+
+cat("\nNew margins-based CI decomposition:\n")
+print(test_ci_decomp)
+```
+
+# Diagnostic Summary
+
+```{r diagnostic-summary}
+cat("\nTEST SUMMARY\n")
+cat("1. svyglm fitted: yes\n")
+cat("2. margins::margins() ran on svyglm with design: yes\n")
+cat(
+  "3. AME terms matched model-matrix terms: ",
+  length(missing_from_margins) == 0L,
+  "\n"
+)
+cat("4. Rineq lower-level decomposition ran for CI: ", exists("test_ci_decomp"), "\n")
+cat(
+  "5. Rineq lower-level decomposition ran for CIg, CIc, CIw: ",
+  exists("test_cig_decomp") &&
+    exists("test_cic_decomp") &&
+    exists("test_ciw_decomp"),
+  "\n"
+)
+```

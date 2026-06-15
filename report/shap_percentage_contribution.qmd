@@ -1,0 +1,175 @@
+---
+title: "SHAP Percentage Contributions Across Concentration-Index Criteria"
+format:
+  html:
+    toc: true
+    number-sections: true
+  pdf:
+    documentclass: article
+    papersize: a4
+    fontsize: 11pt
+    geometry:
+      - margin=25mm
+    pdf-engine: xelatex
+---
+
+# Purpose of this note
+
+This note explains why the predictive-forest SHAP percentage contributions can be the same for the rank-dependent concentration-index criteria, even when the concentration-index tree or forest has different root-node values under those criteria. The point is not that the raw inequality measures are identical. The point is that the reported percentage contributions are normalised shares of a common SHAP rank-covariance decomposition. In this note, absolute contribution means the contribution before it is converted to a percentage. It does not mean taking the mathematical absolute value of a signed contribution.
+
+The table is therefore not a LaTeX problem. The rendered table reflects values that have already been computed before the table is written. When the predictive-forest SHAP columns for $CI$, $CIg$, and $CIc$ are equal, the equality comes from the decomposition formula used for those columns.
+
+# SHAP decomposition of fitted risks
+
+For the predictive forest, the decomposition is applied after the model has produced fitted mortality risks. Let $\hat{f}(x)$ denote the fitted predictive forest and let
+
+$$
+\hat{y}_i = \hat{f}(x_i)
+$$
+
+be the fitted under-five mortality risk for child $i$. SHAP values rewrite this fitted risk as a baseline value plus determinant-level contributions:
+
+$$
+\hat{y}_i = \phi_0 + \sum_{k=1}^{K}\phi_{ik},
+$$
+
+where $\phi_0$ is the baseline fitted value and $\phi_{ik}$ is the SHAP contribution of determinant $k$ for child $i$. In the thesis, the baseline is set to the mean fitted risk, $\mu_{\hat{y}}$. This gives an additive expression that can be inserted into the concentration-index formula.
+
+For the standard concentration index of the fitted risks, the SHAP contribution of determinant $k$ is
+
+$$
+D_{k,CI}^{\text{SHAP}}
+=
+\frac{2}{\mu_{\hat{y}}}
+\operatorname{cov}_w(\phi_{ik}, R_i),
+$$
+
+where $R_i$ is the fractional socioeconomic rank and the covariance is computed using the analysis weights. Equivalently, this is the weighted covariance between the determinant's SHAP value and the socioeconomic rank, scaled by the mean fitted risk.
+
+# Rank-dependent indices differ only by scale
+
+The standard concentration index, the generalised concentration index, and the corrected concentration index are all rank-dependent measures. They use the same fractional rank $R_i$. For the fitted prediction $\hat{y}_i$, their forms are
+
+$$
+CI_{\hat{y}} =
+\frac{2}{\mu_{\hat{y}}}
+\operatorname{cov}_w(\hat{y}_i, R_i),
+$$
+
+$$
+CIg_{\hat{y}} =
+2\operatorname{cov}_w(\hat{y}_i, R_i),
+$$
+
+and
+
+$$
+CIc_{\hat{y}} =
+\frac{8}{b-a}
+\operatorname{cov}_w(\hat{y}_i, R_i),
+$$
+
+where $a$ and $b$ are the lower and upper bounds used for the corrected index. These three expressions use the same rank covariance. They differ by the scalar multiplier placed in front of that covariance.
+
+The same logic carries over to the SHAP contribution of determinant $k$. Define
+
+$$
+A_k = \operatorname{cov}_w(\phi_{ik}, R_i).
+$$
+
+Then the rank-dependent SHAP contributions can be written as
+
+$$
+D_{k,CI}^{\text{SHAP}} = a_{CI}A_k,
+$$
+
+$$
+D_{k,CIg}^{\text{SHAP}} = a_{CIg}A_k,
+$$
+
+and
+
+$$
+D_{k,CIc}^{\text{SHAP}} = a_{CIc}A_k.
+$$
+
+Here $a_{CI}$, $a_{CIg}$, and $a_{CIc}$ are criterion-specific scale factors. For a fixed fitted prediction vector, each scale factor is common to all determinants within that criterion.
+
+# Why the percentage contributions are equal
+
+The predictive-forest SHAP table reports percentage contributions. For a rank-dependent criterion $m$, where $m$ is one of $CI$, $CIg$, or $CIc$, the percentage contribution of determinant $k$ is
+
+$$
+PC_{k,m}^{\text{SHAP}}
+=
+100 \times
+\frac{D_{k,m}^{\text{SHAP}}}
+{\sum_{j=1}^{K}D_{j,m}^{\text{SHAP}}}.
+$$
+
+Substituting $D_{k,m}^{\text{SHAP}} = a_mA_k$ gives
+
+$$
+PC_{k,m}^{\text{SHAP}}
+=
+100 \times
+\frac{a_mA_k}
+{\sum_{j=1}^{K}a_mA_j}.
+$$
+
+Because $a_m$ is the same for all determinants under a fixed rank-dependent criterion, it cancels out:
+
+$$
+PC_{k,m}^{\text{SHAP}}
+=
+100 \times
+\frac{A_k}
+{\sum_{j=1}^{K}A_j}.
+$$
+
+This is why the SHAP percentages for $CI$, $CIg$, and $CIc$ are equal. They are all normalised versions of the same determinant-specific rank covariance, $\operatorname{cov}_w(\phi_{ik}, R_i)$. The scalar change from $CI$ to $CIg$ or $CIc$ changes the raw contribution scale, but it does not change the percentage share once the same scalar appears in the numerator and denominator.
+
+# Why different root nodes do not change this result
+
+The concentration-index trees and forests use the selected index as the impurity measure during splitting. At that stage, $CI$, $CIg$, $CIc$, and $L$ can lead to different node impurity values and can also affect split selection. For example, $CI$ is relative to the mean outcome in the node, while $CIg$ remains on the absolute scale. When child-node means vary across candidate splits, the two criteria can rank candidate splits differently.
+
+The predictive-forest SHAP table is a different object. It does not decompose the root-node impurity values from the tree. It decomposes the fitted predictive-forest risk vector, $\hat{y}_i$, using the same SHAP values and the same socioeconomic ranking. Once this fitted prediction vector is fixed, the rank-dependent SHAP decomposition for $CI$, $CIg$, and $CIc$ differs only by a scale factor. That scale factor disappears when contributions are converted into percentages.
+
+For this reason, different root-node values do not contradict equal SHAP percentage contributions. The root node belongs to the direct tree or forest impurity calculation. The SHAP table belongs to the indirect decomposition of fitted predictions.
+
+# Why the level-dependent measure can differ
+
+The level-dependent index $L$ is not just another scalar rescaling of the same fractional-rank covariance. It uses the observed socioeconomic level directly rather than replacing it with the fractional rank. In the notation of the methodology chapter, the level-dependent index uses $s_i$ rather than $R_i$.
+
+Therefore the determinant-specific SHAP term for $L$ is based on the association between $\phi_{ik}$ and the observed socioeconomic level. This is not generally proportional to $\operatorname{cov}_w(\phi_{ik}, R_i)$. Since the underlying covariance changes, the percentage shares do not have to match the $CI$, $CIg$, and $CIc$ shares.
+
+# Why the rineq regression percentages can differ
+
+The regression decomposition used by `rineq` is based on the Wagstaff-style regression contribution. In the linear decomposition, the absolute contribution of determinant $k$ is
+
+$$
+AC_k =
+\left(
+\frac{\beta_k \bar{x}_k}{\mu_y}
+\right)C_k,
+$$
+
+where $\beta_k$ is the fitted regression coefficient, $\bar{x}_k$ is the determinant mean, $\mu_y$ is the outcome mean, and $C_k$ is the concentration index of the determinant. The percentage contribution is then reported as the determinant's contribution divided by the relevant total inequality measure. When the table is normalised over the determinant contributions, this can be written as
+
+$$
+PC_k =
+100 \times
+\frac{AC_k}{\sum_{j=1}^{K}AC_j}.
+$$
+
+In practice, the regression decomposition may also include the residual contribution, so the denominator can reflect both explained and unexplained parts of the observed inequality. This is important because the residual can change the percentage scale, especially when moving between $CI$, $CIg$, and $CIc$.
+
+The `rineq` regression percentages therefore do not have to be equal across $CI$, $CIg$, and $CIc$. Each determinant's contribution combines a regression elasticity, the socioeconomic distribution of the determinant, and the residual part of the model. When the criterion changes, the determinant concentration indices and the residual contribution can change in a way that is not simply one common multiplier for all determinants.
+
+This is the main difference from the predictive-forest SHAP table. In the SHAP table, the same fitted prediction vector is decomposed through the same determinant-specific SHAP values and the same rank variable. For $CI$, $CIg$, and $CIc$, only the overall scale changes, and that scale cancels in the percentage formula. In the `rineq` regression decomposition, the determinant-level terms are not only scalar rescalings of a common SHAP rank covariance, so the percentages can differ.
+
+# Interpretation
+
+Equal predictive-forest SHAP percentages for $CI$, $CIg$, and $CIc$ should therefore be interpreted carefully. They do not mean that the raw concentration indices, root-node impurities, or criterion-specific tree gains are the same. They mean that, after fixing the predictive-forest fitted risks and decomposing those risks with SHAP, the rank-dependent percentage shares are identical because the three indices are scalar transformations of the same rank-covariance decomposition.
+
+In short, the table is saying which determinants account for the rank-based inequality in the fitted predictive-forest risks. It is not saying that all concentration-index criteria produce the same tree, the same root impurity, or the same raw index value.

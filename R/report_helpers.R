@@ -1857,6 +1857,89 @@ predict_ci_forest_risk <- function(
   )
 }
 
+#' Extract feature-level SHAP estimates from a shapr explanation object.
+extract_shapr_values <- function(explanation) {
+  shap_values <- as.data.frame(explanation$shapley_values_est)
+  shap_values[
+    ,
+    setdiff(names(shap_values), c("explain_id", "none")),
+    drop = FALSE
+  ]
+}
+
+#' Estimate SHAP values with shapr. Kept as an alternative implementation.
+estimate_shapr_values <- function(object,
+                                  x_train,
+                                  x_explain,
+                                  pred_wrapper,
+                                  seed,
+                                  n_mc_samples = 64L) {
+  if (!requireNamespace("shapr", quietly = TRUE)) {
+    stop("Package shapr is required for estimate_shapr_values().", call. = FALSE)
+  }
+
+  model_specs <- function(unused) {
+    list(
+      labels = names(x_train),
+      classes = vapply(x_train, function(col) class(col)[1L], character(1L)),
+      factor_levels = lapply(x_train, function(col) {
+        if (is.factor(col)) levels(col) else NULL
+      })
+    )
+  }
+
+  explanation <- shapr::explain(
+    model = object,
+    x_explain = as.data.frame(x_explain),
+    x_train = as.data.frame(x_train),
+    approach = "ctree",
+    phi0 = mean(pred_wrapper(object, x_train)),
+    n_MC_samples = n_mc_samples,
+    seed = seed,
+    predict_model = pred_wrapper,
+    get_model_specs = model_specs,
+    verbose = NULL
+  )
+
+  extract_shapr_values(explanation)
+}
+
+#' Estimate SHAP values with fastshap using the active report workflow model.
+estimate_fastshap_values <- function(object,
+                                     x_train,
+                                     x_explain,
+                                     pred_wrapper,
+                                     seed,
+                                     nsim = 64L,
+                                     adjust = TRUE) {
+  if (!requireNamespace("fastshap", quietly = TRUE)) {
+    stop(
+      paste(
+        "Package fastshap is required for SHAP estimation.",
+        "Install it from GitHub with:",
+        "remotes::install_github('bgreenwell/fastshap')"
+      ),
+      call. = FALSE
+    )
+  }
+
+  nsim <- max(2L, as.integer(nsim[1L]))
+  set.seed(seed)
+
+  out <- fastshap::explain(
+    object = object,
+    X = as.data.frame(x_train),
+    newdata = as.data.frame(x_explain),
+    pred_wrapper = pred_wrapper,
+    nsim = nsim,
+    adjust = adjust,
+    shap_only = TRUE,
+    parallel = FALSE
+  )
+
+  as.data.frame(out)
+}
+
 #' Run CI forest tuning in logged batches and combine the results.
 run_forest_tuning_batches <- function(
   formula,
@@ -1869,6 +1952,7 @@ run_forest_tuning_batches <- function(
   outcome_name = "deadu5_num",
   weights = data$sample_weight,
   folds = 10L,
+  fold_id = NULL,
   workers = 4L,
   progress_steps = 20L,
   log_file = "logs/forest_tuning.log",
@@ -1880,6 +1964,24 @@ run_forest_tuning_batches <- function(
   stopifnot(requireNamespace("ineqTrees", quietly = TRUE))
 
   forest_grid <- as.data.table(forest_grid)
+  folds <- max(2L, as.integer(folds[1L]))
+  if (!is.null(fold_id)) {
+    fold_id <- as.integer(fold_id)
+    if (length(fold_id) != nrow(data)) {
+      stop(
+        "`fold_id` must have one value for each row in `data`.",
+        call. = FALSE
+      )
+    }
+    if (anyNA(fold_id)) {
+      stop("`fold_id` cannot contain missing values.", call. = FALSE)
+    }
+    folds <- data.table::uniqueN(fold_id)
+    if (folds < 2L) {
+      stop("`fold_id` must contain at least two folds.", call. = FALSE)
+    }
+  }
+
   log_dir <- dirname(log_file)
   if (!identical(log_dir, ".") && !dir.exists(log_dir)) {
     dir.create(log_dir, recursive = TRUE, showWarnings = FALSE)
@@ -1911,12 +2013,21 @@ run_forest_tuning_batches <- function(
     ceiling(seq_len(total_grid) / batch_size)
   )
   total_fold_fits <- total_grid * length(criterion_types) * folds
+  fold_source <- if (is.null(fold_id)) {
+    "outcome-stratified row folds"
+  } else {
+    "user-supplied fold_id"
+  }
 
   log_msg(
-    "Forest tuning: %d grid rows, %d criteria, %d folds (~%s fold-level fits).",
+    paste0(
+      "Forest tuning: %d grid rows, %d criteria, %d folds (%s) ",
+      "(~%s fold-level fits)."
+    ),
     total_grid,
     length(criterion_types),
     folds,
+    fold_source,
     format(total_fold_fits, big.mark = ",", scientific = FALSE)
   )
 
@@ -1947,7 +2058,7 @@ run_forest_tuning_batches <- function(
       length(batch_rows)
     )
 
-    batch_fit <- ineqTrees::tune_ci_forest(
+    tune_args <- list(
       formula = formula,
       data = data,
       rank_name = rank_name,
@@ -1955,8 +2066,6 @@ run_forest_tuning_batches <- function(
       weights = weights,
       type = criterion_types,
       control_grid = batch_grid,
-      v = folds,
-      strata = outcome_name,
       seed = seed,
       metric = tuning_metrics,
       refit = FALSE,
@@ -1965,6 +2074,14 @@ run_forest_tuning_batches <- function(
       future.seed = TRUE,
       control = ineqTrees::control_ci_tune(save_pred = TRUE)
     )
+    if (is.null(fold_id)) {
+      tune_args$v <- folds
+      tune_args$strata <- outcome_name
+    } else {
+      tune_args$fold_id <- fold_id
+    }
+
+    batch_fit <- do.call(ineqTrees::tune_ci_forest, tune_args)
 
     for (name in c(
       "fold_results", "summary",
