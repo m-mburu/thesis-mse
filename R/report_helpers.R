@@ -37,10 +37,13 @@ sample_analysis_rows <- function(
 ) {
   stopifnot(requireNamespace("data.table", quietly = TRUE))
   data <- as.data.table(data)
+
+  # Return a copy so later code cannot accidentally modify the caller's object.
   if (isTRUE(use_full) || nrow(data) <= n) {
     return(data.table::copy(data))
   }
 
+  # Sort sampled row ids so quick checks keep the original row order.
   set.seed(seed)
   rows <- sort(sample.int(nrow(data), n))
   data[rows]
@@ -64,6 +67,7 @@ select_tuning_grid <- function(
   stratify_cols <- intersect(stratify_cols, names(grid))
   selected <- integer()
 
+  # First force at least one row from each requested stratum when possible.
   for (col in stratify_cols) {
     for (value in unique(grid[[col]])) {
       idx <- which(grid[[col]] == value)
@@ -78,6 +82,7 @@ select_tuning_grid <- function(
     }
   }
 
+  # Fill any remaining slots with random rows from the rest of the grid.
   remaining <- setdiff(seq_len(nrow(grid)), selected)
   if (length(selected) < max_rows && length(remaining)) {
     selected <- c(selected, sample(remaining, max_rows - length(selected)))
@@ -115,16 +120,19 @@ suggest_node_size_grid <- function(
     )
   }
 
+  # Build evenly spaced node-size proportions inside the requested range.
   minsplit_prop <- if (grid_size == 1L) {
     mean(prop_range)
   } else {
     seq(prop_range[1L], prop_range[2L], length.out = grid_size)
   }
 
+  # Round counts to convenient values so the grid is easier to read.
   round_count <- function(x) {
     as.integer(round(x / round_to) * round_to)
   }
 
+  # Convert proportions into node-size controls and enforce the requested bounds.
   minsplit <- round_count(n * minsplit_prop)
   minsplit <- pmax(minsplit_bounds[1L], pmin(minsplit_bounds[2L], minsplit))
 
@@ -132,6 +140,7 @@ suggest_node_size_grid <- function(
   minbucket <- round_count(n * minbucket_prop)
   minbucket <- pmax(minbucket_bounds[1L], pmin(minbucket_bounds[2L], minbucket))
 
+  # Keep the paired proportions as well as the unique control vectors.
   pairs <- unique(data.table::data.table(
     minsplit_prop = minsplit_prop,
     minbucket_prop = minbucket_prop,
@@ -170,6 +179,7 @@ tree_edge_panel_values_only <- function(
 ) {
   meta <- obj$data
 
+  # Long categorical split labels can dominate the plot, so compact them here.
   compact_split_value <- function(label) {
     label <- gsub("\\s+", " ", trimws(label))
     if (!grepl(",", label, fixed = TRUE)) {
@@ -191,6 +201,7 @@ tree_edge_panel_values_only <- function(
     )
   }
 
+  # Offset sibling edge labels when they would otherwise overlap.
   justfun <- function(i, split_labels) {
     myjust <- if (mean(nchar(split_labels)) > justmin) {
       match.arg(just, c("alternate", "increasing", "decreasing", "equal"))
@@ -210,6 +221,7 @@ tree_edge_panel_values_only <- function(
   }
 
   function(node, i) {
+    # partykit returns edge labels for all children; draw the label for child i.
     split_info <- partykit::character_split(
       partykit::split_node(node),
       meta,
@@ -226,6 +238,7 @@ tree_edge_panel_values_only <- function(
     label_lines <- strsplit(label, "\n", fixed = TRUE)[[1L]]
     widest_line <- label_lines[which.max(nchar(label_lines))]
 
+    # Size the white backing rectangle to the actual text width.
     grid::grid.rect(
       y = y,
       gp = grid::gpar(fill = fill, col = NA),
@@ -251,6 +264,7 @@ tree_inner_panel_compact_labeled <- function(
 ) {
   meta <- obj$data
 
+  # Prefer report labels, but fall back to readable variable names.
   pretty_var_name <- function(var_name) {
     if (!is.null(var_labels) && var_name %in% names(var_labels)) {
       return(unname(var_labels[[var_name]]))
@@ -258,6 +272,7 @@ tree_inner_panel_compact_labeled <- function(
     gsub("_", " ", var_name)
   }
 
+  # Extract the split-variable label and optional p-value from an inner node.
   extract_label <- function(node) {
     if (partykit::is.terminal(node)) {
       return(list(label = "", p = ""))
@@ -285,6 +300,7 @@ tree_inner_panel_compact_labeled <- function(
   }
 
   function(node) {
+    # Wrap labels before drawing so the node box can be sized correctly.
     lab <- extract_label(node)
     label_lines <- unlist(lapply(
       strsplit(lab$label, "\n", fixed = TRUE)[[1L]],
@@ -301,6 +317,7 @@ tree_inner_panel_compact_labeled <- function(
       widest_line <- paste(rep("a", min_chars), collapse = "")
     }
 
+    # Draw a small custom node box rather than using the default partykit label.
     label_text <- paste(label_lines, collapse = "\n")
     line_count <- length(label_lines) + if (nzchar(lab$p)) 1L else 0L
 
@@ -415,8 +432,11 @@ build_ranger_analysis_data <- function(
   }
 
   ranger_source_dt <- copy(as.data.table(data))
+
+  # Keep original row ids so sampled rows can be selected after shuffling.
   ranger_source_dt[, source_row_id := .I]
 
+  # Record the class balance before any undersampling is applied.
   sampling_summary <- ranger_source_dt[
     ,
     .(weighted_n = sum(get(weight_name), na.rm = TRUE), rows = .N),
@@ -440,6 +460,7 @@ build_ranger_analysis_data <- function(
 
   ranger_dt <- copy(ranger_source_dt)
   if (!is.null(undersample)) {
+    # Separate event and non-event rows because only the majority class is reduced.
     death_rows <- ranger_source_dt[get(outcome_name) == 1, source_row_id]
     nondeath_rows <- ranger_source_dt[get(outcome_name) == 0, source_row_id]
     death_weight <- ranger_source_dt[
@@ -450,12 +471,15 @@ build_ranger_analysis_data <- function(
       get(outcome_name) == 0,
       sum(get(weight_name), na.rm = TRUE)
     ]
+
+    # Use weighted shares because the report analyses weighted DHS data.
     current_death_share <- death_weight / (death_weight + nondeath_weight)
 
     if (is.finite(current_death_share) &&
       current_death_share < undersample &&
       length(death_rows) &&
       length(nondeath_rows)) {
+      # Keep enough non-death rows to approach the requested weighted event share.
       target_nondeath_weight <- death_weight * (1 - undersample) / undersample
       set.seed(seed)
       nondeath_order <- sample(nondeath_rows)
@@ -464,6 +488,8 @@ build_ranger_analysis_data <- function(
       )
       keep_nondeath <- nondeath_order[nondeath_cum_weight <= target_nondeath_weight]
       next_idx <- length(keep_nondeath) + 1L
+
+      # Include the next row if it makes the final weighted share closer.
       if (next_idx <= length(nondeath_order)) {
         previous_weight <- if (length(keep_nondeath)) {
           nondeath_cum_weight[length(keep_nondeath)]
@@ -481,6 +507,7 @@ build_ranger_analysis_data <- function(
       ]
     }
 
+    # Append the post-undersampling class balance to the same summary table.
     sampling_summary <- rbindlist(
       list(
         sampling_summary,
@@ -507,18 +534,27 @@ build_ranger_analysis_data <- function(
 
   setcolorder(sampling_summary, c("sample", "outcome"))
   ranger_dt[, source_row_id := NULL]
+
+  # Ranger uses a factor outcome with the event level first.
   ranger_dt[, deadu5_factor := factor(
     fifelse(get(outcome_name) == 1, "Died", "Survived"),
     levels = c("Died", "Survived")
   )]
+
+  # hardhat stores case weights in the format expected by tidymodels workflows.
   ranger_dt[, sample_weight_case := hardhat::importance_weights(get(weight_name))]
 
+  # Preserve predictor names exactly, including names produced by indicator coding.
   ranger_feature_df <- as.data.frame(ranger_dt[, predictor_terms, with = FALSE])
   names(ranger_feature_df) <- predictor_terms
+
+  # Store syntactic names for tools that modify non-standard column names.
   ranger_feature_lookup <- data.table(
     variable = predictor_terms,
     syntactic_variable = make.names(predictor_terms, unique = FALSE)
   )
+
+  # The fitting data frame contains only outcome, predictors, and case weights.
   ranger_fit_df <- data.frame(
     deadu5_factor = ranger_dt$deadu5_factor,
     ranger_feature_df,
@@ -546,10 +582,12 @@ format_variable_label <- function(x, var_labels = congo_var_labels) {
       return(unname(var_labels[value]))
     }
 
+    # Model terms may start with a parent variable name followed by a level.
     hits <- predictor_names[
       value == predictor_names | startsWith(value, predictor_names)
     ]
     if (length(hits)) {
+      # Choose the longest match so parent variables with shared prefixes work.
       parent <- hits[which.max(nchar(hits))]
       suffix <- trimws(sub(paste0("^", parent), "", value))
       suffix <- gsub("^[:._]+", "", suffix)
@@ -763,6 +801,8 @@ weighted_baseline_table <- function(
   baseline_dt <- copy(as.data.table(results_objects$raw_congo_model_dt))
   baseline_labels <- results_objects$raw_congo_var_labels
   baseline_vars <- setdiff(results_objects$raw_congo_predictors, "reg")
+
+  # Create the stratifying outcome with the same labels as the thesis report.
   baseline_dt[, u5_mortality := factor(
     fifelse(
       deadu5_num == 1,
@@ -780,6 +820,7 @@ weighted_baseline_table <- function(
       unname(baseline_labels[variable])
   }
 
+  # table1 passes only vector slices, so weights are recovered by row index.
   baseline_weights <- baseline_dt$sample_weight
   render_weighted_categorical <- function(x, ...) {
     row_index <- table1:::indices.indexed(x)
@@ -790,6 +831,8 @@ weighted_baseline_table <- function(
     keep <- !is.na(x)
     x_keep <- x[keep]
     w_keep <- baseline_weights[row_index][keep]
+
+    # Preserve factor order where available; otherwise use sorted observed levels.
     levels_keep <- if (is.factor(x)) {
       levels(x)
     } else {
@@ -797,6 +840,7 @@ weighted_baseline_table <- function(
     }
 
     out <- vapply(levels_keep, function(level) {
+      # Show weighted counts and weighted percentages inside each stratum.
       weighted_n <- sum(w_keep[as.character(x_keep) == level], na.rm = TRUE)
       weighted_denominator <- sum(w_keep, na.rm = TRUE)
       weighted_percent <- if (weighted_denominator > 0) {
@@ -816,6 +860,7 @@ weighted_baseline_table <- function(
 
   render_weighted_strata <- function(strata, ...) {
     out <- vapply(seq_along(strata), function(i) {
+      # Add weighted stratum sizes to the column headings.
       row_index <- table1:::indices.indexed(strata[[i]])
       weighted_n <- sum(baseline_weights[row_index], na.rm = TRUE)
       sprintf(
@@ -839,6 +884,8 @@ weighted_baseline_table <- function(
     render.categorical = render_weighted_categorical,
     render.strat = render_weighted_strata
   )
+
+  # Convert table1 output into a data frame before applying shared kable styling.
   baseline_table_out <- as.data.frame(baseline_table1)
   names(baseline_table_out) <- c(
     "Variable",
@@ -856,6 +903,7 @@ weighted_baseline_table <- function(
     bold_header = FALSE
   )
 
+  # Add a grouped header only when kableExtra can render it.
   if (report_use_kable_extra()) {
     baseline_table_kable <- kableExtra::add_header_above(
       baseline_table_kable,
@@ -903,6 +951,8 @@ report_kable <- function(
     longtable = isTRUE(longtable) && latex_table,
     ...
   )
+
+  # Apply extra styling only for output formats supported by kableExtra.
   if (report_use_kable_extra(format)) {
     latex_options <- c(
       if (isTRUE(hold_position)) "hold_position",
@@ -919,6 +969,8 @@ report_kable <- function(
     if (isTRUE(bold_header)) {
       out <- kableExtra::row_spec(out, 0, bold = TRUE)
     }
+
+    # Column widths are mainly used to keep PDF tables inside the page.
     if (!is.null(column_widths)) {
       for (i in seq_along(column_widths)) {
         if (!is.na(column_widths[[i]]) && nzchar(column_widths[[i]])) {
@@ -1046,10 +1098,13 @@ ci_report_tree_plot <- function(
   stopifnot(requireNamespace("partykit", quietly = TRUE))
 
   if (inherits(fit, "rpart")) {
+    # Convert rpart trees to party objects so one plotting path can handle both.
     fit <- partykit::as.party(fit)
   }
 
   ci_fun <- ineqTrees::ci_factory(ci_type)
+
+  # Native ci_tree objects can use plot(); converted party objects need the method.
   plot_fun <- if (inherits(fit, "ci_tree")) {
     plot
   } else if (inherits(fit, "party")) {
@@ -1058,6 +1113,7 @@ ci_report_tree_plot <- function(
     plot
   }
 
+  # Terminal statistics are recomputed from the supplied data and weights.
   plot_fun(
     fit,
     gp = grid::gpar(fontsize = fontsize),
@@ -1066,6 +1122,7 @@ ci_report_tree_plot <- function(
     terminal_stats = list(
       weighted_n = function(df) sum(df[[weight_name]], na.rm = TRUE),
       outcome = function(df) {
+        # Show weighted terminal-node mortality rather than unweighted means.
         weighted_mean_safe(
           df[[outcome_name]],
           df[[weight_name]]
@@ -1078,6 +1135,7 @@ ci_report_tree_plot <- function(
         )
       },
       ci = function(df) {
+        # Recompute the requested concentration-index criterion in each leaf.
         ci_fun(cbind(
           df[[rank_name]],
           df[[outcome_name]]
@@ -1162,6 +1220,8 @@ ci_tree_gg <- function(
   node_box_style <- match.arg(node_box_style)
   edge_label_style <- match.arg(edge_label_style)
   use_repel <- match.arg(use_repel)
+
+  # Repelled labels are optional so the function still works without ggrepel.
   can_repel <- use_repel != "none" &&
     requireNamespace("ggrepel", quietly = TRUE)
   if (use_repel != "none" && !can_repel) {
@@ -1173,10 +1233,13 @@ ci_tree_gg <- function(
   }
 
   if (inherits(fit, "rpart")) {
+    # ggparty works with party objects, so convert rpart fits first.
     fit <- partykit::as.party(fit)
   }
 
   dt <- data.table::as.data.table(data)
+
+  # Assign each observation to a terminal node for weighted leaf summaries.
   node_id <- as.integer(partykit::predict.party(
     fit,
     newdata = as.data.frame(dt),
@@ -1184,6 +1247,7 @@ ci_tree_gg <- function(
   ))
   ci_fun <- ineqTrees::ci_factory(ci_type)
 
+  # Build terminal-node labels from the actual analysis data and weights.
   terminal_stats <- dt[
     ,
     {
@@ -1213,6 +1277,8 @@ ci_tree_gg <- function(
       ci
     )
   ]
+
+  # Wrap the multi-line terminal label so it fits inside the node box.
   terminal_stats[
     ,
     node_label := vapply(
@@ -1231,6 +1297,7 @@ ci_tree_gg <- function(
     terminal_stats$node_id
   )
 
+  # Shared wrapper for split and node text.
   wrap_label <- function(value, width) {
     value <- gsub("\\s+", " ", trimws(as.character(value)))
     if (!nzchar(value) || is.na(value)) {
@@ -1239,6 +1306,7 @@ ci_tree_gg <- function(
     paste(strwrap(value, width = width), collapse = "\n")
   }
 
+  # Compact long multi-level categorical split labels.
   compact_split_value <- function(value, width = edge_label_width, max_items = 3L) {
     value <- gsub("\\s+", " ", trimws(as.character(value)))
     if (!nzchar(value) || is.na(value)) {
@@ -1260,6 +1328,7 @@ ci_tree_gg <- function(
     )
   }
 
+  # Format split-variable labels using report labels when available.
   pretty_split <- function(value) {
     if (is.na(value) || !nzchar(value)) {
       return(NA_character_)
@@ -1270,6 +1339,7 @@ ci_tree_gg <- function(
     wrap_label(gsub("_", " ", value), split_label_width)
   }
 
+  # add_vars lets ggparty carry custom labels in its layout data.
   add_vars <- list(
     node_label = function(data, node) {
       label <- terminal_label_lookup[as.character(data$id)]
@@ -1289,6 +1359,7 @@ ci_tree_gg <- function(
     gg_args$terminal_space <- terminal_space
   }
 
+  # Match the box style used in the base CI-tree plots.
   if (identical(node_box_style, "ci_report_tree")) {
     inner_label_r <- grid::unit(0.08, "lines")
     terminal_label_r <- grid::unit(0, "lines")
@@ -1306,6 +1377,8 @@ ci_tree_gg <- function(
   terminal_padding <- terminal_padding %||% grid::unit(0.18, "lines")
 
   p <- do.call(ggparty::ggparty, gg_args)
+
+  # Optional level layout puts nodes with the same depth on the same row.
   if (identical(terminal_layout, "level") &&
     all(c("id", "parent") %in% names(p$data))) {
     collect_true_levels <- function(node, level = 0L) {
@@ -1326,6 +1399,8 @@ ci_tree_gg <- function(
         use.names = TRUE
       )
     }
+
+    # Merge true recursive depth back into ggparty's plotting data.
     true_levels <- collect_true_levels(partykit::node_party(fit))
     p$data <- merge(
       p$data,
@@ -1335,6 +1410,8 @@ ci_tree_gg <- function(
       sort = FALSE
     )
     max_level <- max(p$data$true_level, na.rm = TRUE)
+
+    # Rescale coordinates so tree depth, not terminal spacing, controls position.
     if (is.finite(max_level) && max_level > 0) {
       if (isTRUE(horizontal)) {
         p$data$x <- p$data$true_level / (max_level + 1)
@@ -1345,6 +1422,8 @@ ci_tree_gg <- function(
       }
     }
   }
+
+  # Fill terminal labels directly on p$data for geom_node_label().
   p$data$node_label <- vapply(
     p$data$id,
     function(id) {
@@ -1353,6 +1432,8 @@ ci_tree_gg <- function(
     },
     character(1L)
   )
+
+  # Format split variable and split value labels for inner nodes and edges.
   p$data$splitvar_label <- vapply(
     p$data$splitvar,
     pretty_split,
@@ -1364,8 +1445,11 @@ ci_tree_gg <- function(
     character(1L)
   )
 
+  # Separate node groups because inner and terminal labels use different styles.
   inner_dt <- p$data[p$data$kids > 0L, , drop = FALSE]
   terminal_dt <- p$data[p$data$kids == 0L, , drop = FALSE]
+
+  # Edge labels are positioned manually at edge midpoints when using text labels.
   edge_dt <- p$data[
     !is.na(p$data$parent) &
       !is.na(p$data$x_parent) &
@@ -1383,6 +1467,7 @@ ci_tree_gg <- function(
   out <- p +
     ggparty::geom_edge(colour = edge_colour, linewidth = 0.35)
 
+  # Edge labels can be drawn by ggparty or manually as plain text.
   if (edge_label_style == "label") {
     edge_label_layer <- suppressWarnings(
       ggparty::geom_edge_label(
@@ -1411,6 +1496,7 @@ ci_tree_gg <- function(
       )
   }
 
+  # Repelled labels help when large terminal trees would otherwise overlap.
   if (use_repel == "all") {
     out <- out +
       ggrepel::geom_label_repel(
@@ -1443,6 +1529,7 @@ ci_tree_gg <- function(
       )
   }
 
+  # Terminal labels show weighted n, outcome mean, rank mean, and CI.
   if (use_repel %in% c("terminal", "all")) {
     out <- out +
       ggrepel::geom_label_repel(
@@ -1494,6 +1581,7 @@ collect_complexity_metrics <- function(tuning) {
     "relative_validation_gain"
   )
 
+  # Use the package's summary table so tree and forest tuning have one shape.
   out <- ineqTrees::ci_fit_summary_table(
     tuning,
     selected = NULL,
@@ -1501,6 +1589,7 @@ collect_complexity_metrics <- function(tuning) {
     include_percent = FALSE
   )
 
+  # mean_terminal_nodes lives in the raw tuning summary, so merge it back in.
   terminal_nodes <- unique(data.table::as.data.table(tuning$summary)[
     ,
     .(grid_id, type, mean_terminal_nodes)
@@ -1514,6 +1603,7 @@ collect_complexity_metrics <- function(tuning) {
     sort = FALSE
   )
 
+  # Keep only columns that exist because trees and forests have different controls.
   keep_cols <- intersect(
     c(
       "grid_id", "type", "ntree", "mtry", "minsplit", "minbucket",
@@ -1552,6 +1642,8 @@ min_relative_gain_path <- function(complexity_dt, selected = NULL) {
   }
 
   out <- copy(data.table::as.data.table(complexity_dt))
+
+  # Convert relative validation gain to percentage units for plotting.
   out[
     ,
     `:=`(
@@ -1565,6 +1657,8 @@ min_relative_gain_path <- function(complexity_dt, selected = NULL) {
       }
     )
   ]
+
+  # Drop incomplete grid rows before summarising the tuning path.
   out <- out[
     is.finite(min_relative_gain) &
       is.finite(validation_percent_gain) &
@@ -1576,11 +1670,13 @@ min_relative_gain_path <- function(complexity_dt, selected = NULL) {
 
   out[, selected := FALSE]
   if (!is.null(selected)) {
+    # Mark the selected tuning rows supplied by ci_select_best().
     selected_keys <- unique(
       as.data.table(selected)[, .(type, grid_id)]
     )
     out[selected_keys, selected := TRUE, on = c("type", "grid_id")]
   } else {
+    # If no selected rows are supplied, mark the best validation row per type.
     out[
       ,
       `:=`(
@@ -1591,6 +1687,7 @@ min_relative_gain_path <- function(complexity_dt, selected = NULL) {
     ]
   }
 
+  # Average over other controls to show the path against min_relative_gain.
   out <- out[
     ,
     {
@@ -1602,11 +1699,13 @@ min_relative_gain_path <- function(complexity_dt, selected = NULL) {
         mean_root_objective = mean(mean_root_objective, na.rm = TRUE),
         validation_percent_gain = mean(validation_percent_gain, na.rm = TRUE),
         validation_percent_se = if (length(se_values) && n_settings > 0L) {
+          # Combine standard errors across settings using root-sum-squares.
           sqrt(sum(se_values^2)) / n_settings
         } else {
           NA_real_
         },
         validation_percent_from_mean_root = {
+          # Provide a second percent-gain calculation using mean root impurity.
           mean_gain <- mean(mean_validation_gain, na.rm = TRUE)
           mean_root <- mean(mean_root_objective, na.rm = TRUE)
           if (is.finite(mean_gain) &&
@@ -1658,6 +1757,8 @@ plot_validation_percent_gain_path <- function(path_dt, title) {
   }
 
   plot_dt <- copy(data.table::as.data.table(path_dt))
+
+  # Non-finite standard errors are left out of the error-bar layer.
   plot_dt[!is.finite(validation_percent_se), validation_percent_se := NA_real_]
   selected_dt <- plot_dt[selected == TRUE]
 
@@ -1721,6 +1822,8 @@ plot_terminal_nodes_path <- function(path_dt, title) {
   }
 
   path_dt <- as.data.table(path_dt)
+
+  # Highlight selected settings with white-filled points.
   selected_dt <- path_dt[selected == TRUE]
 
   ggplot(
@@ -1776,6 +1879,7 @@ collect_variable_importance <- function(models, top_n = 12L) {
       return(empty_importance)
     }
 
+    # Keep positive importance only, then rank within each criterion.
     out <- data.table(
       criterion = criterion_name,
       variable = names(importance),
@@ -1814,6 +1918,7 @@ plot_variable_importance <- function(importance_dt, title, var_labels = NULL) {
   if (is.null(var_labels)) {
     plot_dt[, variable_pretty := variable]
   } else {
+    # Replace internal variable names with report labels where possible.
     plot_dt[
       ,
       variable_pretty := ifelse(
@@ -1823,6 +1928,8 @@ plot_variable_importance <- function(importance_dt, title, var_labels = NULL) {
       )
     ]
   }
+
+  # Include criterion in the factor so free-y facets can keep independent order.
   plot_dt[
     ,
     variable_label := factor(
@@ -1846,15 +1953,106 @@ predict_ci_forest_risk <- function(
   object, newdata,
   outcome_name = object$outcome_name %||% "deadu5_num"
 ) {
+  # Predict each tree in the forest and average terminal-node outcome estimates.
   stats::predict(
     object,
     newdata = as.data.frame(newdata),
     type = "response",
     OOB = FALSE,
     FUN = function(y, w) {
+      # The response is a weighted terminal-node mortality estimate.
       stats::weighted.mean(y[, outcome_name], w, na.rm = TRUE)
     }
   )
+}
+
+#' Extract feature-level SHAP estimates from a shapr explanation object.
+extract_shapr_values <- function(explanation) {
+  shap_values <- as.data.frame(explanation$shapley_values_est)
+
+  # Drop bookkeeping columns and keep only feature contributions.
+  shap_values[
+    ,
+    setdiff(names(shap_values), c("explain_id", "none")),
+    drop = FALSE
+  ]
+}
+
+#' Estimate SHAP values with shapr. Kept as an alternative implementation.
+estimate_shapr_values <- function(object,
+                                  x_train,
+                                  x_explain,
+                                  pred_wrapper,
+                                  seed,
+                                  n_mc_samples = 64L) {
+  if (!requireNamespace("shapr", quietly = TRUE)) {
+    stop("Package shapr is required for estimate_shapr_values().", call. = FALSE)
+  }
+
+  # shapr needs a small model-spec function for the active predictor data.
+  model_specs <- function(unused) {
+    list(
+      labels = names(x_train),
+      classes = vapply(x_train, function(col) class(col)[1L], character(1L)),
+      factor_levels = lapply(x_train, function(col) {
+        if (is.factor(col)) levels(col) else NULL
+      })
+    )
+  }
+
+  # phi0 is the baseline prediction used by the SHAP decomposition.
+  explanation <- shapr::explain(
+    model = object,
+    x_explain = as.data.frame(x_explain),
+    x_train = as.data.frame(x_train),
+    approach = "ctree",
+    phi0 = mean(pred_wrapper(object, x_train)),
+    n_MC_samples = n_mc_samples,
+    seed = seed,
+    predict_model = pred_wrapper,
+    get_model_specs = model_specs,
+    verbose = NULL
+  )
+
+  extract_shapr_values(explanation)
+}
+
+#' Estimate SHAP values with fastshap using the active report workflow model.
+estimate_fastshap_values <- function(object,
+                                     x_train,
+                                     x_explain,
+                                     pred_wrapper,
+                                     seed,
+                                     nsim = 64L,
+                                     adjust = TRUE) {
+  if (!requireNamespace("fastshap", quietly = TRUE)) {
+    stop(
+      paste(
+        "Package fastshap is required for SHAP estimation.",
+        "Install it from GitHub with:",
+        "remotes::install_github('bgreenwell/fastshap')"
+      ),
+      call. = FALSE
+    )
+  }
+
+  nsim <- max(2L, as.integer(nsim[1L]))
+  set.seed(seed)
+
+  # fastshap estimates feature contributions by Monte Carlo permutations.
+  out <- fastshap::explain(
+    object = object,
+    X = as.data.frame(x_train),
+    newdata = as.data.frame(x_explain),
+    pred_wrapper = pred_wrapper,
+    nsim = nsim,
+    adjust = adjust,
+    shap_only = TRUE,
+    parallel = FALSE
+  )
+
+  # Return a plain data frame so downstream data.table code controls conversion.
+  as.data.frame(out)
 }
 
 #' Run CI forest tuning in logged batches and combine the results.
@@ -1869,6 +2067,7 @@ run_forest_tuning_batches <- function(
   outcome_name = "deadu5_num",
   weights = data$sample_weight,
   folds = 10L,
+  fold_id = NULL,
   workers = 4L,
   progress_steps = 20L,
   log_file = "logs/forest_tuning.log",
@@ -1880,6 +2079,27 @@ run_forest_tuning_batches <- function(
   stopifnot(requireNamespace("ineqTrees", quietly = TRUE))
 
   forest_grid <- as.data.table(forest_grid)
+  folds <- max(2L, as.integer(folds[1L]))
+
+  # A supplied fold_id allows PSU-held-out validation from the generator QMD.
+  if (!is.null(fold_id)) {
+    fold_id <- as.integer(fold_id)
+    if (length(fold_id) != nrow(data)) {
+      stop(
+        "`fold_id` must have one value for each row in `data`.",
+        call. = FALSE
+      )
+    }
+    if (anyNA(fold_id)) {
+      stop("`fold_id` cannot contain missing values.", call. = FALSE)
+    }
+    folds <- data.table::uniqueN(fold_id)
+    if (folds < 2L) {
+      stop("`fold_id` must contain at least two folds.", call. = FALSE)
+    }
+  }
+
+  # Create a fresh log file for the long-running forest tuning job.
   log_dir <- dirname(log_file)
   if (!identical(log_dir, ".") && !dir.exists(log_dir)) {
     dir.create(log_dir, recursive = TRUE, showWarnings = FALSE)
@@ -1888,6 +2108,7 @@ run_forest_tuning_batches <- function(
     file.remove(log_file)
   }
 
+  # Write progress messages both to the console and to disk.
   log_msg <- function(fmt, ...) {
     line <- sprintf(
       "[%s] %s",
@@ -1901,9 +2122,13 @@ run_forest_tuning_batches <- function(
 
   old_plan <- future::plan()
   on.exit(future::plan(old_plan), add = TRUE)
+
+  # Use a temporary multisession plan for forest tuning, then restore the old one.
   future::plan(future::multisession, workers = workers)
 
   total_grid <- nrow(forest_grid)
+
+  # Split the grid into batches so progress can be logged and partial work isolated.
   progress_steps <- max(1L, min(as.integer(progress_steps), total_grid))
   batch_size <- max(1L, ceiling(total_grid / progress_steps))
   batches <- split(
@@ -1911,15 +2136,25 @@ run_forest_tuning_batches <- function(
     ceiling(seq_len(total_grid) / batch_size)
   )
   total_fold_fits <- total_grid * length(criterion_types) * folds
+  fold_source <- if (is.null(fold_id)) {
+    "outcome-stratified row folds"
+  } else {
+    "user-supplied fold_id"
+  }
 
   log_msg(
-    "Forest tuning: %d grid rows, %d criteria, %d folds (~%s fold-level fits).",
+    paste0(
+      "Forest tuning: %d grid rows, %d criteria, %d folds (%s) ",
+      "(~%s fold-level fits)."
+    ),
     total_grid,
     length(criterion_types),
     folds,
+    fold_source,
     format(total_fold_fits, big.mark = ",", scientific = FALSE)
   )
 
+  # Batch-level tuning creates local grid ids; shift them back to global row ids.
   shift_grid_id <- function(dt, global_rows) {
     dt <- as.data.table(dt)
     if (nrow(dt) && "grid_id" %in% names(dt)) {
@@ -1933,6 +2168,7 @@ run_forest_tuning_batches <- function(
 
   batch_results <- vector("list", length(batches))
 
+  # Tune each batch independently, then combine the batch results at the end.
   for (batch_idx in seq_along(batches)) {
     batch_rows <- batches[[batch_idx]]
     batch_grid <- forest_grid[batch_rows]
@@ -1947,7 +2183,8 @@ run_forest_tuning_batches <- function(
       length(batch_rows)
     )
 
-    batch_fit <- ineqTrees::tune_ci_forest(
+    # Assemble tune_ci_forest arguments in a list so fold handling is explicit.
+    tune_args <- list(
       formula = formula,
       data = data,
       rank_name = rank_name,
@@ -1955,8 +2192,6 @@ run_forest_tuning_batches <- function(
       weights = weights,
       type = criterion_types,
       control_grid = batch_grid,
-      v = folds,
-      strata = outcome_name,
       seed = seed,
       metric = tuning_metrics,
       refit = FALSE,
@@ -1966,6 +2201,17 @@ run_forest_tuning_batches <- function(
       control = ineqTrees::control_ci_tune(save_pred = TRUE)
     )
 
+    # Use row-level stratified folds only when no explicit fold id is provided.
+    if (is.null(fold_id)) {
+      tune_args$v <- folds
+      tune_args$strata <- outcome_name
+    } else {
+      tune_args$fold_id <- fold_id
+    }
+
+    batch_fit <- do.call(ineqTrees::tune_ci_forest, tune_args)
+
+    # Restore grid ids so selected rows refer to the original forest_grid.
     for (name in c(
       "fold_results", "summary",
       "predictions", "extracts", "fits", "notes"
@@ -1993,12 +2239,14 @@ run_forest_tuning_batches <- function(
     )
   }
 
+  # Combine batch summaries before constructing the tuning object.
   combined_summary <- rbindlist(lapply(
     batch_results,
     `[[`, "summary"
   ), fill = TRUE)
   setorderv(combined_summary, c("metric", "type", "grid_id"), c(1L, 1L, 1L))
 
+  # Recreate the same list shape returned by tune_ci_forest().
   out <- list(
     fold_results = rbindlist(lapply(
       batch_results,
@@ -2032,6 +2280,8 @@ run_forest_tuning_batches <- function(
     control = batch_results[[1L]]$control
   )
   class(out) <- c("ci_forest_tuning", "ci_tree_tuning", class(out))
+
+  # Select best parameters after all batches have been recombined.
   out$best_params <- ineqTrees::ci_select_best(out)
   log_msg("Forest tuning: finished all batches.")
   out

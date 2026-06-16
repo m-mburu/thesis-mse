@@ -48,6 +48,7 @@ po/*~
 rsconnect/
 
 # Data files that should not be committed
+data/
 data/*.csv
 data/*.xlsx
 data/*.rds
@@ -56,6 +57,34 @@ data/*.rda
 data/*.dta
 data/*.sav
 data/downloaded/
+
+# Private/local references, papers, journals, and source data
+docs/
+prev_analysis/
+
+# Private raw-data formats anywhere in the repo
+*.csv
+*.xlsx
+*.dta
+*.sav
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+
+# Quarto-rendered result files are allowed to remain public.
+# Private papers and data are still covered by docs/, data/, and prev_analysis/.
+
+# Scratch, archive, and local-only work
+archive/
+report/archive/
+logs/
+test_*
+*_TODO.md
+MOSES.docx
+report/comments*.md
+report/results_discussion_abstract_narrative_flags.md
 
 # Local config
 R/cookies_local.R
