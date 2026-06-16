@@ -76,6 +76,13 @@ prev_analysis/
 # Quarto-rendered result files are allowed to remain public.
 # Private papers and data are still covered by docs/, data/, and prev_analysis/.
 
+# Final thesis report products kept local.
+report/MSE_Thesis_Decomposition_of_CI_Trees_MM.docx
+report/MSE_Thesis_Decomposition_of_CI_Trees_MM.pdf
+report/MSE_Thesis_Decomposition_of_CI_Trees_MM.qmd
+report/MSE_Thesis_Decomposition_of_CI_Trees_MM.tex
+report/MSE_Thesis_Decomposition_of_CI_Trees_MM_files/
+
 # Scratch, archive, and local-only work
 archive/
 report/archive/
