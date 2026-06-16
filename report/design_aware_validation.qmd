@@ -20,6 +20,7 @@ params:
 ---
 
 ```{r setup}
+# Use one plotting setup for the validation tables and any diagnostic figures.
 knitr::opts_chunk$set(
   fig.width = 9,
   fig.height = 5.5,
@@ -27,6 +28,7 @@ knitr::opts_chunk$set(
   dev = "png"
 )
 
+# Load packages and helper functions used by the tree-fitting workflow.
 library(data.table)
 library(ggplot2)
 library(here)
@@ -59,13 +61,17 @@ not produce formal survey-design confidence intervals for individual splits.
 # Load Generated Results
 
 ```{r load-generated-results}
+# Load the object produced by Generate_DRC_Results_Objects.qmd.
 results_object_file <- here("data", "drc_report_results_objects.rda")
 stopifnot(file.exists(results_object_file))
 
 load(results_object_file)
 stopifnot(exists("drc_results_objects"))
+
+# Put the generated objects into this environment so the code stays readable.
 list2env(drc_results_objects, envir = environment())
 
+# These objects are required to refit and compare the selected trees.
 required_objects <- c(
   "congo_model_dt",
   "raw_congo_model_dt",
@@ -74,6 +80,8 @@ required_objects <- c(
   "tree_best_by_type"
 )
 missing_objects <- setdiff(required_objects, names(drc_results_objects))
+
+# Stop early if the generator was not rerun with the needed objects.
 if (length(missing_objects)) {
   stop(
     "Missing required generated objects: ",
@@ -82,6 +90,7 @@ if (length(missing_objects)) {
   )
 }
 
+# The bootstrap uses PSU values from the raw data and predictors from model data.
 stopifnot(nrow(congo_model_dt) == nrow(raw_congo_model_dt))
 if (!"PSU" %in% names(raw_congo_model_dt)) {
   stop(
@@ -91,10 +100,13 @@ if (!"PSU" %in% names(raw_congo_model_dt)) {
   )
 }
 
+# Keep only criteria for which selected tree settings are available.
 criterion_types <- intersect(c("CI", "CIg", "CIc", "L"), tree_best_by_type$type)
 if (!length(criterion_types)) {
   stop("No selected tree criteria were found in `tree_best_by_type`.", call. = FALSE)
 }
+
+# Allow either the design-aware PSU bootstrap or a row-level sensitivity check.
 bootstrap_unit <- toupper(as.character(params$bootstrap_unit)[1L])
 if (!bootstrap_unit %in% c("PSU", "ROW")) {
   stop("`bootstrap_unit` must be either 'PSU' or 'ROW'.", call. = FALSE)
@@ -103,11 +115,13 @@ if (!bootstrap_unit %in% c("PSU", "ROW")) {
 bootstrap_replicates <- max(1L, as.integer(params$bootstrap_replicates))
 bootstrap_seed <- as.integer(params$bootstrap_seed)
 
+# Add PSU to the model-ready data so bootstrap samples can be drawn by cluster.
 bootstrap_source_dt <- data.table(
   PSU = raw_congo_model_dt$PSU,
   congo_model_dt
 )
 
+# Summarise the run inputs before any bootstrap refitting starts.
 loaded_summary <- data.table(
   item = c(
     "Generated object",
@@ -136,6 +150,7 @@ report_compact_table(
 # Selected Settings
 
 ```{r selected-tree-settings}
+# Hold the selected tuning settings fixed across all bootstrap refits.
 selected_tree_settings <- copy(tree_best_by_type[type %in% criterion_types])
 
 report_compact_table(
@@ -160,6 +175,7 @@ report_compact_table(
 ```
 
 ```{r fit-reference-trees}
+# Fit one concentration-index tree using a selected tuning row.
 fit_selected_tree <- function(setting, data) {
   ci_tree(
     formula = congo_ci_formula,
@@ -172,9 +188,11 @@ fit_selected_tree <- function(setting, data) {
   )
 }
 
+# Prefer the tree models saved by the generator if they are available.
 have_saved_tree_models <- exists("tree_models_by_type") &&
   all(criterion_types %in% names(tree_models_by_type))
 
+# Otherwise refit the selected trees from their saved tuning settings.
 reference_tree_models_by_type <- if (have_saved_tree_models) {
   tree_models_by_type[criterion_types]
 } else {
@@ -186,6 +204,7 @@ reference_tree_models_by_type <- if (have_saved_tree_models) {
   )
 }
 
+# Summarise the original selected trees before bootstrap sampling.
 reference_tree_summary <- rbindlist(
   lapply(names(reference_tree_models_by_type), function(type) {
     out <- as.data.table(
@@ -208,6 +227,7 @@ report_compact_table(
 # Bootstrap Stability
 
 ```{r bootstrap-helpers}
+# Return one finite numeric value, or NA if the tree field is absent.
 scalar_numeric <- function(x) {
   if (is.null(x) || !length(x)) {
     return(NA_real_)
@@ -216,6 +236,7 @@ scalar_numeric <- function(x) {
   if (is.na(x) || !is.finite(x)) NA_real_ else x
 }
 
+# Return one non-empty character value, or NA if the tree field is absent.
 scalar_character <- function(x) {
   if (is.null(x) || !length(x) || is.na(x[1L]) || !nzchar(as.character(x[1L]))) {
     return(NA_character_)
@@ -223,6 +244,7 @@ scalar_character <- function(x) {
   as.character(x[1L])
 }
 
+# Replace internal split-variable names with the report labels.
 label_tree_variable <- function(x) {
   if (is.na(x) || !nzchar(x)) {
     return(NA_character_)
@@ -233,6 +255,7 @@ label_tree_variable <- function(x) {
   x
 }
 
+# Collapse a vector of split variables into a readable semicolon-separated string.
 collapse_split_variables <- function(x) {
   x <- unique(x[!is.na(x) & nzchar(x)])
   if (!length(x)) {
@@ -241,6 +264,7 @@ collapse_split_variables <- function(x) {
   paste(x, collapse = "; ")
 }
 
+# Walk through a partykit tree and collect every split variable used.
 collect_split_variables <- function(node) {
   if (partykit::is.terminal(node)) {
     return(character())
@@ -258,6 +282,7 @@ collect_split_variables <- function(node) {
   c(this_var, child_vars)
 }
 
+# Add absolute concentration-index impurity to the terminal-node summary.
 terminal_node_summary <- function(fit) {
   out <- as.data.table(ci_tree_terminal_summary(fit))
   out[, abs_impurity := abs(ci)]
@@ -268,11 +293,14 @@ tree_leaf_similarity <- function(reference_fit,
                                  bootstrap_fit,
                                  reference_data,
                                  recovery_threshold = 0.50) {
+  # Assign every original observation to a reference-tree terminal node.
   reference_leaf <- as.integer(partykit::predict.party(
     reference_fit,
     newdata = as.data.frame(reference_data),
     type = "node"
   ))
+
+  # Assign the same observations to the bootstrap-refitted tree.
   bootstrap_leaf <- as.integer(partykit::predict.party(
     bootstrap_fit,
     newdata = as.data.frame(reference_data),
@@ -282,6 +310,7 @@ tree_leaf_similarity <- function(reference_fit,
   reference_leaves <- sort(unique(reference_leaf))
   bootstrap_leaves <- sort(unique(bootstrap_leaf))
 
+  # For each reference leaf, find the bootstrap leaf with the best overlap.
   best_jaccard <- vapply(reference_leaves, function(reference_id) {
     reference_rows <- reference_leaf == reference_id
     max(vapply(bootstrap_leaves, function(bootstrap_id) {
@@ -290,6 +319,7 @@ tree_leaf_similarity <- function(reference_fit,
     }, numeric(1L)))
   }, numeric(1L))
 
+  # Median overlap summarises tree similarity; recovery uses a 0.50 cutoff.
   list(
     tree_similarity_score = stats::median(best_jaccard, na.rm = TRUE),
     reference_leaves_recovered_percent =
@@ -297,8 +327,10 @@ tree_leaf_similarity <- function(reference_fit,
   )
 }
 
+# Draw one bootstrap sample, either by PSU clusters or by individual rows.
 draw_bootstrap_data <- function(unit) {
   if (identical(unit, "PSU")) {
+    # Sample PSUs with replacement and keep all children inside sampled PSUs.
     sampled_psus <- sample(
       unique(bootstrap_source_dt$PSU),
       size = uniqueN(bootstrap_source_dt$PSU),
@@ -309,24 +341,36 @@ draw_bootstrap_data <- function(unit) {
       PSU = sampled_psus
     )
     out <- bootstrap_source_dt[boot_key, on = "PSU", allow.cartesian = TRUE]
+
+    # Remove bootstrap bookkeeping columns before passing data to ci_tree().
     out[, bootstrap_draw_id := NULL]
     out[, PSU := NULL]
     return(out)
   }
 
+  # Row bootstrap is retained only as a sensitivity check.
   congo_model_dt[sample.int(nrow(congo_model_dt), size = nrow(congo_model_dt), replace = TRUE)]
 }
 
+# Summarise one successfully refitted bootstrap tree.
 summarise_bootstrap_tree <- function(fit, type, replicate, reference_fit) {
+  # Root-node information stores the first split and fitted impurity values.
   root_info <- partykit::info_node(partykit::node_party(fit))
+
+  # Terminal summaries describe the final bootstrap subgroups.
   terminal_summary <- terminal_node_summary(fit)
+
+  # Collect all split variables, not only the root split.
   split_variables <- collect_split_variables(partykit::node_party(fit))
+
+  # Compare terminal-node membership with the original selected tree.
   similarity <- tree_leaf_similarity(
     reference_fit = reference_fit,
     bootstrap_fit = fit,
     reference_data = congo_model_dt
   )
 
+  # Weight terminal impurities by terminal-node sample weight.
   weighted_terminal_impurity <- if (nrow(terminal_summary)) {
     sum(
       terminal_summary$abs_impurity * terminal_summary$weight,
@@ -336,6 +380,7 @@ summarise_bootstrap_tree <- function(fit, type, replicate, reference_fit) {
     NA_real_
   }
 
+  # Return one row per criterion and bootstrap replicate.
   data.table(
     type = type,
     bootstrap_replicate = replicate,
@@ -367,6 +412,7 @@ summarise_bootstrap_tree <- function(fit, type, replicate, reference_fit) {
   )
 }
 
+# Return the same columns for failed bootstrap fits so binding is simple.
 failed_bootstrap_tree <- function(type, replicate, error_message) {
   data.table(
     type = type,
@@ -395,6 +441,7 @@ failed_bootstrap_tree <- function(type, replicate, error_message) {
   )
 }
 
+# Format a median and 95% bootstrap interval for continuous quantities.
 format_interval <- function(x, digits = 3L, percent = FALSE) {
   x <- x[is.finite(x)]
   if (!length(x)) {
@@ -413,6 +460,7 @@ format_interval <- function(x, digits = 3L, percent = FALSE) {
   sprintf(fmt, qs[[2L]], qs[[1L]], qs[[3L]])
 }
 
+# Format a median and 95% bootstrap interval for count quantities.
 format_count_interval <- function(x) {
   x <- x[is.finite(x)]
   if (!length(x)) {
@@ -422,6 +470,7 @@ format_count_interval <- function(x) {
   sprintf("%s (%s, %s)", round(qs[[2L]]), round(qs[[1L]]), round(qs[[3L]]))
 }
 
+# Report the root split that appears most often among successful refits.
 most_common_root <- function(dt) {
   dt <- dt[success == TRUE & !is.na(root_split_variable_label)]
   if (!nrow(dt)) {
@@ -439,12 +488,14 @@ most_common_root <- function(dt) {
   )
 }
 
+# Report the split variables that appear most often anywhere in the tree.
 most_common_split_variables <- function(dt, max_vars = 5L) {
   dt <- dt[success == TRUE]
   if (!nrow(dt)) {
     return(NA_character_)
   }
 
+  # Expand the semicolon-separated split list into one variable per row.
   split_dt <- rbindlist(lapply(seq_len(nrow(dt)), function(i) {
     value <- dt$all_split_variable_labels[i]
     if (is.na(value) || !nzchar(value)) {
@@ -460,6 +511,7 @@ most_common_split_variables <- function(dt, max_vars = 5L) {
     return(NA_character_)
   }
 
+  # Count the percentage of bootstrap replicates that used each variable.
   split_dt <- split_dt[
     ,
     .(n = uniqueN(bootstrap_replicate)),
@@ -474,10 +526,12 @@ most_common_split_variables <- function(dt, max_vars = 5L) {
   paste(top_split_variables, collapse = "; ")
 }
 
+# Collapse the raw bootstrap results into the table shown in the report.
 summarise_bootstrap_table <- function(raw_dt) {
   raw_dt[
     ,
     {
+      # Failed fits are counted, but intervals use successful refits only.
       successful <- .SD[success == TRUE]
       .(
         successful_replicates = nrow(successful),
@@ -509,6 +563,7 @@ summarise_bootstrap_table <- function(raw_dt) {
 ```
 
 ```{r run-bootstrap}
+# All bootstrap outputs are saved with a label that records unit, B, and seed.
 results_dir <- here("data")
 bootstrap_label <- paste0(
   "selected_tree_",
@@ -531,6 +586,7 @@ bootstrap_tree_stability_table_csv <- file.path(
   paste0(bootstrap_label, "_table.csv")
 )
 
+# Reuse saved bootstrap results unless an explicit refresh is requested.
 if (
   !isTRUE(params$refresh_bootstrap) &&
     file.exists(bootstrap_tree_stability_raw_file) &&
@@ -539,18 +595,25 @@ if (
   bootstrap_tree_stability_raw <- readRDS(bootstrap_tree_stability_raw_file)
   bootstrap_tree_stability_table <- readRDS(bootstrap_tree_stability_table_file)
 } else {
+  # Create a fixed bootstrap stream for reproducible stability checks.
   set.seed(bootstrap_seed)
+
+  # Preallocate one result row for each criterion and bootstrap replicate.
   bootstrap_rows <- vector("list", length(criterion_types) * bootstrap_replicates)
   row_id <- 0L
 
+  # Refit each selected criterion under each bootstrap draw.
   for (criterion in criterion_types) {
     setting <- selected_tree_settings[type == criterion]
     reference_fit <- reference_tree_models_by_type[[criterion]]
 
     for (b in seq_len(bootstrap_replicates)) {
       row_id <- row_id + 1L
+
+      # Draw the bootstrap data before fitting the selected tree again.
       bootstrap_dt <- draw_bootstrap_data(bootstrap_unit)
 
+      # Store either the tree summary or a failure row with the error message.
       bootstrap_rows[[row_id]] <- tryCatch({
         fit <- fit_selected_tree(setting, bootstrap_dt)
         summarise_bootstrap_tree(
@@ -569,20 +632,24 @@ if (
     }
   }
 
+  # Bind replicate-level rows and build the compact report table.
   bootstrap_tree_stability_raw <- rbindlist(bootstrap_rows, fill = TRUE)
   bootstrap_tree_stability_table <- summarise_bootstrap_table(
     bootstrap_tree_stability_raw
   )
 
+  # Save raw and summarised objects so reruns do not repeat the bootstrap.
   saveRDS(bootstrap_tree_stability_raw, bootstrap_tree_stability_raw_file)
   saveRDS(bootstrap_tree_stability_table, bootstrap_tree_stability_table_file)
   fwrite(bootstrap_tree_stability_table, bootstrap_tree_stability_table_csv)
 }
 
+# Ensure a CSV summary exists even when cached RDS files were loaded.
 if (!file.exists(bootstrap_tree_stability_table_csv)) {
   fwrite(bootstrap_tree_stability_table, bootstrap_tree_stability_table_csv)
 }
 
+# Display the compact bootstrap stability table.
 report_compact_table(
   bootstrap_tree_stability_table,
   caption = "Cluster-level bootstrap stability of selected concentration-index trees"
@@ -603,6 +670,7 @@ p-values, formal split-level inference, or full survey-design uncertainty.
 # Save Objects
 
 ```{r save-bootstrap-objects}
+# Bundle the settings, reference summaries, and output paths for the main report.
 bootstrap_tree_results <- list(
   results_object_file = results_object_file,
   bootstrap_seed = bootstrap_seed,
@@ -616,15 +684,18 @@ bootstrap_tree_results <- list(
   bootstrap_tree_stability_table = bootstrap_tree_stability_table
 )
 
+# Use the same label as the raw/table files so the report can find the object.
 bootstrap_tree_results_file <- here(
   "data",
   paste0(bootstrap_label, "_objects.rda")
 )
 
+# Save the bootstrap object unless the user explicitly disables saving.
 if (isTRUE(params$save_results)) {
   save(bootstrap_tree_results, file = bootstrap_tree_results_file)
 }
 
+# Print a short save summary at the end of the validation workflow.
 data.table(
   saved = isTRUE(params$save_results),
   file = bootstrap_tree_results_file,

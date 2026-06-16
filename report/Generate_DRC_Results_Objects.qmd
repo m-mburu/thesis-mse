@@ -36,6 +36,7 @@ always_allow_html: true
 ---
 
 ```{r setup}
+# Set one plotting style for all generated figures in this workflow.
 knitr::opts_chunk$set(
   fig.width = 9,
   fig.height = 5.5,
@@ -43,6 +44,7 @@ knitr::opts_chunk$set(
   dev = "png"
 )
 
+# Load the packages and local helper functions used across the generator.
 library(data.table)
 library(ggplot2)
 library(grid)
@@ -57,6 +59,7 @@ kableExtra::use_latex_packages()
 ```
 
 ```{r runtime-parameter-config}
+# Store default values for slow parts of the workflow.
 default_params <- list(
   analysis_rows = 1L,
   tuning_folds = 10L,
@@ -67,8 +70,10 @@ default_params <- list(
   shap_workers = 4L
 )
 
+# Let Quarto parameters override defaults, while keeping the same object names.
 runtime_params <- utils::modifyList(default_params, as.list(params))
 
+# Coerce parameters here so later chunks do not have to repeat checks.
 runtime_params$analysis_rows <- as.integer(runtime_params$analysis_rows)
 runtime_params$tuning_folds <- max(2L, as.integer(runtime_params$tuning_folds))
 runtime_params$undersample <- as.numeric(runtime_params$undersample)
@@ -77,6 +82,7 @@ runtime_params$shap_n_mc_samples <- as.integer(runtime_params$shap_n_mc_samples)
 runtime_params$shap_seed <- as.integer(runtime_params$shap_seed)
 runtime_params$shap_workers <- max(1L, as.integer(runtime_params$shap_workers))
 
+# Fall back to safe defaults if a parameter is missing or not valid.
 if (is.na(runtime_params$analysis_rows) || runtime_params$analysis_rows <= 0L) {
   runtime_params$analysis_rows <- default_params$analysis_rows
 }
@@ -93,6 +99,7 @@ if (is.na(runtime_params$shap_seed)) {
   runtime_params$shap_seed <- default_params$shap_seed
 }
 
+# Pull out the SHAP parameters because they are used repeatedly later.
 shap_n_mc_samples <- runtime_params$shap_n_mc_samples
 shap_seed <- runtime_params$shap_seed
 shap_workers <- runtime_params$shap_workers
@@ -100,17 +107,23 @@ shap_rows_requested <- runtime_params$shap_rows
 ```
 
 ```{r criterion-config}
+# These are the concentration-index criteria compared throughout the analysis.
 criterion_types <- c("CI", "CIg", "CIc", "L")
 rineq_ci_types <- c("CI", "CIg", "CIc", "CIw")
+
+# Define the main input and output files in one place.
 results_object_file <- here("data", "drc_report_results_objects.rda")
 tree_tuning_file <- here("data", "tree_tuning.rda")
 source_data_file <- here("prev_analysis", "DRCongo .dta")
 paper_reference_file <- here("prev_analysis", "667.full.pdf")
+
+# Use readable outcome labels in tables and plots.
 outcome_labels <- c(
   alive = "Alive at age 5",
   died = "Died before age 5"
 )
 
+# Keep a single baseline tree control for reference and plotting.
 main_tree_control <-ci_tree_control(
   minsplit = 500L,
   minbucket = 250L,
@@ -122,6 +135,7 @@ main_tree_control <-ci_tree_control(
 ```
 
 ```{r map-model-terms-helper}
+# Map model-matrix columns back to their original predictor names.
 map_model_terms_to_predictors <- function(term_names, predictors) {
   vapply(term_names, function(term) {
     hit <- predictors[term == predictors | startsWith(term, predictors)]
@@ -131,6 +145,7 @@ map_model_terms_to_predictors <- function(term_names, predictors) {
 ```
 
 ```{r canonicalize-model-terms-helper}
+# Convert syntactic model names back to the names used in the report tables.
 canonicalize_model_terms <- function(term_names, reference_terms) {
   lookup <- data.table(
     variable = reference_terms,
@@ -153,6 +168,7 @@ canonicalize_model_terms <- function(term_names, reference_terms) {
 ```
 
 ```{r rank-from-named-vector-helper}
+# Convert named importance vectors into ranked tables for method comparison.
 rank_from_named_vector <- function(x, method_name) {
   x <- x %||% numeric()
   data.table(variable = names(x), score = as.numeric(x))[
@@ -186,18 +202,23 @@ use the full data set.
 
 ```{r load-2007-drc-data}
 library(haven)
+
+# Load the DRC 2007 data file used for the empirical application.
 drc_2007_dt <- as.data.table(haven::read_dta(source_data_file))
 ```
 
 ```{r prepare-2007-drc-analysis-data}
+# Turn labelled numeric codes into factors with readable labels.
 factor_from_codes <- function(x, labels) {
   factor(labels[as.character(as.integer(x))], levels = unname(labels))
 }
 
+# Use this helper for binary variables so levels stay in the intended order.
 binary_factor <- function(x, labels) {
   factor(labels[as.character(as.integer(x))], levels = unname(labels))
 }
 
+# Labels below follow the determinant groups used in the thesis report.
 drc_birth_labels <- c(
   "1" = "First birth",
   "2" = "2-4 short interval",
@@ -227,6 +248,7 @@ drc_region_labels <- c(
   "11" = "Sud-Kivu"
 )
 
+# Keep the analysis variables, convert types, and attach readable categories.
 raw_congo_model_dt <- drc_2007_dt[
   ,
   .(
@@ -252,8 +274,11 @@ raw_congo_model_dt <- drc_2007_dt[
     reg = factor_from_codes(reg, drc_region_labels)
   )
 ]
+
+# Drop rows with missing values so all methods use the same complete cases.
 raw_congo_model_dt <- na.omit(raw_congo_model_dt)
 
+# Store report labels separately from the data so they can be reused in plots.
 raw_congo_var_labels <- c(
   quint = "Household wealth",
   unskilled = "Skilled birth attendance",
@@ -271,6 +296,7 @@ raw_congo_predictors <- names(raw_congo_var_labels)
 ```
 
 ```{r sample-2007-drc-analysis-data}
+# Use the full data for the final run; allow small samples for quick checks.
 raw_congo_model_dt <- sample_analysis_rows(
     raw_congo_model_dt,
     use_full = runtime_params$analysis_rows == 1L,
@@ -280,6 +306,7 @@ raw_congo_model_dt <- sample_analysis_rows(
 ```
 
 ```{r encode-analysis-predictors}
+# Count predictor levels before deciding how each variable enters the tree model.
 predictor_level_counts <- vapply(
     raw_congo_model_dt[, raw_congo_predictors, with = FALSE],
     function(x) length(levels(as.factor(x))),
@@ -296,12 +323,15 @@ multi_level_predictors <- intersect(
     names(predictor_level_counts[predictor_level_counts > 2L]),
     nominal_predictors
 )
+
+# Multi-level nominal variables are expanded into binary indicators.
 kept_predictors <- setdiff(raw_congo_predictors, multi_level_predictors)
 
 make_indicator_name <- function(variable, level) {
     make.names(paste(variable, level, sep = "_"), unique = FALSE)
 }
 
+# Keep a lookup from each indicator back to its original variable and level.
 indicator_level_map <- rbindlist(lapply(multi_level_predictors, function(variable) {
     levels_i <- levels(as.factor(raw_congo_model_dt[[variable]]))
     data.table(
@@ -314,7 +344,10 @@ indicator_level_map <- rbindlist(lapply(multi_level_predictors, function(variabl
 
 stopifnot(!anyDuplicated(indicator_level_map$variable))
 
+# Start with variables that can enter the model as they are.
 model_predictor_dt <- copy(raw_congo_model_dt[, kept_predictors, with = FALSE])
+
+# Add one Yes/No indicator for each level of the multi-level predictors.
 for (i in seq_len(nrow(indicator_level_map))) {
     source_variable <- indicator_level_map$raw_variable[i]
     source_level <- indicator_level_map$level[i]
@@ -328,6 +361,7 @@ for (i in seq_len(nrow(indicator_level_map))) {
     ]
 }
 
+# Combine the rank, outcome, weights, and encoded predictors for tree fitting.
 congo_model_dt <- data.table(
     raw_congo_model_dt[, .(wealth, deadu5_num, sample_weight)],
     model_predictor_dt
@@ -338,12 +372,14 @@ congo_var_labels[intersect(kept_predictors, names(raw_congo_var_labels))] <-
     raw_congo_var_labels[intersect(kept_predictors, names(raw_congo_var_labels))]
 congo_var_labels[indicator_level_map$variable] <- indicator_level_map$variable_label
 
+# The ineqTrees functions expect cbind(rank, outcome) on the left-hand side.
 congo_ci_formula <- as.formula(
     paste("cbind(wealth, deadu5_num) ~", paste(congo_predictors, collapse = " + "))
 )
 ```
 
 ```{r format-variable-label-helper}
+# Convert regression term names to the same variables used by tree and SHAP tables.
 canonicalize_regression_terms <- function(term_names) {
     vapply(term_names, function(term) {
         parent <- map_model_terms_to_predictors(term, raw_congo_predictors)
@@ -359,6 +395,7 @@ canonicalize_regression_terms <- function(term_names) {
     }, character(1L))
 }
 
+# Format variable names for report tables after dummy-variable expansion.
 format_variable_label <- function(x) {
     vapply(x, function(value) {
         parent <- map_model_terms_to_predictors(value, raw_congo_predictors)
@@ -387,6 +424,7 @@ format_variable_label <- function(x) {
 ```
 
 ```{r run-configuration-preview, purl=FALSE}
+# Show the settings for this run before the expensive model fitting starts.
 report_compact_table(
     data.table(
         item = c(
@@ -423,6 +461,7 @@ This section constructs the basic descriptive outputs that anchor the rest of
 the report: outcome prevalence, predictor coverage, and root-node inequality.
 
 ```{r build-descriptive-objects}
+# Summarise the weighted outcome distribution used in the results section.
 outcome_plot_dt <- congo_model_dt[
     ,
     .(weighted_n = sum(sample_weight)),
@@ -435,6 +474,7 @@ outcome_plot_dt <- congo_model_dt[
     weighted_percent := 100 * weighted_n / sum(weighted_n)
 ]
 
+# Build a compact table describing the raw candidate predictors.
 candidate_predictor_table <- rbindlist(lapply(raw_congo_predictors, function(var) {
     x <- raw_congo_model_dt[[var]]
     level_dt <- raw_congo_model_dt[, .(weighted_n = sum(sample_weight)), by = var][order(-weighted_n)]
@@ -449,6 +489,7 @@ candidate_predictor_table <- rbindlist(lapply(raw_congo_predictors, function(var
     )
 }), fill = TRUE)
 
+# Compute the root-node inequality before any tree split is made.
 drc_root_ci_table <- rbindlist(lapply(criterion_types, function(type) {
     ci_fun <- ci_factory(type)
     data.table(
@@ -460,6 +501,7 @@ drc_root_ci_table <- rbindlist(lapply(criterion_types, function(type) {
     )
 }))
 
+# Collect the main sample details read by the final thesis report.
 drc_data_summary_table <- data.table(
     item = c(
         "Analysis rows",
@@ -504,15 +546,20 @@ decomposition method is built in its own chunk before being displayed.
 library(survey)
 library(rineq)
 library(margins)
+
+# Fit the same determinant set in a survey-weighted logistic regression.
 linear_decomp_formula <- as.formula(
   paste("deadu5_num ~", paste(raw_congo_predictors, collapse = " + "))
 )
+
+# Include DHS clustering and weights in the survey design object.
 linear_decomp_design <- survey::svydesign(
   id = as.formula("~PSU+household"),
   weights = as.formula("~sample_weight"),
   data = raw_congo_model_dt
 )
 
+# This is the regression model used for the indirect decomposition.
 linear_decomp_fit <- survey::svyglm(
   linear_decomp_formula,
   design = linear_decomp_design,
@@ -521,14 +568,17 @@ linear_decomp_fit <- survey::svyglm(
 ```
 
 ```{r classical-model-summary, purl=FALSE}
+# Print the fitted regression model for checking before decomposition.
 print(summary(linear_decomp_fit))
 ```
 
 ```{r extract-classical-model-components}
+# Extract the model matrix because rineq decomposes term-level contributions.
 linear_x <- model.matrix(linear_decomp_formula, data = raw_congo_model_dt)
 linear_beta <- coef(linear_decomp_fit)
 linear_terms <- setdiff(colnames(linear_x), "(Intercept)")
 
+# Convert regression coefficients into average marginal effects on the risk scale.
 linear_margins <- tryCatch(
   margins::margins(
     linear_decomp_fit,
@@ -544,6 +594,8 @@ linear_margins <- tryCatch(
   }
 )
 linear_ame_table <- as.data.table(summary(linear_margins))
+
+# Different margins versions use different column names for the AME.
 ame_col <- intersect(c("AME", "dydx"), names(linear_ame_table))[1L]
 if (is.na(ame_col)) {
   stop("Could not identify the average marginal effect column in margins output.")
@@ -555,6 +607,8 @@ linear_average_marginal_effects <- setNames(
   linear_ame_table[[ame_col]],
   linear_ame_table$factor
 )
+
+# Stop early if the marginal effects cannot be aligned with the model matrix.
 missing_from_margins <- setdiff(linear_terms, names(linear_average_marginal_effects))
 extra_from_margins <- setdiff(names(linear_average_marginal_effects), linear_terms)
 if (length(missing_from_margins) > 0L) {
@@ -565,6 +619,7 @@ if (length(missing_from_margins) > 0L) {
   )
 }
 
+# Store coefficient, marginal-effect, and weighted-mean information by term.
 linear_term_info <- data.table(
   term = linear_terms,
   variable = canonicalize_regression_terms(linear_terms),
@@ -577,6 +632,7 @@ linear_term_info <- data.table(
   )
 )
 
+# Keep a tidy regression summary for the appendix tables.
 regression_model_summary <- as.data.table(
   as.data.frame(broom::tidy(linear_decomp_fit, conf.int = TRUE))
 )
@@ -597,6 +653,7 @@ setcolorder(
 ```
 
 ```{r margins-rineq-decomposition-helper}
+# Use rineq's internal decomposition function with our marginal effects.
 rineq_decomposition <- getFromNamespace("decomposition", "rineq")
 expected_decomposition_args <- c(
   "outcome",
@@ -608,6 +665,8 @@ expected_decomposition_args <- c(
   "citype"
 )
 actual_decomposition_args <- names(formals(rineq_decomposition))
+
+# Check the function signature because this is an internal rineq function.
 if (!all(expected_decomposition_args %in% actual_decomposition_args)) {
   stop(
     "Rineq's internal decomposition() function has different argument names. ",
@@ -619,6 +678,7 @@ if (!all(expected_decomposition_args %in% actual_decomposition_args)) {
   )
 }
 
+# Build one rineq decomposition for a requested concentration-index type.
 build_margins_rineq_decomposition <- function(type) {
   tryCatch(
     rineq_decomposition(
@@ -644,6 +704,7 @@ build_margins_rineq_decomposition <- function(type) {
 ```
 
 ```{r decomposition-to-table-helper}
+# Convert rineq output into a table that can be displayed and saved.
 decomposition_to_table <- function(object, digits = 4L) {
   data.table(
     term = names(object$rel_contribution),
@@ -659,6 +720,7 @@ decomposition_to_table <- function(object, digits = 4L) {
 ```
 
 ```{r summarise-rineq-decomposition-helper}
+# Add labels and auxiliary regression quantities to the rineq contribution table.
 summarise_rineq_decomposition <- function(object, method_name) {
   out <- merge(
     linear_term_info,
@@ -701,6 +763,7 @@ summarise_rineq_decomposition <- function(object, method_name) {
 ```
 
 ```{r build-rineq-ci-decomposition}
+# Run the standard concentration-index regression decomposition.
 rineq_ci_decomp <- build_margins_rineq_decomposition("CI")
 rineq_ci_summary <- decomposition_to_table(rineq_ci_decomp, digits = 4L)
 classical_ci_table <- summarise_rineq_decomposition(rineq_ci_decomp, "CI")
@@ -721,6 +784,7 @@ plot(
 ```
 
 ```{r build-rineq-cig-decomposition}
+# Run the generalized concentration-index regression decomposition.
 rineq_cig_decomp <- build_margins_rineq_decomposition("CIg")
 rineq_cig_summary <- decomposition_to_table(rineq_cig_decomp, digits = 4L)
 classical_cig_table <- summarise_rineq_decomposition(rineq_cig_decomp, "CIg")
@@ -741,6 +805,7 @@ plot(
 ```
 
 ```{r build-rineq-cic-decomposition}
+# Run the corrected concentration-index regression decomposition.
 rineq_cic_decomp <- build_margins_rineq_decomposition("CIc")
 rineq_cic_summary <- decomposition_to_table(rineq_cic_decomp, digits = 4L)
 classical_cic_table <- summarise_rineq_decomposition(rineq_cic_decomp, "CIc")
@@ -761,6 +826,7 @@ plot(
 ```
 
 ```{r build-rineq-ciw-decomposition}
+# Run the Wagstaff-style concentration-index decomposition for comparison.
 rineq_ciw_decomp <- build_margins_rineq_decomposition("CIw")
 rineq_ciw_summary <- decomposition_to_table(rineq_ciw_decomp, digits = 4L)
 classical_ciw_table <- summarise_rineq_decomposition(rineq_ciw_decomp, "CIw")
@@ -781,6 +847,7 @@ plot(
 ```
 
 ```{r assemble-rineq-objects}
+# Keep full rineq objects because the report may need diagnostics or plots.
 rineq_decomp_by_type <- list(
   CI = rineq_ci_decomp,
   CIg = rineq_cig_decomp,
@@ -795,6 +862,7 @@ rineq_summary_by_type <- list(
   CIw = rineq_ciw_summary
 )
 
+# Bind the criterion-specific summaries into one long table.
 rineq_summary <- rbindlist(lapply(names(rineq_summary_by_type), function(type) {
   out <- copy(rineq_summary_by_type[[type]])
   out[, criterion := type]
@@ -802,6 +870,7 @@ rineq_summary <- rbindlist(lapply(names(rineq_summary_by_type), function(type) {
   out
 }), fill = TRUE)
 
+# This is the regression decomposition table used for comparison with SHAP.
 classical_decomposition_table <- rbindlist(
   list(classical_ci_table, classical_cig_table, classical_cic_table, classical_ciw_table),
   fill = TRUE
@@ -809,6 +878,7 @@ classical_decomposition_table <- rbindlist(
 ```
 
 ```{r published-2007-reference}
+# Enter the published DRC 2007 benchmark values used for comparison.
 published_drc_table3_reference <- rbindlist(list(
   data.table(
     criterion = "G",
@@ -848,6 +918,7 @@ published_drc_table3_reference <- rbindlist(list(
   )
 ))
 
+# Map both original variables and expanded indicators back to determinant groups.
 determinant_map <- data.table(
   variable = c("quint", "unskilled", "male", "birth", "agemoth", "rural", "ed", "ped", "mocc", "pocc", "reg"),
   raw_variable = c("quint", "unskilled", "male", "birth", "agemoth", "rural", "ed", "ped", "mocc", "pocc", "reg"),
@@ -879,6 +950,7 @@ determinant_map <- rbindlist(
   fill = TRUE
 )
 
+# Aggregate term-level decomposition results to the determinant groups in the paper.
 classical_decomposition_grouped <- classical_decomposition_table[
   determinant_map,
   on = "variable",
@@ -892,6 +964,7 @@ classical_decomposition_grouped <- classical_decomposition_table[
   by = .(criterion, determinant)
 ]
 
+# Compare the generated CI decomposition with the published C-column benchmark.
 published_drc_table3_comparison <- merge(
   published_drc_table3_reference[criterion == "C"],
   classical_decomposition_grouped[criterion == "CI"],
@@ -927,9 +1000,10 @@ This is the core generator step. The grid is cross-validated, then each
 criterion is refitted at its selected setting.
 
 ```{r tree-control-grid}
+# Define the stopping-rule grid for concentration-index tree tuning.
 tree_grid <- ci_tree_control_grid(
-    minsplit = c(500L), # 750L worked
-    minbucket = c(100L), # 100 worked
+    minsplit = c(500L),
+    minbucket = c(100L),
     minprob = 0.01,
     maxdepth = 10L,
     min_gain = 0.0001,
@@ -938,11 +1012,12 @@ tree_grid <- ci_tree_control_grid(
 
 
 
-# filter where minbucket is at least 50% of minsplit to avoid invalid settings
+# Keep only valid settings where terminal nodes can satisfy the split rule.
 tree_grid <- tree_grid[minbucket <= 0.5 * minsplit]
 ```
 
 ```{r make-tree-psu-folds}
+# Create cross-validation folds at the PSU level rather than the child level.
 make_psu_fold_id <- function(psu,
                              outcome,
                              weights = NULL,
@@ -976,9 +1051,11 @@ make_psu_fold_id <- function(psu,
         by = PSU
     ]
 
+    # Use no more folds than the number of available PSUs.
     v <- max(2L, as.integer(v[1L]))
     v <- min(v, nrow(psu_frame))
 
+    # Order PSUs so deaths are spread across folds as evenly as possible.
     set.seed(seed)
     psu_frame[, random_order := runif(.N)]
     setorder(psu_frame, -deaths, -weighted_deaths, random_order)
@@ -992,6 +1069,7 @@ make_psu_fold_id <- function(psu,
         weighted_rows = 0
     )
 
+    # Greedily assign each PSU to the fold with the smallest current burden.
     for (i in seq_len(nrow(psu_frame))) {
         setorder(fold_load, deaths, weighted_deaths, rows, fold_id)
         chosen_fold <- fold_load$fold_id[1L]
@@ -1012,6 +1090,7 @@ make_psu_fold_id <- function(psu,
     row_frame$fold_id
 }
 
+# Build the folds used for tree tuning and validation.
 tree_psu_fold_id <- make_psu_fold_id(
     psu = raw_congo_model_dt$PSU,
     outcome = congo_model_dt$deadu5_num,
@@ -1020,6 +1099,7 @@ tree_psu_fold_id <- make_psu_fold_id(
     seed = 20260508
 )
 
+# Check that every child from the same PSU stays in the same fold.
 psu_fold_check <- data.table(
     PSU = raw_congo_model_dt$PSU,
     fold_id = tree_psu_fold_id
@@ -1028,6 +1108,7 @@ if (any(psu_fold_check$fold_count > 1L)) {
     stop("At least one PSU was assigned to more than one fold.", call. = FALSE)
 }
 
+# Save a fold summary so the report can describe the validation design.
 tree_psu_fold_summary <- data.table(
     fold_id = tree_psu_fold_id,
     PSU = raw_congo_model_dt$PSU,
@@ -1048,6 +1129,7 @@ tree_psu_fold_summary <- data.table(
 ```
 
 ```{r tune-ci-trees}
+# Evaluate each tree setting with training and PSU-held-out validation metrics.
 ci_tuning_metrics <- c(
     "validation_gain",
     "relative_validation_gain",
@@ -1057,6 +1139,7 @@ ci_tuning_metrics <- c(
     "roc_auc"
 )
 
+# Tune concentration-index trees for all criteria on the same grid.
 tree_tuning <- tune_ci_tree(
     formula = congo_ci_formula,
     data = congo_model_dt,
@@ -1073,14 +1156,18 @@ tree_tuning <- tune_ci_tree(
 )
 
 
+# Save and reload the tuning object so later chunks use the same on-disk object.
 save(tree_tuning, file = tree_tuning_file)
 load(tree_tuning_file)
 ```
 
 ```{r select-ci-tree-settings}
+# Select the tree setting that keeps the largest relative validation gain.
 tree_best_by_type <- ci_select_best(tree_tuning,
     metric = "relative_validation_gain"
 )
+
+# Summarise the selected settings and their validation metrics.
 tree_selection_table <- ci_fit_summary_table(
     tree_tuning,
     selected = tree_best_by_type,
@@ -1096,6 +1183,8 @@ tree_selection_table[, selection_basis := paste(
     runtime_params$tuning_folds,
     "PSU-held-out folds"
 )]
+
+# Display the selected tree settings in the generator output.
 report_compact_table(
     tree_selection_table,
     digits = 4,
@@ -1104,6 +1193,7 @@ report_compact_table(
 ```
 
 ```{r fit-selected-ci-trees}
+# Refit each criterion on the full analysis data using its selected controls.
 tree_models_by_type <- setNames(
     lapply(seq_len(nrow(tree_best_by_type)), function(i) {
         setting <- tree_best_by_type[i]
@@ -1122,8 +1212,11 @@ tree_models_by_type <- setNames(
 ```
 
 ```{r summarise-selected-ci-tree}
+# Use the best validation performer as the main selected tree.
 selected_tree_type <- tree_selection_table[order(-mean_validation_relative_gain)][1L, type]
 selected_tree_fit <- tree_models_by_type[[selected_tree_type]]
+
+# Store terminal-node summaries for the selected and criterion-specific trees.
 selected_tree_summary <- as.data.table(ci_tree_terminal_summary(selected_tree_fit))
 
 all_tree_terminal_summaries <- rbindlist(lapply(names(tree_models_by_type), function(type) {
@@ -1135,18 +1228,22 @@ all_tree_terminal_summaries <- rbindlist(lapply(names(tree_models_by_type), func
 ```
 
 ```{r summarise-ci-tree-selection-objects}
+# Collect tree variable importance for the results and appendix plots.
 tree_variable_importance <- collect_variable_importance(tree_models_by_type)
 
+# Keep the chosen hyperparameters separately for reporting and validation.
 tree_best_controls <- tree_best_by_type[
     ,
     .(type, minsplit, minbucket, minprob, maxdepth, min_gain, min_relative_gain)
 ]
 
+# Build complexity paths showing how tree size changes with stopping rules.
 tree_complexity_metrics <- collect_complexity_metrics(tree_tuning)
 tree_min_relative_gain_path <- min_relative_gain_path(tree_complexity_metrics,
     selected = tree_best_by_type
 )
 
+# Save both wide and long versions of the tuning metrics.
 tree_fit_wide <- ci_fit_summary_table(
     tree_tuning,
     selected = tree_best_by_type,
@@ -1220,6 +1317,7 @@ The benchmark rpart trees are retained because they are easy to discuss beside
 the inequality-driven tree.
 
 ```{r build-rpart-comparison}
+# Fit the rpart comparison trees using the same analysis variables.
 lecturer_rpart_models <- fit_ci_rpart_comparison(
   data = congo_model_dt,
   predictors = congo_predictors,
@@ -1227,10 +1325,13 @@ lecturer_rpart_models <- fit_ci_rpart_comparison(
   rank = "wealth",
   weights = "sample_weight"
 )
+
+# Summarise rpart terminal nodes so they can be compared with the main trees.
 lecturer_rpart_summary <- summarise_ci_rpart_comparison(lecturer_rpart_models)
 ```
 
 ```{r rpart-comparison-preview, purl=FALSE}
+# Show only terminal nodes because those are the final subgroups.
 rpart_summary_out <- copy(lecturer_rpart_summary)[is_terminal == TRUE]
 
 report_compact_table(
@@ -1241,12 +1342,14 @@ report_compact_table(
 ```
 
 ```{r rpart-comparison-plots, purl=FALSE, fig.width=12, fig.height=8, results='asis'}
+# Give the two comparison trees readable plot titles.
 plot_labels <- c(
     simple_abs = "Lecturer rpart method 1: absolute CI impurity",
     robust_abs = "Lecturer rpart method 2: robust absolute CI impurity"
 )
 plot_fontsize <- c(simple_abs = 4.2, robust_abs = 4.6)
 
+# Plot each rpart comparison tree in the same style as the main CI trees.
 for (method_name in names(lecturer_rpart_models)) {
     cat("\n\n### ", plot_labels[[method_name]] %||% method_name, "\n\n", sep = "")
     ci_report_tree_plot(
@@ -1266,16 +1369,15 @@ for (method_name in names(lecturer_rpart_models)) {
 
 
 ```{r forest-control-grid}
-# min_relative_gain =       c( 0.25, 0.30, 0.35, 0.40)
-#minisplit = 500 #minibucket 
+# Define the forest tuning grid. The forest uses the same split criteria as the trees.
 p <- length(congo_predictors)
 forest_grid <- ci_tree_control_grid(
-    minsplit = 500L, # 1000
-    minbucket = 100L, # 300
+    minsplit = 500L,
+    minbucket = 100L,
     minprob = 0.01,
     maxdepth = 15L,
     min_gain = 0.00001,
-    min_relative_gain = c(0.10, 0.15, 0.20, 0.25), #0.3,0.35,
+    min_relative_gain = c(0.10, 0.15, 0.20, 0.25),
     mtry = c(15),
     ntree = c(50L, 100L)
 )
@@ -1284,6 +1386,7 @@ forest_grid <- ci_tree_control_grid(
 ```{r tune-ci-forests}
 
 
+# The full forest tuning is expensive, so the saved tuning object is loaded here.
 # forest_tuning <- run_forest_tuning_batches(
 #   formula = congo_ci_formula,
 #   data = congo_model_dt,
@@ -1311,8 +1414,7 @@ load(here("data", "forest_tuning.rdata"))
 ```
 
 ```{r select-ci-forest-settings}
-#roc_auc
-#relative_validation_gain
+# Select forest settings using the same relative validation gain criterion.
 forest_best_by_type <- ci_select_best(
   forest_tuning,
   metric = "relative_validation_gain"
@@ -1321,6 +1423,8 @@ forest_best_by_type <- ci_select_best(
 
 ```{r fit-selected-ci-forests}
 set.seed(20260509)
+
+# The selected forests were fitted once and saved because this step is slow.
 # forest_models_by_type <- setNames(
 #   lapply(seq_len(nrow(forest_best_by_type)), function(i) {
 #     setting <- forest_best_by_type[i]
@@ -1343,11 +1447,15 @@ set.seed(20260509)
 # save(forest_models_by_type, file = here("data", "forest_models_by_type.rdata"))
 load(here("data", "forest_models_by_type.rdata"))
 
+# Keep the forest matching the selected tree criterion for the main comparison.
 selected_forest_fit <- forest_models_by_type[[selected_tree_type]]
+
+# Collect forest variable importance for the report plots.
 forest_variable_importance <- collect_variable_importance(forest_models_by_type)
 ```
 
 ```{r summarise-ci-forest-complexity}
+# Summarise how forest complexity varies across tuning settings.
 forest_complexity_metrics <- collect_complexity_metrics(forest_tuning)
 forest_min_relative_gain_path <- min_relative_gain_path(
   forest_complexity_metrics,
@@ -1356,12 +1464,15 @@ forest_min_relative_gain_path <- min_relative_gain_path(
 ```
 
 ```{r summarise-ci-forest-selection}
+# Build the table that records selected forest settings and validation metrics.
 forest_selection_table <- ci_fit_summary_table(
     forest_tuning,
     selected = forest_best_by_type,
     metrics = unique(forest_tuning$summary$metric),
     include_percent = FALSE
 )
+
+# Add ensemble size and mtry because those are forest-specific controls.
 forest_selection_table <- merge(
     forest_selection_table,
     forest_best_by_type[, .(type, ntree, mtry)],
@@ -1382,6 +1493,7 @@ forest_selection_table[, selection_basis := paste(
     "fold cross-validation"
 )]
 
+# Keep both display and tidy versions of the forest validation results.
 forest_fit_wide <- copy(forest_selection_table)
 forest_fit_table <- ci_collect_metrics(
     forest_tuning,
@@ -1390,6 +1502,8 @@ forest_fit_table <- ci_collect_metrics(
     format = "tidy",
     include_train = TRUE
 )
+
+# Save the selected forest controls for the report appendix.
 forest_best_controls <- forest_best_by_type[
     ,
     .(
@@ -1401,33 +1515,26 @@ forest_best_controls <- forest_best_by_type[
 ```
 
 ```{r fit-ci-forest-surrogates}
+# Fit a readable surrogate tree to each selected concentration-index forest.
 forest_surrogates_by_type <- setNames(
   lapply(seq_len(nrow(forest_best_by_type)), function(i) {
-    #setting <- copy(forest_best_by_type[i])
-    # use same tree settings
+    # Use the selected tree setting as the starting point for the surrogate.
     setting <- copy(tree_best_by_type[type == forest_best_by_type$type[i]])
     type = setting$type[1L]
 
+    # Adjust surrogate complexity so the plotted tree remains readable.
     if (type == "CIc"){
       setting$min_relative_gain <- 0.15
-      #setting$minsplit <- 500L
-      #setting$minbucket <- 200L
     }else if (type == "L"){
       setting$min_relative_gain <- 0.3
-      # setting$minsplit <- 1000L
-      #setting$minbucket <- 200L
       setting$maxdepth <- 3L
     } else {
       setting$min_relative_gain <- 0.3
       setting$maxdepth <- 4L
-      #setting$minsplit <- 1000L
-      #setting$minbucket <- 200L
-      #setting$min_gain <- 0.001
     }
 
-    # # setting$minsplit <- 500L
+    # Use a larger terminal-node size to avoid very small surrogate leaves.
     setting$minbucket <- 500L
-    # # setting$maxdepth <- 6L
     ci_forest_surrogate(
       forest_fit = forest_models_by_type[[setting$type[1L]]],
       data = congo_model_dt,
@@ -1441,6 +1548,8 @@ forest_surrogates_by_type <- setNames(
   }),
   forest_best_by_type$type
 )
+
+# Use the selected criterion's surrogate as the main forest summary tree.
 selected_forest_surrogate <- forest_surrogates_by_type[[selected_tree_type]]
 selected_forest_surrogate_summary <- as.data.table(
   ci_tree_terminal_summary(selected_forest_surrogate$fit)
@@ -1448,6 +1557,7 @@ selected_forest_surrogate_summary <- as.data.table(
 ```
 
 ```{r ci-forest-surrogate-preview, purl=FALSE, fig.width=12, fig.height=8}
+# Preview the CI forest surrogate tree.
 ci_report_tree_plot(
   fit = forest_surrogates_by_type[["CI"]]$fit,
   data = forest_surrogates_by_type[["CI"]]$data,
@@ -1459,6 +1569,7 @@ ci_report_tree_plot(
 ```
 
 ```{r cig-forest-surrogate-preview, purl=FALSE, fig.width=12, fig.height=8}
+# Preview the CIg forest surrogate tree.
 ci_report_tree_plot(
   fit = forest_surrogates_by_type[["CIg"]]$fit,
   data = forest_surrogates_by_type[["CIg"]]$data,
@@ -1470,6 +1581,7 @@ ci_report_tree_plot(
 ```
 
 ```{r cic-forest-surrogate-preview, purl=FALSE, fig.width=12, fig.height=8}
+# Preview the CIc forest surrogate tree.
 ci_report_tree_plot(
   fit = forest_surrogates_by_type[["CIc"]]$fit,
   data = forest_surrogates_by_type[["CIc"]]$data,
@@ -1482,6 +1594,7 @@ ci_report_tree_plot(
 
 
 ```{r l-forest-surrogate-preview, purl=FALSE, fig.width=12, fig.height=8}
+# Preview the level-dependent forest surrogate tree.
 ci_report_tree_plot(
   fit = forest_surrogates_by_type[["L"]]$fit,
   data = forest_surrogates_by_type[["L"]]$data,
@@ -1495,6 +1608,8 @@ ci_report_tree_plot(
 
 ```{r build-ranger-analysis-data}
 library(tidymodels)
+
+# Build the predictive-forest data, including the undersampled fitting set.
 ranger_analysis <- build_ranger_analysis_data(
   data = data.table(
     raw_congo_model_dt[, .(PSU)],
@@ -1504,14 +1619,18 @@ ranger_analysis <- build_ranger_analysis_data(
   undersample = runtime_params$undersample,
   outcome_labels = outcome_labels
 )
+
+# Expose the returned ranger data objects in the current workflow environment.
 list2env(ranger_analysis, envir = environment())
 ```
 
 ```{r build-ranger-recipe}
+# Use all prepared predictor columns to predict under-five mortality status.
 ranger_recipe <- recipe(deadu5_factor ~ ., data = ranger_fit_df)
 ```
 
 ```{r build-ranger-model-spec}
+# Tune mtry and min_n while keeping a fixed number of trees.
 ranger_model_spec <- rand_forest(
   mtry = tune(),
   min_n = tune(),
@@ -1522,6 +1641,7 @@ ranger_model_spec <- rand_forest(
 ```
 
 ```{r build-ranger-resamples}
+# Convert the PSU fold ids into a tidymodels resampling object.
 make_manual_fold_rset <- function(data, fold_id) {
   fold_values <- sort(unique(as.integer(fold_id)))
   splits <- lapply(fold_values, function(fold_value) {
@@ -1539,6 +1659,7 @@ make_manual_fold_rset <- function(data, fold_id) {
   )
 }
 
+# Create PSU-held-out folds for the predictive ranger model.
 ranger_psu_fold_id <- make_psu_fold_id(
   psu = ranger_dt$PSU,
   outcome = as.integer(ranger_dt$deadu5_factor == "Died"),
@@ -1547,6 +1668,7 @@ ranger_psu_fold_id <- make_psu_fold_id(
   seed = 20260508
 )
 
+# Check that ranger resampling also keeps each PSU in one fold.
 ranger_psu_fold_check <- data.table(
   PSU = ranger_dt$PSU,
   fold_id = ranger_psu_fold_id
@@ -1555,6 +1677,7 @@ if (any(ranger_psu_fold_check$fold_count > 1L)) {
   stop("At least one ranger PSU was assigned to more than one fold.", call. = FALSE)
 }
 
+# Summarise the ranger folds to document the validation split.
 ranger_psu_fold_summary <- data.table(
   fold_id = ranger_psu_fold_id,
   PSU = ranger_dt$PSU,
@@ -1573,6 +1696,7 @@ ranger_psu_fold_summary <- data.table(
   by = fold_id
 ][order(fold_id)]
 
+# Build the manual resampling object used by tune_grid().
 ranger_resamples <- make_manual_fold_rset(
   data = ranger_fit_df,
   fold_id = ranger_psu_fold_id
@@ -1580,6 +1704,7 @@ ranger_resamples <- make_manual_fold_rset(
 ```
 
 ```{r build-ranger-workflow}
+# Combine the model, recipe, and case weights in one tidymodels workflow.
 ranger_workflow <- workflow() |>
   add_model(ranger_model_spec) |>
   add_recipe(ranger_recipe) |>
@@ -1587,6 +1712,7 @@ ranger_workflow <- workflow() |>
 ```
 
 ```{r build-ranger-grid}
+# Define the ranger hyperparameter grid.
 ranger_parameter_set <- hardhat::extract_parameter_set_dials(ranger_workflow) |>
   update(
     mtry = dials::mtry(range = c(10L, length(ranger_predictor_terms))),
@@ -1599,6 +1725,7 @@ ranger_grid <- dials::grid_regular(
 ```
 
 ```{r tune-ranger-model}
+# Tune the predictive forest with classification metrics.
 ranger_metric_set <- yardstick::metric_set(
   yardstick::roc_auc,
   yardstick::accuracy,
@@ -1606,6 +1733,8 @@ ranger_metric_set <- yardstick::metric_set(
   yardstick::spec,
   yardstick::f_meas
 )
+
+# Save predictions because the probability threshold is tuned separately.
 ranger_tune_results <- tune_grid(
   ranger_workflow,
   resamples = ranger_resamples,
@@ -1613,16 +1742,20 @@ ranger_tune_results <- tune_grid(
   metrics = ranger_metric_set,
   control = control_grid(save_pred = TRUE)
 )
+
+# Store tuning summaries and fold predictions for the report appendix.
 ranger_tuning <- as.data.table(collect_metrics(ranger_tune_results))
 ranger_cv_predictions <- as.data.table(collect_predictions(ranger_tune_results))
 ```
 
 ```{r tune-ranger-probability-threshold}
+# Search probability cutoffs because deaths are relatively rare.
 ranger_threshold_grid <- seq(0.05, 0.95, by = 0.01)
 
 ranger_threshold_performance <- rbindlist(lapply(ranger_threshold_grid, function(cutoff) {
   threshold_dt <- copy(ranger_cv_predictions)
 
+  # Convert predicted probabilities into classes at the current cutoff.
   threshold_dt[, pred_threshold := factor(
     fifelse(.pred_Died >= cutoff, "Died", "Survived"),
     levels = levels(deadu5_factor)
@@ -1669,8 +1802,10 @@ report_compact_table(
 ```
 
 ```{r select-best-ranger-model}
+# Select the ranger model that gives the best F1 score.
 selected_ranger_setting <- select_best(ranger_tune_results, metric = "f_meas")
 
+# Within the selected model, choose the threshold that balances F1 and sensitivity.
 selected_ranger_threshold <- ranger_threshold_performance[
   .config == selected_ranger_setting$.config
 ][
@@ -1687,6 +1822,7 @@ report_compact_table(
 ```
 
 ```{r}
+# Plot threshold sensitivity for the selected ranger configuration.
 plot_threshold_dt <- ranger_threshold_performance[
   .config == selected_ranger_setting$.config,
   .(threshold, F1 = specificity, Sensitivity = sensitivity)
@@ -1731,11 +1867,13 @@ report_compact_table(
 ```
 
 ```{r fit-selected-ranger-model}
+# Fit the final predictive forest on the undersampled ranger training data.
 final_ranger_workflow <- finalize_workflow(ranger_workflow, selected_ranger_setting)
 predictive_forest_fit <- workflows::fit(final_ranger_workflow, data = ranger_fit_df)
 ```
 
 ```{r predict-ranger-risk-helper}
+# Return the fitted probability score for death before age five.
 predict_ranger_risk <- function(object, newdata) {
   pred <- workflows:::predict.workflow(
     object,
@@ -1745,6 +1883,7 @@ predict_ranger_risk <- function(object, newdata) {
   as.numeric(pred$.pred_Died)
 }
 
+# Apply the selected threshold when a class label is needed.
 predict_ranger_class <- function(
   object,
   newdata,
@@ -1758,6 +1897,7 @@ predict_ranger_class <- function(
 ```
 
 ```{r prepare-shap-data}
+# Stop with a clear installation message if fastshap is unavailable.
 if (!requireNamespace("fastshap", quietly = TRUE)) {
   stop(
     paste(
@@ -1769,14 +1909,19 @@ if (!requireNamespace("fastshap", quietly = TRUE)) {
   )
 }
 
+# Use all rows when shap_rows is zero, otherwise use the requested prefix.
 shap_rows <- if (shap_rows_requested == 0L) {
   seq_len(nrow(ranger_fit_df))
 } else {
   seq_len(min(shap_rows_requested, nrow(ranger_fit_df)))
 }
+
+# Prepare background, explanation, and prediction inputs for SHAP.
 shap_x_background <- ranger_fit_df[, ranger_predictor_terms, drop = FALSE]
 shap_x_eval <- ranger_fit_df[shap_rows, ranger_predictor_terms, drop = FALSE]
 shap_prediction <- as.numeric(predict_ranger_risk(predictive_forest_fit, shap_x_eval))
+
+# Record SHAP settings so the final report knows how explanations were built.
 shap_parallel_config <- data.table(
   requested_rows = shap_rows_requested,
   explanation_rows = nrow(shap_x_eval),
@@ -1787,6 +1932,7 @@ shap_parallel_config <- data.table(
 ```
 
 ```{r compute-fastshap-values}
+# Estimate SHAP values for the selected predictive ranger forest.
 selected_forest_shap <- estimate_fastshap_values(
   object = predictive_forest_fit,
   x_train = shap_x_background,
@@ -1796,16 +1942,20 @@ selected_forest_shap <- estimate_fastshap_values(
   nsim = shap_n_mc_samples,
   adjust = TRUE
 )
+
+# Put SHAP column names back into the same naming system used elsewhere.
 colnames(selected_forest_shap) <- canonicalize_model_terms(
   colnames(selected_forest_shap),
   congo_predictors
 )
 
+# Combine SHAP values with the observed feature values for plotting.
 shap_feature_values <- copy(as.data.table(shap_x_eval))
 shap_feature_values[, observation_id := seq_len(.N)]
 selected_forest_shap_dt <- as.data.table(selected_forest_shap)
 selected_forest_shap_dt[, observation_id := seq_len(.N)]
 
+# Store SHAP values in long form because the report plots features vertically.
 shap_summary_long <- melt(
   selected_forest_shap_dt,
   id.vars = "observation_id",
@@ -1813,6 +1963,8 @@ shap_summary_long <- melt(
   value.name = "shap_value",
   variable.factor = FALSE
 )
+
+# Store matching feature values in long form.
 shap_value_long <- melt(
   shap_feature_values,
   id.vars = "observation_id",
@@ -1820,6 +1972,8 @@ shap_value_long <- melt(
   value.name = "feature_value",
   variable.factor = FALSE
 )
+
+# Join SHAP values to the original feature values.
 shap_summary_long <- merge(
   shap_summary_long,
   shap_value_long,
@@ -1827,6 +1981,8 @@ shap_summary_long <- merge(
   all.x = TRUE,
   sort = FALSE
 )
+
+# Convert feature values to numeric values for the colour scale in SHAP plots.
 shap_summary_long[
   ,
   feature_value_numeric := suppressWarnings(as.numeric(as.character(feature_value)))
@@ -1835,6 +1991,8 @@ shap_summary_long[
   is.na(feature_value_numeric),
   feature_value_numeric := as.numeric(factor(feature_value)) - 1
 ]
+
+# Scale feature values within each feature for comparable plot colours.
 shap_summary_long[
   ,
   feature_value_scaled := {
@@ -1847,6 +2005,8 @@ shap_summary_long[
   },
   by = feature
 ]
+
+# Add report labels and mean absolute SHAP values for feature ordering.
 shap_summary_long[, feature_label := format_variable_label(feature)]
 shap_summary_long[
   ,
@@ -1869,6 +2029,7 @@ setcolorder(
 ```
 
 ```{r build-shap-ci-decomposition}
+# Decompose the concentration of ranger predictions using standard CI.
 shap_ci_decomp <- shap_conc_decomp(
   shap = selected_forest_shap,
   rank = ranger_dt$wealth[shap_rows],
@@ -1879,6 +2040,7 @@ shap_ci_decomp <- shap_conc_decomp(
 ```
 
 ```{r shap-ci-output, purl=FALSE, fig.height=7}
+# Display SHAP diagnostics and percentage contributions for CI.
 shap_ci_diag <- as.data.table(shap_ci_decomp$diagnostics)
 shap_ci_contrib <- as.data.table(shap_ci_decomp$contributions)[order(pct_contribution)]
 report_compact_table(
@@ -1900,6 +2062,7 @@ ggplot(shap_ci_contrib, aes(x = pct_contribution, y = reorder(feature, pct_contr
 ```
 
 ```{r build-shap-cig-decomposition}
+# Decompose the concentration of ranger predictions using CIg.
 shap_cig_decomp <- shap_conc_decomp(
   shap = selected_forest_shap,
   rank = ranger_dt$wealth[shap_rows],
@@ -1910,6 +2073,7 @@ shap_cig_decomp <- shap_conc_decomp(
 ```
 
 ```{r shap-cig-output, purl=FALSE, fig.height=7}
+# Display SHAP diagnostics and percentage contributions for CIg.
 shap_cig_diag <- as.data.table(shap_cig_decomp$diagnostics)
 shap_cig_contrib <- as.data.table(shap_cig_decomp$contributions)[order(pct_contribution)]
 report_compact_table(
@@ -1931,6 +2095,7 @@ ggplot(shap_cig_contrib, aes(x = pct_contribution, y = reorder(feature, pct_cont
 ```
 
 ```{r build-shap-cic-decomposition}
+# Decompose the concentration of ranger predictions using CIc.
 shap_cic_decomp <- shap_conc_decomp(
   shap = selected_forest_shap,
   rank = ranger_dt$wealth[shap_rows],
@@ -1941,6 +2106,7 @@ shap_cic_decomp <- shap_conc_decomp(
 ```
 
 ```{r shap-cic-output, purl=FALSE, fig.height=7}
+# Display SHAP diagnostics and percentage contributions for CIc.
 shap_cic_diag <- as.data.table(shap_cic_decomp$diagnostics)
 shap_cic_contrib <- as.data.table(shap_cic_decomp$contributions)[order(pct_contribution)]
 report_compact_table(
@@ -1962,6 +2128,7 @@ ggplot(shap_cic_contrib, aes(x = pct_contribution, y = reorder(feature, pct_cont
 ```
 
 ```{r build-shap-l-decomposition}
+# Decompose the level-dependent concentration of ranger predictions.
 shap_l_decomp <- shap_conc_decomp(
   shap = selected_forest_shap,
   rank = ranger_dt$wealth[shap_rows],
@@ -1972,6 +2139,7 @@ shap_l_decomp <- shap_conc_decomp(
 ```
 
 ```{r shap-l-output, purl=FALSE, fig.height=7}
+# Display SHAP diagnostics and percentage contributions for L.
 shap_l_diag <- as.data.table(shap_l_decomp$diagnostics)
 shap_l_contrib <- as.data.table(shap_l_decomp$contributions)[order(pct_contribution)]
 report_compact_table(
@@ -1993,6 +2161,7 @@ ggplot(shap_l_contrib, aes(x = pct_contribution, y = reorder(feature, pct_contri
 ```
 
 ```{r assemble-shap-objects}
+# Bind SHAP contributions across all criteria.
 selected_shap_contributions <- rbindlist(list(
   as.data.table(shap_ci_decomp$contributions)[, criterion := "CI"],
   as.data.table(shap_cig_decomp$contributions)[, criterion := "CIg"],
@@ -2002,6 +2171,7 @@ selected_shap_contributions <- rbindlist(list(
 selected_shap_contributions[, feature := canonicalize_model_terms(feature, congo_predictors)]
 setcolorder(selected_shap_contributions, c("criterion", setdiff(names(selected_shap_contributions), "criterion")))
 
+# Bind the SHAP diagnostics in the same criterion-indexed format.
 selected_shap_diagnostics <- rbindlist(list(
   as.data.table(shap_ci_decomp$diagnostics)[, criterion := "CI"],
   as.data.table(shap_cig_decomp$diagnostics)[, criterion := "CIg"],
@@ -2012,6 +2182,7 @@ setcolorder(selected_shap_diagnostics, c("criterion", setdiff(names(selected_sha
 ```
 
 ```{r forest-preview, purl=FALSE}
+# Add readable labels before displaying forest variable importance.
 forest_importance_out <- copy(forest_variable_importance)
 forest_importance_out[, variable_label := fifelse(
   variable %in% names(congo_var_labels),
@@ -2032,14 +2203,19 @@ Once the regression, tree, forest, and SHAP objects exist, the next step is to
 rank variables and assemble the comparison tables used in the main report.
 
 ```{r build-method-comparison}
+# Rank variables by the regression decomposition contribution under CI.
 linear_rank <- classical_decomposition_table[
   criterion == "CI"
 ][
   order(-abs(regression_pct_contribution)),
   .(variable, method = "Linear decomposition", rank = seq_len(.N))
 ]
+
+# Rank the selected tree and forest by their stored variable-importance values.
 tree_rank <- rank_from_named_vector(selected_tree_fit$variable.importance, "Selected CI-tree")
 forest_rank <- rank_from_named_vector(selected_forest_fit$variable.importance, "Selected CI-forest")
+
+# Rank SHAP variables by absolute contribution under CI.
 shap_rank <- selected_shap_contributions[
   criterion == "CI"
 ][
@@ -2048,6 +2224,7 @@ shap_rank <- selected_shap_contributions[
 ]
 importance_long <- rbindlist(list(linear_rank, tree_rank, forest_rank, shap_rank), fill = TRUE)
 
+# Keep variables that appear in the regression decomposition comparison table.
 selected_variables <- classical_decomposition_table[
   criterion == "CI"
 ][
@@ -2055,8 +2232,11 @@ selected_variables <- classical_decomposition_table[
 ]$variable[seq_len(max(15L, classical_decomposition_table[criterion == "CI", .N]))]
 selected_variables <- selected_variables[!is.na(selected_variables) & nzchar(selected_variables)]
 
+# Start the comparison table with readable variable labels.
 method_comparison_table <- data.table(variable = selected_variables)
 method_comparison_table[, variable_label := format_variable_label(variable)]
+
+# Widen regression contributions so each criterion becomes a column.
 regression_wide <- dcast(
   classical_decomposition_table[
     criterion %in% c("CI", "CIg", "CIc"),
@@ -2079,6 +2259,8 @@ method_comparison_table <- merge(
   by = "variable",
   all.x = TRUE
 )
+
+# Widen SHAP contributions in the same way for side-by-side comparison.
 shap_wide <- dcast(
   selected_shap_contributions[
     criterion %in% criterion_types,
@@ -2103,16 +2285,21 @@ method_comparison_table <- merge(
   by = "variable",
   all.x = TRUE
 )
+
+# Sort by the main CI regression contribution, then by SHAP contribution.
 method_comparison_table <- method_comparison_table[
   order(-abs(regression_ci_pct_contribution), -abs(forest_shap_ci_pct_contribution))
 ]
 
+# Build a top-rank table comparing the variable order across methods.
 importance_wide <- dcast(
   importance_long,
   rank ~ method,
   value.var = "variable",
   fun.aggregate = function(x) paste(unique(x), collapse = ", ")
 )
+
+# Replace internal variable names with labels in the rank table.
 for (col in setdiff(names(importance_wide), "rank")) {
   importance_wide[, (col) := format_variable_label(get(col))]
 }
@@ -2141,6 +2328,7 @@ The last chunk assembles the full object list and writes it to disk for the
 main report to consume.
 
 ```{r save-results-objects}
+# Save everything the thesis report needs in one named list.
 drc_results_objects <- list(
   generation_params = runtime_params,
   source_data_file = source_data_file,
@@ -2210,8 +2398,10 @@ drc_results_objects <- list(
   importance_wide = importance_wide
 )
 
+# This is the main file loaded by MSE_Thesis_Decomposition_of_CI_Trees_MM.qmd.
 save(drc_results_objects, file = results_object_file)
 
+# Print a short save summary at the end of the generator.
 data.table(
   saved_to = results_object_file,
   object_count = length(drc_results_objects),
