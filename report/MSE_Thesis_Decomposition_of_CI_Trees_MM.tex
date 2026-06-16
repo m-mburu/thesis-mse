@@ -262,19 +262,19 @@ agricultural occupation, skilled birth attendance, household wealth, and
 Katanga. The high-mortality branch was made up of children whose mothers
 had no education, who lived in low-wealth households, and who resided in
 Katanga. This pattern was clear in the fitted data, but it did not carry
-well to PSU-held-out validation folds. The level-dependent concentration
-index (\(L\)) method gave a different tree, beginning with residence and
-then splitting by occupation, wealth, and province. The \(L\) tree and
-forest retained positive validation gains. However, because the DHS
-wealth index is not ratio-scale, this result was treated as a
-sensitivity analysis rather than as the final direct result.
+well to the primary sampling unit (PSU)-held-out validation folds. The
+level-dependent concentration index (\(L\)) method gave a different
+tree, beginning with residence and then splitting by occupation, wealth,
+and province. The \(L\) tree and forest retained positive validation
+gains. However, because the DHS wealth index is not ratio-scale, this
+result was treated as a sensitivity analysis rather than as the final
+direct result.
 
-The concentration-index tree adds subgroup rules to the decomposition.
-It shows which branches led to groups with higher or lower
-concentrations of under-five deaths, rather than only reporting
-percentage contributions by variable. These rules are weighted
-descriptive results, checked with PSU-held-out validation and PSU
-bootstrap stability checks, not formal survey-design estimates.
+The tree adds subgroup rules to the decomposition. It shows the paths to
+groups where under-five deaths were more or less concentrated. These are
+weighted descriptive results. They were checked with PSU-held-out
+validation and PSU bootstrap checks, but they are not formal
+survey-design estimates.
 
 \section{Introduction}\label{sec-introduction}
 
@@ -284,7 +284,7 @@ under-five mortality fell from 93 deaths per 1,000 live births in 1990
 to 37.7 in 2019, and the number of under-five deaths fell from 12.5
 million to 5.2 million
 (\citeproc{ref-sharrow2022_under5_mortality}{{Sharrow \emph{et al.}},
-2022}). Reduction in under-5 mortality are linked to improved child
+2022}). Reductions in under-five mortality are linked to improved child
 health services, greater access to care, and lower levels of extreme
 poverty (\citeproc{ref-jones2003_child_survival}{Jones \emph{et al.},
 2003}). The burden, however, is still concentrated in poorer settings.
@@ -305,10 +305,10 @@ risks that can be prevented.
 When statistical methods such as regression analysis are used in policy
 making, a national estimate may show that poorer children have higher
 mortality rates. However, it can hide subgroup differences linked to
-household conditions, province(administrative areas), maternal
+household conditions, province (administrative area), maternal
 background, or demographic characteristics. Identifying risk groups
 matters because interventions are organised in real settings, through
-health facilities, communities, provinces(administrative areas), and
+health facilities, communities, provinces (administrative areas), and
 programme catchment areas. A more detailed inequality analysis can
 therefore identify the groups that should receive attention and indicate
 where a single public health response may not be sufficient.
@@ -342,9 +342,9 @@ regression coefficients alone, because they point to groups that policy
 makers, programme teams, and public health planners can recognise and
 act on.
 
-At each node, the tree searches across candidate variables and
-admissible split points, then selects the variable and split pair that
-gives the largest reduction in weighted within-node concentration-index
+At each node, the tree searches over candidate variables and admissible
+split points, then selects the variable and split pair that yields the
+largest reduction in the weighted within-node concentration-index
 impurity. The fitted tree is stored using the partykit tree
 representation for plotting and traversal
 (\citeproc{ref-hothorn2015partykit}{Hothorn and Zeileis, 2015}), but the
@@ -412,14 +412,14 @@ The coding uses the child's survival status and age at death. Children
 who died before 60 months receive a value of one. Since the outcome is
 adverse, higher fitted values correspond to higher mortality risk.
 
-Socioeconomic position is measured using the DHS household wealth
-index(\citeproc{ref-dhsprogram_wealth_index_construction}{The DHS
-Program, 2007}). The wealth score is a PCA-derived composite measure of
-household living standard based on asset ownership, housing materials,
-water access, sanitation facilities, and related household amenities.
-The continuous wealth score is used to rank children from poorer to
-richer households when computing the concentration index. Wealth defines
-the socioeconomic scale along which mortality inequality is measured.
+Socioeconomic position is measured using the DHS household wealth index
+(\citeproc{ref-dhsprogram_wealth_index_construction}{The DHS Program,
+2007}). The wealth score is a PCA-derived composite measure of household
+living standard based on asset ownership, housing materials, water
+access, sanitation facilities, and related household amenities. The
+continuous wealth score is used to rank children from poorer to richer
+households when computing the concentration index. Wealth defines the
+socioeconomic scale along which mortality inequality is measured.
 
 The independent variables describe the child, mother, household,
 occupation, residence, and province. They include child sex, birth-order
@@ -646,17 +646,16 @@ consumption, or expenditure, but a PCA-derived composite measure of
 household living standard based on asset ownership, housing materials,
 water access, sanitation facilities, and related household amenities
 (\citeproc{ref-dhsprogram_wealth_index_construction}{The DHS Program,
-2007}). For the \(L\) index
-(\citeproc{ref-erreygers2017socioeconomic}{Erreygers and Kessels,
-2017}), state that the level-dependent construction is acceptable only
-when the socioeconomic variable has ratio-scale properties; since the
-wealth index is a PCA score rather than income or consumption, results
-based on \(L\) should therefore be interpreted with caution. When the
-concentration indeces are used as impurity measures, the tree may not
-form the same subgroups under all concentration indices. A split chosen
-under \(CI\) may differ from one chosen under \(CIg\), \(CIc\), or
-\(L\), because each index defines inequality in a slightly different
-way.
+2007}). For the \(L\) index, the level-dependent construction is
+acceptable only when the socioeconomic variable has ratio-scale
+properties (\citeproc{ref-erreygers2017socioeconomic}{Erreygers and
+Kessels, 2017}); since the wealth index is a PCA score rather than
+income or consumption, results based on \(L\) should therefore be
+interpreted with caution. When the concentration indices are used as
+impurity measures, the tree may not form the same subgroups under all
+concentration indices. A split chosen under \(CI\) may differ from one
+chosen under \(CIg\), \(CIc\), or \(L\), because each index defines
+inequality in a slightly different way.
 
 \subsubsection{Limits of the Linear
 Framework}\label{sec-linear-framework-limits}
@@ -745,11 +744,11 @@ subgroup-specific effects.
 \subsubsection{Recursive Partitioning for Inequality
 Analysis}\label{sec-recursive-partitioning-inequality}
 
-In a usual CART(Classification and Regression
-Trees)(\citeproc{ref-breiman1984classification}{Breiman \emph{et al.},
-1984}), splits are chosen mainly for prediction. A regression tree
-searches for splits that reduce within-node outcome variation, while a
-classification tree searches for splits that improve class separation
+In usual CART (Classification and Regression Trees)
+(\citeproc{ref-breiman1984classification}{Breiman \emph{et al.}, 1984}),
+splits are chosen mainly for prediction. A regression tree searches for
+splits that reduce within-node outcome variation, while a classification
+tree searches for splits that improve class separation
 (\citeproc{ref-hastie2009elements}{Hastie, Tibshirani and Friedman,
 2017}).
 
@@ -964,10 +963,11 @@ p_L I_m(t_L) + p_R I_m(t_R).
 \]
 
 Thus, the impurity measure affects the gain function, which in turn
-ranks candidate splits. The concentration indices here are impurity
-measures that are intended to be reduced. Under the standard
-concentration index rule, the child-node impurity is relative to the
-child-node mean:
+ranks candidate splits. Let
+\(A_t = |2\operatorname{cov}_w(Y_i, R_{i|t})|\) denote the absolute
+generalised concentration-index component in node \(t\). Under the
+standard concentration index rule, the child-node impurity is relative
+to the child-node mean
 
 \[
 p_L \frac{A_{t_L}}{\mu_{t_L}}
@@ -1189,12 +1189,14 @@ Inequality Analysis}\label{sec-model-selection}
 
 The purpose of the inequality tree is to split the sample into subgroups
 where under-five mortality is no longer strongly concentrated by
-socioeconomic position. In an ideal terminal node, the selected
-inequality index would be close to zero. Model selection, therefore,
-evaluates how much of the root-node impurity is removed after
-partitioning, and how much impurity remains inside the terminal nodes.
-For a fitted tree, the remaining impurity is summarised by the weighted
-terminal-node impurity:
+socioeconomic position. Because the tree is an algorithmic partitioning
+method rather than a parametric regression model, I assess it by the
+apparent impurity reduction and by how well the fitted rules perform on
+held-out data (\citeproc{ref-breiman2001two_cultures}{Breiman, 2001}).
+In an ideal terminal node, the selected inequality index would be close
+to zero. Model selection, therefore, evaluates how much of the root-node
+impurity is removed after partitioning, and how much impurity remains
+inside the terminal nodes.
 
 \[
 \sum_{\ell \in \mathcal{L}}
@@ -1237,7 +1239,7 @@ RG_m^{val}(c,v)
 \frac{G_m^{val}(c,v)}{I_m(D_v)}.
 \]
 
-where \(c\) is the tunning setting being evaluated, \(v\) is the
+where \(c\) is the tuning setting being evaluated, \(v\) is the
 validation fold, and \(I_m(D_v)\) is the impurity of the validation fold
 before splitting. This gives the proportion of root impurity removed by
 the fitted partition. For each impurity criterion, we choose the tuning
@@ -1267,8 +1269,8 @@ Framework}\label{sec-tree-based-decomposition}
 
 Tree-based models, including random forests, can provide flexible
 predictions of health risk. This makes it hard to use them for
-decomposition, since the current decomposition methods rely on
-GLMs(\citeproc{ref-wagstaff2003decomposing}{{Wagstaff, van Doorslaer and
+decomposition, since the current decomposition methods rely on GLMs
+(\citeproc{ref-wagstaff2003decomposing}{{Wagstaff, van Doorslaer and
 Watanabe}, 2003}; \citeproc{ref-speybroeck2010decomposing}{Speybroeck
 \emph{et al.}, 2010}). To deal with this, this thesis uses SHAP values
 to rewrite the fitted predictions as a sum of feature-specific
@@ -1562,13 +1564,12 @@ term:
 D_k^{\text{SHAP}} = \hat{\beta}_k \left( \frac{\bar{x}_k}{\mu_{\hat{y}}} \right) C_k.
 \]
 
-This is identical to the Wagstaff contribution
-formula(\citeproc{ref-wagstaff2003decomposing}{{Wagstaff, van Doorslaer
-and Watanabe}, 2003};
-\citeproc{ref-speybroeck2010decomposing}{Speybroeck \emph{et al.},
-2010}). This means the SHAP-based decomposition generalises the standard
-approach, retaining equivalence under linearity while expanding to
-accommodate tree ensembles.
+This is identical to the Wagstaff contribution formula
+(\citeproc{ref-wagstaff2003decomposing}{{Wagstaff, van Doorslaer and
+Watanabe}, 2003}; \citeproc{ref-speybroeck2010decomposing}{Speybroeck
+\emph{et al.}, 2010}). This means the SHAP-based decomposition
+generalises the standard approach, retaining equivalence under linearity
+while expanding to accommodate tree ensembles.
 
 \subsection{Simulation}\label{sec-simulation-study}
 
@@ -1628,12 +1629,12 @@ tidymodels R package with the ranger R package as the modelling backend
 under-five deaths were rare relative to surviving children, the alive
 class was undersampled during model fitting to reduce class imbalance.
 The resulting forest was therefore used as a predictive scoring model
-rather than as a calibrated probability model. We then used the shapr R
-package to estimate SHAP contributions from the fitted forest
-(\citeproc{ref-jullum2025shapr}{Jullum \emph{et al.}, 2025}). The SHAP
-analysis was used to describe how the fitted forest used the predictors,
-not to estimate causal or population-level contributions of predictors
-to under-five mortality.
+rather than as a calibrated probability model. We then used the fastshap
+R package to estimate SHAP contributions from the fitted forest
+(\citeproc{ref-fastshap2024}{Greenwell, 2024}). The SHAP analysis was
+used to describe how the fitted forest used the predictors, not to
+estimate causal or population-level contributions of predictors to
+under-five mortality.
 
 We also fitted a comparison concentration-index tree using the rpart R
 package with a custom concentration-index splitting method
@@ -1646,13 +1647,13 @@ tree-growing controls and the partykit R package for tree representation
 and plotting (\citeproc{ref-hothorn2015partykit}{Hothorn and Zeileis,
 2015}). A split was accepted only if it satisfied the concentration
 index tree stopping rules described in the
-\hyperref[sec-stopping-rules]{tree the tree stopping rules section}. In
-the rpart comparison, split search and stopping were controlled via
-rpart controls, primarily minsplit, minbucket, and the complexity
-parameter cp.~
+\hyperref[sec-stopping-rules]{tree stopping rules section}. In the rpart
+comparison, split search and stopping were controlled via rpart
+controls, primarily minsplit, minbucket, and the complexity parameter
+cp.~
 
 For the concentration-index trees and forests, validation folds were
-created at the DHS primary sampling unit(PSU) level. All children from
+created at the DHS primary sampling unit (PSU) level. All children from
 the same PSU were kept in the same fold. The model was fitted on the
 training PSUs and then evaluated on held-out PSUs using the same
 validation-gain measure. This was done because children in the same
@@ -1677,7 +1678,7 @@ comparable terminal subgroups.
 
 \subsection{Exploratory Data Analysis}\label{exploratory-data-analysis}
 
-In the DRC Data Set(\citeproc{ref-dhs_drc_2007_dataset}{The DRC Program
+In the DRC data set (\citeproc{ref-dhs_drc_2007_dataset}{The DRC Program
 Program, 2007}), 10.32\% of children died before reaching age five
 (Figure~\ref{fig-results-wealth-distribution}). Deaths were more
 commonly observed among children from disadvantaged or rural
@@ -1723,7 +1724,7 @@ agricultural occupation, household wealth, mother's education, Maniema,
 mother's agricultural occupation, and skilled birth attendance. Under L,
 residence was again the largest contributor, followed by father's
 agricultural occupation, mother's education, Maniema, mother's
-agricultural occupation, Kinshasa, and household wealth. The fitted
+agricultural occupation, household wealth and Kinshasa. The fitted
 regression model is reported in
 Table~\ref{tbl-appendix-regression-model-summary}. Details of the fitted
 predictive forest are provided in
@@ -1862,7 +1863,11 @@ about 18.5\%. Thus, the level-dependent tree tells a more spatial story
 of inequality: mortality risk is first organised by the rural-urban
 divide, then by occupation, wealth, and region. This structure differs
 from the rank-dependent trees, which first organise the fitted subgroups
-around maternal education and father's agricultural occupation.
+around maternal education and father's agricultural occupation. The full
+fitted tree also includes a short preceding birth-interval split among
+rural children in high-wealth households, so birth interval appears as a
+lower-branch refinement rather than as the main organising feature of
+the \(L\) tree.
 
 \begin{figure}[H]
 
@@ -1947,7 +1952,7 @@ trees}\label{bootstrap-stability-of-selected-trees}
 
 \begingroup\fontsize{11}{13}\selectfont
 
-\begin{longtable}[t]{>{\raggedright\arraybackslash}p{1.2cm}>{\raggedright\arraybackslash}p{1.6cm}>{\raggedright\arraybackslash}p{1.8cm}>{\raggedright\arraybackslash}p{4.0cm}>{\raggedright\arraybackslash}p{2.7cm}>{\raggedright\arraybackslash}p{2.7cm}}
+\begin{longtable}[t]{>{\raggedright\arraybackslash}p{1.6cm}>{\raggedright\arraybackslash}p{1.6cm}>{\raggedright\arraybackslash}p{1.8cm}>{\raggedright\arraybackslash}p{4.0cm}>{\raggedright\arraybackslash}p{2.7cm}>{\raggedright\arraybackslash}p{2.7cm}}
 
 \caption{\label{tbl-results-bootstrap-tree-stability}Bootstrap stability
 of selected concentration-index trees}
@@ -2121,8 +2126,8 @@ From (Figure~\ref{fig-results-simulation-null-trees}) we see that the
 algorithm developed here did not find a meaningful structure and behaved
 as expected. This shows that the tree-growing rule does not create
 subgroup structure when the outcome and socioeconomic ranking are
-independent, since the tree uses concentraion index as an impurity
-measure, which measures how sociaeconomic ranking and outcome covary.
+independent, since the tree uses concentration index as an impurity
+measure, which measures how socioeconomic ranking and outcome covary.
 
 \begin{figure}[H]
 
@@ -2181,7 +2186,7 @@ concentration-index trees by criterion.}
 
 \subsubsection{Poor subgroup case}\label{poor-subgroup-case}
 
-In the positive-control simulation, the method(the concentration index
+In the positive-control simulation, the method (the concentration index
 tree with \(CIc\) as an impurity measure) recovered the planted subgroup
 structure. The tree first separated urban from rural observations, then
 split the rural group by province and maternal education
@@ -2206,69 +2211,69 @@ mechanism.}
 
 \end{figure}%
 
-We see the same pattern across the sensitivity plots in the appendix the
-trees developed using \(CI\), \(CIg\), and \(CIc\), and \(L\) as
-impurity
-measures(Figure~\ref{fig-appendix-simulation-positive-control-ci};
-Figure~\ref{fig-appendix-simulation-positive-control-cic};
+We see the same pattern across the appendix sensitivity plots for the
+trees developed using \(CI\), \(CIg\), and \(L\) as impurity measures
+(Figure~\ref{fig-appendix-simulation-positive-control-ci};
+Figure~\ref{fig-appendix-simulation-positive-control-cig};
 Figure~\ref{fig-appendix-simulation-positive-control-l}).
 
 \section{Discussion}\label{discussion}
 
 \subsection{Main findings}\label{main-findings}
 
-This thesis developed a tree-based model for analysing socioeconomic
+This thesis developed a tree-based method for analysing socioeconomic
 inequality in under-five mortality using the concentration index
-impurity. In the DRC data, inequality in under-five mortality was not
-only a wealth pattern. Residence, maternal education, skilled birth
-attendance, parental occupation, household wealth, and province all
-appeared in the analysis. Overall, 10.32\% of children died before age
-five. Deaths were more common among children from low-wealth households,
-rural households, mothers with no education, births without skilled
-attendance, and in some provinces, especially Katanga. A similar pattern
-appears in earlier work. (\citeproc{ref-kandala2014drc}{Kandala \emph{et
-al.}, 2014}) reported geographic differences in under-five mortality in
-the DRC, and (\citeproc{ref-vanmalderen2013under5}{Van Malderen, Van
-Oyen and Speybroeck, 2013};
-\citeproc{ref-vanmalderen2019socioeconomic}{Van Malderen \emph{et al.},
-2019})~reported wealth, education, residence, and occupation in
+impurity. In the DRC data, under-five mortality inequality was not
+solely a function of household wealth. Residence, maternal education,
+skilled birth attendance, parental occupation, household wealth, and
+province all appeared in the results. Overall, 10.32\% of children died
+before age five. Deaths were more common among children from low-wealth
+households, rural households, mothers with no education, births without
+skilled attendance, and in some provinces, especially Katanga. A similar
+pattern appears in earlier work. (\citeproc{ref-kandala2014drc}{Kandala
+\emph{et al.}, 2014}) reported geographic differences in under-five
+mortality in the DRC, while (\citeproc{ref-vanmalderen2013under5}{Van
+Malderen, Van Oyen and Speybroeck, 2013}) and
+(\citeproc{ref-vanmalderen2019socioeconomic}{Van Malderen \emph{et al.},
+2019}) reported wealth, education, residence, and occupation in
 decomposition studies of under-five mortality inequality in African
-settings
+settings.
 
-The indirect methods yielded the variable-level results. In the
-regression-based decomposition, mother's education had the largest
-contribution, followed by father's agricultural occupation, mother's
-agricultural occupation, household wealth, residence, and skilled birth
-attendance. This is close to earlier decomposition work, where household
-wealth, parental education, occupation, and residence were important for
-under-five mortality inequality
-(\citeproc{ref-vanmalderen2013under5}{Van Malderen, Van Oyen and
-Speybroeck, 2013}; \citeproc{ref-vanmalderen2019socioeconomic}{Van
-Malderen \emph{et al.}, 2019}). The SHAP analysis from the fitted random
-forest was less concentrated on one or two variables. Residence was the
-largest SHAP contributor, while household wealth, parental occupation,
-mother's education, skilled birth attendance, and some regional
-indicators also appeared across criteria. These SHAP results explain the
-fitted predictive model. They should not be interpreted as causal
-effects or as population-level determinants.
+The indirect methods gave the variable-level results. In the regression
+decomposition, mother's education had the largest contribution, followed
+by father's agricultural occupation, mother's agricultural occupation,
+household wealth, residence, and skilled birth attendance. The SHAP
+decomposition from the fitted random forest was less concentrated on one
+or two variables. Residence was the largest SHAP contributor, while
+household wealth, parental occupation, mother's education, skilled birth
+attendance, and some regional indicators also appeared across criteria.
+These SHAP results explain the fitted predictive model. They should not
+be read as causal effects or as population-level contributions to
+under-five mortality.
 
-The direct concentration-index trees yielded the subgroup results. The
-indirect methods ranked variables by their contribution to inequality,
-while the trees showed how some of these variables appeared together in
-branches of the fitted tree. The \(CI\), \(CIg\), and \(CIc\) trees
-mainly split through mother's education, father's agricultural
-occupation, skilled birth attendance, household wealth, and Katanga.
-Mortality was lower among children whose mothers had some education and
-whose fathers were not in agriculture. It was higher among children
-whose mothers had no education, who lived in low-wealth households, and
-who resided in Katanga.
-
-These rank-dependent trees fitted the training data much better than the
+The direct concentration-index trees gave the subgroup results. The
+\(CI\), \(CIg\), and \(CIc\) trees mainly split through mother's
+education, father's agricultural occupation, skilled birth attendance,
+household wealth, and Katanga. Mortality was lower among children whose
+mothers had some education and whose fathers were not in agriculture. It
+was higher among children whose mothers had no education, who lived in
+low-wealth households, and who resided in Katanga. These branches are
+easier to read than a table of percentage contributions because they
+show how variables appeared together in the fitted data. The
+rank-dependent trees fitted the training data much better than the
 held-out PSUs. In training, the \(CI\) tree removed 83.3\% of the
 root-node impurity, while the \(CIc\) and \(CIg\) trees removed 81.6\%.
 In validation, the gains were negative. This means that the same
 branches did not reduce concentration-index impurity when applied to
 PSUs that were not used to fit the tree.
+
+The \(L\) tree gave a different result. It was split first by residence,
+then by father's agricultural occupation, household wealth, birth
+interval, and province. This structure had positive validation gain,
+unlike the rank-dependent trees. This made the \(L\) result more stable
+in this application. It should still be read as a sensitivity result
+because the DHS wealth index is a PCA-derived asset score, not a
+ratio-scale measure such as income, consumption, or expenditure.
 
 \subsection{Rank-dependent and level-dependent views of
 inequality}\label{rank-dependent-and-level-dependent-views-of-inequality}
@@ -2433,9 +2438,9 @@ showing where mortality and disadvantage are concentrated in the data.
 The interpretation should therefore focus on unequal conditions, access
 to services, and policy response, not labelling groups.
 
-Compared with GLM based decomposition, tree-based models are easier to
+Compared with GLM-based decomposition, tree-based models are easier to
 interpret. The variable percentage contribution from regression or
-Shap-based decomposition can show which variables contribute more.
+SHAP-based decomposition can show which variables contribute more.
 However, it cannot show how disadvantage is organised across residence,
 household wealth, occupation, maternal background, and province. A tree
 is easier to discuss because it works like a flow chart. As shown in
@@ -2513,6 +2518,11 @@ final level-dependent inequality claim.
 Breiman, L. \emph{et al.} (1984) \emph{Classification and regression
 trees}. Available at: \url{https://doi.org/10.1201/9781315139470}.
 
+\bibitem[\citeproctext]{ref-breiman2001two_cultures}
+Breiman, L. (2001) {`Statistical modeling: The two cultures'},
+\emph{Statistical Science}, 16(3), pp. 199--231. Available at:
+\url{https://doi.org/10.1214/ss/1009213726}.
+
 \bibitem[\citeproctext]{ref-rineq2025}
 Devleesschauwer, B. \emph{et al.} (2025) \emph{Rineq: Concentration
 index and decomposition for health inequalities}. Available at:
@@ -2544,6 +2554,10 @@ A new approach to the measurement of bivariate inequality'},
 Health}, 14(7), p. 673. Available at:
 \url{https://doi.org/10.3390/ijerph14070673}.
 
+\bibitem[\citeproctext]{ref-fastshap2024}
+Greenwell, B. (2024) \emph{Fastshap: Fast approximate shapley values}.
+Available at: \url{https://doi.org/10.32614/CRAN.package.fastshap}.
+
 \bibitem[\citeproctext]{ref-hastie2009elements}
 Hastie, T., Tibshirani, R. and Friedman, J. (2017) \emph{The elements of
 statistical learning: Data mining, inference, and prediction}. 12th edn.
@@ -2560,12 +2574,6 @@ Research}, 16, pp. 3905--3909. Available at:
 Jones, G. \emph{et al.} (2003) {`How many child deaths can we prevent
 this year?'}, \emph{The Lancet}, 362(9377), pp. 65--71. Available at:
 \url{https://doi.org/10.1016/S0140-6736(03)13811-1}.
-
-\bibitem[\citeproctext]{ref-jullum2025shapr}
-Jullum, M. \emph{et al.} (2025) {`Shapr: Explaining machine learning
-models with conditional shapley values in {R} and python'}, \emph{arXiv
-preprint arXiv:2504.01842} {[}Preprint{]}. Available at:
-\url{https://arxiv.org/abs/2504.01842}.
 
 \bibitem[\citeproctext]{ref-kakwani1997socioeconomic}
 {Kakwani, N., Wagstaff, A. and van Doorslaer, E.} (1997) {`Socioeconomic
@@ -3554,7 +3562,7 @@ concentration-index forest.}
 \subsubsection{Appendix S: Simulation Sensitivity
 Plots}\label{appendix-s-simulation-sensitivity-plots}
 
-The CIg tree is shown in the main results section. The remaining
+The CIc tree is shown in the main results section. The remaining
 positive-control simulation trees are shown here to check whether the
 recovered subgroup pattern is stable across concentration-index
 criteria.
@@ -3576,12 +3584,12 @@ simulation tree fitted with the CI criterion.}
 
 \centering{
 
-\pandocbounded{\includegraphics[keepaspectratio]{MSE_Thesis_Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-appendix-simulation-positive-control-cic-1.pdf}}
+\pandocbounded{\includegraphics[keepaspectratio]{MSE_Thesis_Decomposition_of_CI_Trees_MM_files/figure-pdf/fig-appendix-simulation-positive-control-cig-1.pdf}}
 
 }
 
-\caption{\label{fig-appendix-simulation-positive-control-cic}Positive-control
-simulation tree fitted with the CIc criterion.}
+\caption{\label{fig-appendix-simulation-positive-control-cig}Positive-control
+simulation tree fitted with the CIg criterion.}
 
 \end{figure}%
 
