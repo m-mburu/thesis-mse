@@ -103,9 +103,5 @@ quarto render report/MSE_Thesis_Decomposition_of_CI_Trees_MM.qmd
 
 ## Data Availability Note
 
-The source data are not shared in this GitHub repository. Public GitHub users
-can inspect the code and report structure, but the full analysis will not run
-unless the private data files are supplied separately and placed in the expected
-project folders. My supervisors will be able to reproduce the workflow after I
-share the data with them separately.
+The source data are not shared in this GitHub repository.
 

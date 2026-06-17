@@ -1,6 +1,6 @@
 # MSc Thesis: Decomposing health inequalities through regression trees
 
-2026-06-16
+2026-06-17
 
 ## Overview
 
@@ -48,11 +48,10 @@ stratification.
   Report/**](./report/MSE_Thesis_Decomposition_of_CI_Trees_MM.qmd) - QMD
   used to generate thesis report
 - [**DRC Results
-  Generator/**](./report/Generate_DRC_Results_Objects.qmd) - QMD used
-  to generate the main analysis objects
-- [**Design-Aware
-  Validation/**](./report/design_aware_validation.qmd) - QMD used for
-  PSU-level bootstrap stability checks
+  Generator/**](./report/Generate_DRC_Results_Objects.qmd) - QMD used to
+  generate the main analysis objects
+- [**Design-Aware Validation/**](./report/design_aware_validation.qmd) -
+  QMD used for PSU-level bootstrap stability checks
 - [**Inequality Tree
   Implementation**](https://github.com/m-mburu/ineqTrees) - R package
   for concentration index tree and forest implementation
@@ -86,20 +85,20 @@ To reproduce the thesis results, run the analysis files in this order:
 2.  Render [**DRC Results
     Generator**](./report/Generate_DRC_Results_Objects.qmd). This
     creates `data/drc_report_results_objects.rda`, which is the main
-    object consumed by the thesis report. It includes the DRC descriptive
-    summaries, survey-weighted regression and `rineq` decompositions,
-    concentration-index trees for `CI`, `CIg`, `CIc`, and `L`,
-    lecturer/rpart comparison trees, concentration-index forests and
-    surrogate trees, the predictive `ranger` forest, `fastshap` SHAP
-    decompositions, variable-importance objects, and the method-comparison
-    tables.
+    object consumed by the thesis report. It includes the DRC
+    descriptive summaries, survey-weighted regression and `rineq`
+    decompositions, concentration-index trees for `CI`, `CIg`, `CIc`,
+    and `L`, lecturer/rpart comparison trees, concentration-index
+    forests and surrogate trees, the predictive `ranger` forest,
+    `fastshap` SHAP decompositions, variable-importance objects, and the
+    method-comparison tables.
 3.  Render [**Design-Aware
     Validation**](./report/design_aware_validation.qmd). This uses the
     generated DRC results object and runs PSU-level bootstrap stability
     checks for the selected concentration-index trees.
 4.  Render [**MSE
-    Report**](./report/MSE_Thesis_Decomposition_of_CI_Trees_MM.qmd). This
-    is the final thesis report QMD. It reads the saved DRC results,
+    Report**](./report/MSE_Thesis_Decomposition_of_CI_Trees_MM.qmd).
+    This is the final thesis report QMD. It reads the saved DRC results,
     simulation plots, and bootstrap validation objects produced by the
     previous steps.
 
@@ -114,8 +113,4 @@ quarto render report/MSE_Thesis_Decomposition_of_CI_Trees_MM.qmd
 
 ## Data Availability Note
 
-The source data are not shared in this GitHub repository. Public GitHub
-users can inspect the code and report structure, but the full analysis
-will not run unless the private data files are supplied separately and
-placed in the expected project folders. My supervisors will be able to
-reproduce the workflow after I share the data with them separately.
+The source data are not shared in this GitHub repository.
