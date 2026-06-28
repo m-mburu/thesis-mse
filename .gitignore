@@ -110,3 +110,8 @@ Rplots.pdf
 # Local reference documents
 Masterthesis-Guidelinesstudents2025-2026.pdf
 docs/awesome_table_in_pdf.pdf
+
+# Local 2022 analysis bundle for email attachment
+/2022_analysis.zip
+/2022_analysis/
+report/.vdoc.*.r
